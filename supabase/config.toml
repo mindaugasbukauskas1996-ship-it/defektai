@@ -1,0 +1,3 @@
+# Supabase CLI nustatymai šiam projektui
+[functions.ai]
+verify_jwt = false   # vartotojas tikrinamas funkcijos kode
