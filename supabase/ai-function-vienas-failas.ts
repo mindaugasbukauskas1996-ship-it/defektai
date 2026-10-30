@@ -1,7 +1,7 @@
 // =====================================================================
-// VIENO FAILO VERSIJA Supabase naršyklės redaktoriui (Edge Functions → Via Editor).
+// VIENO FAILO VERSIJA Supabase naršyklės redaktoriui (Edge Functions -> Via Editor).
 // Šis failas sugeneruotas iš supabase/functions/ai/prompt.js + index.ts.
-// Įklijuokite VISĄ turinį į funkcijos „ai“ failą index.ts ir spauskite Deploy.
+// Įklijuokite VISĄ turinį į funkcijos "ai" failą index.ts ir spauskite Deploy.
 // =====================================================================
 
 // =====================================================================
@@ -213,6 +213,107 @@ export function buildActRequest(payload, model = DEFAULT_MODEL) {
 }
 
 // ---------------------------------------------------------------------
+// Neatikties aktas (rangovo darbų neatitiktys)
+// ---------------------------------------------------------------------
+
+const NC_SYSTEM = `Tu esi patyręs statybos / techninės priežiūros darbų kokybės kontrolės inžinierius Lietuvoje. Padedi techniniam inžinieriui parengti NEATIKTIES AKTĄ: dokumentą, kuriame fiksuojama, kad rangovo atlikti (ar atliekami) darbai neatitinka projekto, techninių reikalavimų, normų ar gerosios praktikos.
+
+Rašymo taisyklės:
+- Rašyk taisyklinga, dalykine lietuvių kalba, trumpais techniniais sakiniais, kaip oficialiuose aktuose. Jokių kreipinių ar paaiškinimų vartotojui aktų laukuose.
+- Remkis TIK inžinieriaus aprašymu (jis gali būti padiktuotas, su klaidomis) ir nuotraukomis. Neišgalvok neatitikčių, kurių nėra aprašyme ar nuotraukose.
+- Nuotraukos sunumeruotos („1 pav.“, „2 pav.“ ...). Spalvoti kontūrai, rodyklės ir skaičiai apskritimuose nuotraukose – inžinieriaus pažymėtos vietos. Kiekvienai neatitiktis nurodyk susijusias nuotraukas (laukas photos).
+- Kiekviena atskira neatiktis – atskira eilutė: ką rangovas padarė ar nepadarė (description – faktas, be vertinimų), kokį reikalavimą pažeidžia (requirement) ir ką rangovas privalo padaryti (action).
+- requirement: nurodyk reikalavimą, kurį pažeidžia (projektas, techninė specifikacija, gamintojo montavimo instrukcija, STR / RSN norma, darbų kokybės reikalavimai). Konkrečius normų punktus nurodyk TIK jei esi tikras; kitu atveju rašyk bendrai („Pagal projekto sprendinius ir statybos darbų kokybės reikalavimus“) ir tai įrašyk į assumptions.
+- action: konkretus taisymo veiksmas (pvz., „Išardyti ir pakartotinai sumontuoti pagal gamintojo instrukciją“, „Pašalinti ir atstatyti dangą“).
+- severity (neatitikties lygis): „Nežymi“ – estetinis ar menkas, nedaro įtakos saugai / patvarumui; „Esminė“ – mažina patvarumą, funkcionalumą ar kokybę, reikia taisyti; „Kritinė“ – kelia pavojų saugai ar sukels avariją, darbus reikia stabdyti. Pasirink aukščiausią tarp neatitikčių.
+- work: kokie rangovo darbai vertinami (pvz., „Stogo dangos remontas“). Jei neaišku – naudok užduoties duomenis.
+- summary: 1–3 sakiniai: kas nustatyta ir ko reikalaujama.
+- Jokių klausimų: jei kažko trūksta, parink protingą formuluotę ir įrašyk į assumptions.
+
+Rezultatą VISADA pateik iškviesdamas įrankį „pateikti_neatiktis“.`;
+
+const NC_TOOL = {
+  name: 'pateikti_neatiktis',
+  description: 'Pateikia sugeneruotą neatikties aktą.',
+  input_schema: {
+    type: 'object',
+    properties: {
+      work: { type: 'string', description: 'Vertinami rangovo darbai.' },
+      severity: { type: 'string', enum: ['Nežymi', 'Esminė', 'Kritinė'] },
+      items: {
+        type: 'array',
+        items: {
+          type: 'object',
+          properties: {
+            description: { type: 'string', description: 'Nustatyta neatiktis (faktas).' },
+            requirement: { type: 'string', description: 'Pažeidžiamas reikalavimas.' },
+            action: { type: 'string', description: 'Ką rangovas privalo padaryti.' },
+            photos: { type: 'array', items: { type: 'integer' }, description: 'Susijusių nuotraukų numeriai.' }
+          },
+          required: ['description', 'requirement', 'action']
+        }
+      },
+      summary: { type: 'string', description: 'Trumpa išvada ir reikalavimas rangovui.' },
+      assumptions: { type: 'array', items: { type: 'string' }, description: 'Prielaidos, kurias padarei (rodomos tik inžinieriui).' }
+    },
+    required: ['work', 'severity', 'items', 'summary']
+  }
+};
+
+/**
+ * payload = {
+ *   instruction?: string, current?: nc_act,
+ *   task: {address, city, stairwell, contractor, work_name, problem, description, field_notes, inspection_date},
+ *   photos: [{n, caption, annotated, url? | data?}]
+ * }
+ */
+export function buildNcRequest(payload, model = DEFAULT_MODEL) {
+  const t = payload.task || {};
+  const content = [];
+
+  let text = 'UŽDUOTIES DUOMENYS\n';
+  text += line('Objektas / adresas', [t.address, t.city].filter(Boolean).join(', '));
+  text += line('Laiptinė', t.stairwell);
+  text += line('Rangovas', t.contractor);
+  text += line('Darbai', t.work_name);
+  text += line('Nustatymo data', t.inspection_date);
+  text += line('Neatikties santrauka (užduotyje)', t.problem);
+  if (t.description) text += `\nPAPILDOMA INFORMACIJA:\n${t.description}\n`;
+  text += `\nINŽINIERIAUS APRAŠYMAS (gali būti padiktuotas):\n${t.field_notes || '(neaprašyta)'}\n`;
+
+  if (payload.instruction && payload.current) {
+    text += '\nDABARTINIS AKTO VARIANTAS (JSON):\n' + JSON.stringify(payload.current) + '\n';
+    text += `\nINŽINIERIAUS NURODYMAS, KAIP PATAISYTI: ${payload.instruction}\n`;
+    text += 'Pataisyk aktą pagal nurodymą, kitas dalis palik nepakeistas.\n';
+  }
+
+  const photos = (payload.photos || []).slice(0, MAX_PHOTOS);
+  text += photos.length
+    ? `\nPRIDEDAMA NUOTRAUKŲ: ${photos.length}. Jos pateiktos žemiau eilės tvarka.\n`
+    : '\nNUOTRAUKŲ NĖRA.\n';
+  content.push({ type: 'text', text });
+
+  photos.forEach((p, i) => {
+    const n = p.n || i + 1;
+    const block = imageBlock(p);
+    if (!block) return;
+    content.push({ type: 'text', text: `${n} pav.${p.caption ? ' – ' + p.caption : ''}${p.annotated ? ' (su inžinieriaus žymėjimais)' : ''}` });
+    content.push(block);
+  });
+
+  content.push({ type: 'text', text: 'Pateik rezultatą per įrankį „pateikti_neatiktis“.' });
+
+  return {
+    model,
+    max_tokens: 5000,
+    system: NC_SYSTEM,
+    tools: [NC_TOOL],
+    tool_choice: { type: 'auto' },
+    messages: [{ role: 'user', content }]
+  };
+}
+
+// ---------------------------------------------------------------------
 // Pranešimo (laiško) išskaidymas į užduoties laukus
 // ---------------------------------------------------------------------
 
@@ -287,7 +388,7 @@ export async function callAnthropic(apiKey, body, extraHeaders = {}) {
   return data;
 }
 
-/** Vienas įėjimo taškas: action = 'generate_act' | 'parse_task'. */
+/** Vienas įėjimo taškas: action = 'generate_act' | 'generate_nc' | 'parse_task'. */
 export async function runAction(apiKey, model, action, payload, extraHeaders = {}) {
   if (action === 'parse_task') {
     const body = buildParseRequest(payload.text || '', payload.service_types || [], model);
@@ -305,11 +406,17 @@ export async function runAction(apiKey, model, action, payload, extraHeaders = {
     out.usage = resp.usage || null;
     return out;
   }
+  if (action === 'generate_nc') {
+    const body = buildNcRequest(payload, model);
+    const resp = await callAnthropic(apiKey, body, extraHeaders);
+    const out = extractToolInput(resp, NC_TOOL.name);
+    out.usage = resp.usage || null;
+    return out;
+  }
   throw new Error('Nežinomas veiksmas: ' + action);
 }
 
 
-// ----- Serverio dalis -----
 // Supabase Edge Function „ai“ – saugiai kviečia Claude API.
 // API raktas laikomas Supabase paslaptyse (secrets), naršyklė jo nemato.
 //

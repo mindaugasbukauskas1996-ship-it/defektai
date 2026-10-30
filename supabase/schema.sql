@@ -37,6 +37,11 @@ create table if not exists public.tasks (
   act_generated_at   timestamptz
 );
 
+-- Neatikčių aktai (rangovų darbų neatitiktys)
+alter table public.tasks add column if not exists kind       text not null default 'defect';  -- defect | nonconformity
+alter table public.tasks add column if not exists contractor text;                            -- rangovas
+alter table public.tasks add column if not exists nc_act     jsonb;                           -- neatikties aktas
+
 create index if not exists tasks_status_idx on public.tasks (status);
 create index if not exists tasks_created_idx on public.tasks (created_at desc);
 
