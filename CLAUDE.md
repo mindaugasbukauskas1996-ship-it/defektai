@@ -18,7 +18,7 @@ Kodas baigtas. Patikrintas tik **demo režimu** (Playwright, kompiuterio ir tele
 - **Supabase**:
   - lentelės `tasks`, `photos`, `settings` (viena eilutė id=1, `data` jsonb);
   - privatus bucket `photos`;
-  - RLS – visa prieiga `authenticated`.
+  - RLS pagal paskyrą: `profiles` (role admin | user), `tasks.assigned_to` / `created_by`; paprastas vartotojas mato tik jam priskirtas užduotis, `is_admin()` mato ir skirsto visas. Nuotraukų saugykla ir `photos` seka užduoties matomumą. Nustatymai atskiri kiekvienai paskyrai (`user_settings`).
   - Visa schema yra `supabase/schema.sql`, ją galima paleisti pakartotinai.
 - **DI**: Edge Function `ai` = `supabase/functions/ai/index.ts` + `prompt.js`.
   - Veiksmai: `parse_task` (iš laiško užpildo laukus) ir `generate_act` (grąžina aktus arba papildomus klausimus).
@@ -26,7 +26,7 @@ Kodas baigtas. Patikrintas tik **demo režimu** (Playwright, kompiuterio ir tele
   - Modelis: env `ANTHROPIC_MODEL`, numatytas `claude-sonnet-5-5`.
   - Vartotoją funkcija tikrina pati: `/auth/v1/user` su `SUPABASE_ANON_KEY` arba `SUPABASE_PUBLISHABLE_KEYS`. Todėl diegti reikia su **verify_jwt = false**.
   - `supabase/ai-function-vienas-failas.ts` – tos pačios funkcijos vieno failo versija rankiniam įklijavimui. Jei keiti `prompt.js` arba `index.ts`, ją sugeneruok iš naujo.
-- **Vienas vartotojas** (inžinierius). Registracija išjungta, paskyra kuriama rankiniu būdu.
+- **Keli vartotojai**: pirma paskyra tampa admin, kitos – darbuotojai. Registracija išjungta, paskyros kuriamos rankiniu būdu Supabase (Authentication → Users). Užduotį sukūręs automatiškai tampa jos atsakingu; admin perskiria užduoties kortelėje.
 - `js/config.js`: `SUPABASE_URL` ir `SUPABASE_ANON_KEY` (tinka publishable `sb_publishable_...` arba legacy anon). Kol tuščia, veikia demo režimas (IndexedDB).
 - Supabase klientas: `https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.3/+esm` (`js/data.js`).
 
