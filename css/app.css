@@ -350,3 +350,9 @@ textarea.notes { font-size: 16px; min-height: 260px; }
 .tag.nc .ic { width: 13px; height: 13px; }
 .head-btns { display: inline-flex; gap: 8px; }
 .obj-no { min-width: 28px; }
+
+/* Paskyros */
+.who-sel { padding: 8px 10px; border: 1px solid var(--line, #d0d5dd); border-radius: 8px; background: #fff; font: inherit; max-width: 100%; }
+.tc-meta .assignee { font-weight: 600; color: #175cd3; }
+.acct-list { margin: 6px 0; padding-left: 18px; }
+.kv select { max-width: 60%; }
