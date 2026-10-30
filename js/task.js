@@ -18,9 +18,10 @@ let S = null; // dabartinės užduoties būsena
 
 export async function renderTask(el, id, tab) {
   el.innerHTML = `<div class="loading">Kraunama...</div>`;
-  const [task, photos, settings] = await Promise.all([db.getTask(id), db.listPhotos(id), db.getSettings()]);
+  const [task, photos, settings, me] = await Promise.all([db.getTask(id), db.listPhotos(id), db.getSettings(), db.getProfile()]);
   if (!task) throw new Error('Užduotis nerasta');
-  S = { el, task, photos, settings, tab, saving: false };
+  const people = me.role === 'admin' ? await db.listProfiles() : [];
+  S = { el, task, photos, settings, tab, saving: false, me, people };
   draw();
 }
 
@@ -119,6 +120,10 @@ function drawInfo(body) {
         ${row(isNc(t) ? 'Pašalinti iki' : 'Atlikti iki', fmtDate(t.due_date))}
         ${row('Būsena', statusLabel(t.status))}
         ${row('Sukurta', fmtDateTime(t.created_at))}
+        ${S.me.role === 'admin' && S.people.length ? `
+        <div class="kv"><span>Atsakingas</span>
+          <select id="assignee">${S.people.map(p => `<option value="${esc(p.id)}" ${p.id === t.assigned_to ? 'selected' : ''}>${esc(db.profileName(p))}${p.role === 'admin' ? ' (admin)' : ''}</option>`).join('')}</select>
+        </div>` : ''}
       </div>
       <div class="card">
         <div class="card-title">Kontaktai ir prieiga</div>
@@ -143,6 +148,14 @@ function drawInfo(body) {
       <a class="btn" href="#/u/${t.id}/redaguoti">${icon('edit')} Redaguoti užduotį</a>
       <button class="btn danger-ghost" id="del-task">${icon('trash')} Ištrinti</button>
     </div>`;
+
+  const asg = $('#assignee');
+  if (asg) asg.addEventListener('change', async () => {
+    try {
+      await save({ assigned_to: asg.value });
+      toast('Užduotis priskirta: ' + db.profileName(S.people.find(p => p.id === asg.value)), 'ok');
+    } catch (e) { toast(e.message, 'error'); }
+  });
 
   const cc = $('#copy-code');
   if (cc) cc.addEventListener('click', () => {

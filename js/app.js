@@ -14,7 +14,7 @@ import { renderPrint } from './print.js';
 
 const view = () => document.getElementById('view');
 let user = null;
-let listFilter = { status: 'aktyvios', q: '' };
+let listFilter = { status: 'aktyvios', q: '', who: 'all' };
 
 // ---------------------------------------------------------------------
 // Paleidimas
@@ -129,7 +129,10 @@ const STATUS_ORDER = { nauja: 0, planuota: 1, apziureta: 2, aktas: 3, baigta: 4 
 
 async function renderList() {
   view().innerHTML = `<div class="loading">Kraunama...</div>`;
-  const tasks = await db.listTasks();
+  const [tasks, me] = await Promise.all([db.listTasks(), db.getProfile()]);
+  const isAdmin = me.role === 'admin';
+  const people = isAdmin ? await db.listProfiles() : [];
+  const pname = id => db.profileName(people.find(p => p.id === id));
   const chips = [{ id: 'aktyvios', label: 'Aktyvios' }, ...STATUSES, { id: 'neatiktys', label: 'Neatiktys' }, { id: 'visos', label: 'Visos' }];
 
   const counts = {};
@@ -148,6 +151,12 @@ async function renderList() {
     </div>
     <div class="list-tools">
       <div class="search">${icon('search')}<input id="q" type="search" placeholder="Ieškoti: adresas, problema, telefonas..." value="${esc(listFilter.q)}"></div>
+      ${isAdmin && people.length > 1 ? `
+      <select id="who" class="who-sel" title="Atsakingas">
+        <option value="all" ${listFilter.who === 'all' ? 'selected' : ''}>Visi darbuotojai</option>
+        <option value="${esc(me.id)}" ${listFilter.who === me.id ? 'selected' : ''}>Mano užduotys</option>
+        ${people.filter(p => p.id !== me.id).map(p => `<option value="${esc(p.id)}" ${listFilter.who === p.id ? 'selected' : ''}>${esc(db.profileName(p))}</option>`).join('')}
+      </select>` : ''}
       <div class="chips" id="chips">
         ${chips.map(c => `<button class="chip ${listFilter.status === c.id ? 'on' : ''}" data-st="${c.id}">${esc(c.label)} <span>${counts[c.id] || 0}</span></button>`).join('')}
       </div>
@@ -157,6 +166,7 @@ async function renderList() {
   const draw = () => {
     const q = listFilter.q.trim().toLowerCase();
     let arr = tasks.filter(t => {
+      if (isAdmin && listFilter.who !== 'all' && t.assigned_to !== listFilter.who) return false;
       if (listFilter.status === 'aktyvios' && t.status === 'baigta') return false;
       if (listFilter.status === 'neatiktys' && t.kind !== 'nonconformity') return false;
       if (!['aktyvios', 'visos', 'neatiktys'].includes(listFilter.status) && t.status !== listFilter.status) return false;
@@ -187,6 +197,7 @@ async function renderList() {
           </div>
           <div class="tc-problem">${esc(t.problem || 'Problema neaprašyta')}</div>
           <div class="tc-meta">
+            ${isAdmin && t.assigned_to && t.assigned_to !== me.id ? `<span class="assignee">${esc(pname(t.assigned_to))}</span>` : ''}
             ${t.contractor ? `<span>Rangovas: ${esc(t.contractor)}</span>` : ''}
             ${t.service_type ? `<span>${esc(t.service_type)}</span>` : ''}
             ${t.contact_name || t.contact_phone ? `<span>${esc([t.contact_name, t.contact_phone].filter(Boolean).join(' · '))}</span>` : ''}
@@ -203,6 +214,8 @@ async function renderList() {
   draw();
 
   $('#q').addEventListener('input', e => { listFilter.q = e.target.value; draw(); });
+  const who = $('#who');
+  if (who) who.addEventListener('change', e => { listFilter.who = e.target.value; draw(); });
   $('#chips').addEventListener('click', e => {
     const b = e.target.closest('[data-st]');
     if (!b) return;
@@ -220,7 +233,13 @@ async function renderTaskForm(id, kind = 'defect') {
   const s = await db.getSettings();
   const t = id ? await db.getTask(id) : { city: s.city, priority: 'iprastas', status: 'nauja', kind };
   if (id && !t) throw new Error('Užduotis nerasta');
-  if (t.kind === 'nonconformity') return renderNcForm(id, t, s);
+  const me = await db.getProfile();
+  const people = me.role === 'admin' ? await db.listProfiles() : [];
+  const assignee = people.length > 1 ? `
+      <label class="span2">Atsakingas darbuotojas<select name="assigned_to">
+        ${people.map(p => `<option value="${esc(p.id)}" ${p.id === (t.assigned_to || me.id) ? 'selected' : ''}>${esc(db.profileName(p))}${p.id === me.id ? ' (aš)' : ''}</option>`).join('')}
+      </select></label>` : '';
+  if (t.kind === 'nonconformity') return renderNcForm(id, t, s, assignee);
 
   const opt = (list, val) => list.map(o => {
     const v = typeof o === 'string' ? o : o.id;
@@ -256,6 +275,7 @@ async function renderTaskForm(id, kind = 'defect') {
       <label>Atlikti iki<input name="due_date" type="date" value="${esc(fmtDate(t.due_date))}"></label>
       ${id ? `<label>Būsena<select name="status">${opt(STATUSES, t.status)}</select></label>` : ''}
       <label class="${id ? '' : 'span2'}">Pastatų administravimo vadybininkas<input name="manager" value="${esc(t.manager)}" placeholder="V. Pavardė, tel."></label>
+      ${assignee}
       <label class="span4">Problema (trumpai) *<input name="problem" required value="${esc(t.problem)}" placeholder="Pratekėjimas per lietų į 7 laiptinės el. skydinę"></label>
       <label class="span4">Pranešimo tekstas / aprašymas<textarea name="description" rows="5">${esc(t.description)}</textarea></label>
       <div class="span4 form-actions">
@@ -311,7 +331,7 @@ async function renderTaskForm(id, kind = 'defect') {
 // Neatikties forma (nauja / redagavimas)
 // ---------------------------------------------------------------------
 
-function renderNcForm(id, t, s) {
+function renderNcForm(id, t, s, assignee = '') {
   const back = id ? `#/u/${id}` : '#/';
   view().innerHTML = `
     <div class="page-head">
@@ -327,6 +347,7 @@ function renderNcForm(id, t, s) {
         <datalist id="nc-works">${s.service_types.map(x => `<option value="${esc(x)}">`).join('')}</datalist></label>
       <label>Pašalinti iki<input name="due_date" type="date" value="${esc(fmtDate(t.due_date))}"></label>
       ${id ? `<label>Būsena<select name="status">${STATUSES.map(o => `<option value="${o.id}" ${o.id === t.status ? 'selected' : ''}>${esc(o.label)}</option>`).join('')}</select></label>` : ''}
+      ${assignee}
       <label class="span4">Neatikties santrauka (galima palikti tuščią – DI parašys)<input name="problem" value="${esc(t.problem)}" placeholder="Neteisingai sumontuota įlaja"></label>
       <label class="span4">Papildoma informacija<textarea name="description" rows="3">${esc(t.description)}</textarea></label>
       <input type="hidden" name="kind" value="nonconformity">
@@ -361,13 +382,29 @@ function renderNcForm(id, t, s) {
 
 async function renderSettings() {
   const s = await db.getSettings(true);
-  const comm = (s.commission || []).concat([{ position: '', name: '' }]).slice(0, 4);
+  const account = await db.getProfile(true);
+  const accounts = account.role === 'admin' ? await db.listProfiles() : [];
+  const comm =(s.commission || []).concat([{ position: '', name: '' }]).slice(0, 4);
 
   view().innerHTML = `
     <div class="page-head"><h1>Nustatymai</h1>
       ${db.isDemo ? '' : `<button class="btn ghost" id="btn-logout">${icon('logout')} Atsijungti</button>`}
     </div>
     <form id="set-form">
+      ${account.email === 'demo' ? '' : `
+      <div class="card form-grid">
+        <div class="card-title span4">Paskyra</div>
+        <div class="span4 acct">
+          <b>${esc(account.email)}</b> <span class="tag ${account.role === 'admin' ? 'nc' : ''}">${account.role === 'admin' ? 'Administratorius' : 'Darbuotojas'}</span>
+          <div class="muted small">Šie nustatymai (vardas, parašas, akto numeracija) galioja tik šiai paskyrai.</div>
+        </div>
+        ${account.role === 'admin' ? `
+        <div class="span4">
+          <div class="lbl">Paskyros (užduotis skirstote užduoties kortelėje)</div>
+          <ul class="acct-list">${accounts.map(p => `<li><b>${esc(db.profileName(p))}</b> <span class="muted small">${esc(p.email || '')}${p.role === 'admin' ? ' · admin' : ''}</span></li>`).join('')}</ul>
+          <div class="muted small">Nauja paskyra kuriama Supabase: Authentication → Users → Add user (Auto Confirm User). Ji atsiras čia po pirmo prisijungimo.</div>
+        </div>` : ''}
+      </div>`}
       <div class="card form-grid">
         <div class="card-title span4">Akto rengėjas ir organizacija</div>
         <label class="span2">Vardas, pavardė<input name="engineer_name" value="${esc(s.engineer_name)}"></label>

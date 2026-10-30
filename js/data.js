@@ -70,18 +70,51 @@ export async function getUser() {
 }
 
 export async function signIn(email, password) {
+  resetCaches();
   const { error } = await sb.auth.signInWithPassword({ email, password });
   if (error) throw new Error(error.message === 'Invalid login credentials'
     ? 'Neteisingas el. paštas arba slaptažodis' : error.message);
 }
 
 export async function signOut() {
+  resetCaches();
   if (!isDemo) await sb.auth.signOut();
 }
 
 export function onAuthChange(cb) {
-  if (!isDemo) sb.auth.onAuthStateChange((_e, session) => cb(session ? session.user : null));
+  if (!isDemo) sb.auth.onAuthStateChange((_e, session) => { resetCaches(); cb(session ? session.user : null); });
 }
+
+// ---------------------------------------------------------------------
+// Paskyros ir rolės
+// ---------------------------------------------------------------------
+
+let meCache = null;
+
+function resetCaches() { meCache = null; settingsCache = null; }
+
+/** Prisijungusios paskyros profilis: { id, email, full_name, role: 'admin' | 'user' }. */
+export async function getProfile(force = false) {
+  if (isDemo) return { id: 'demo', email: 'demo', full_name: '', role: 'admin' };
+  if (meCache && !force) return meCache;
+  const { data: s } = await sb.auth.getSession();
+  const u = s.session && s.session.user;
+  if (!u) return null;
+  const r = await sb.from('profiles').select('id,email,full_name,role').eq('id', u.id).maybeSingle();
+  if (r.error) throw r.error;
+  meCache = r.data || { id: u.id, email: u.email, full_name: '', role: 'user' };
+  return meCache;
+}
+
+/** Visos paskyros (RLS: tik adminui; paprastas vartotojas mato tik save). */
+export async function listProfiles() {
+  if (isDemo) return [];
+  const { data, error } = await sb.from('profiles').select('id,email,full_name,role').order('created_at');
+  if (error) throw error;
+  return data;
+}
+
+export const profileName = p => (p && (p.full_name || p.email)) || '';
 
 // ---------------------------------------------------------------------
 // Užduotys
@@ -90,7 +123,7 @@ export function onAuthChange(cb) {
 export async function listTasks() {
   if (isDemo) return (await idbAll('tasks')).sort((a, b) => b.created_at.localeCompare(a.created_at));
   const { data, error } = await sb.from('tasks')
-    .select('id,created_at,updated_at,status,priority,service_type,address,city,apartment,stairwell,contact_name,contact_phone,problem,due_date,act_number,kind,contractor')
+    .select('id,created_at,updated_at,status,priority,service_type,address,city,apartment,stairwell,contact_name,contact_phone,problem,due_date,act_number,kind,contractor,assigned_to')
     .order('created_at', { ascending: false }).limit(1000);
   if (error) throw error;
   return data;
@@ -282,7 +315,8 @@ export async function getSettings(force = false) {
     const rec = await idbGet('settings', 1);
     data = rec ? rec.data : {};
   } else {
-    const r = await sb.from('settings').select('data').eq('id', 1).maybeSingle();
+    const me = await getProfile();
+    const r = await sb.from('user_settings').select('data').eq('user_id', me.id).maybeSingle();
     if (r.error) throw r.error;
     data = (r.data && r.data.data) || {};
   }
@@ -296,8 +330,14 @@ export async function saveSettings(data) {
     await idbPut('settings', { id: 1, data: clean });
   } else {
     delete clean.demo_api_key;
-    const { error } = await sb.from('settings').upsert({ id: 1, data: clean });
+    const me = await getProfile();
+    const { error } = await sb.from('user_settings').upsert({ user_id: me.id, data: clean });
     if (error) throw error;
+    const name = (clean.engineer_name || '').trim();
+    if (name !== (me.full_name || '')) {
+      const r = await sb.from('profiles').update({ full_name: name || null }).eq('id', me.id);
+      if (!r.error) meCache = { ...me, full_name: name };
+    }
   }
   settingsCache = { ...DEFAULT_SETTINGS, ...data };
   return settingsCache;
