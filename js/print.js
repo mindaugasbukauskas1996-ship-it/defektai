@@ -10,7 +10,8 @@ export async function renderPrint(el, id, doc) {
   el.innerHTML = `<div class="loading">Ruošiamas dokumentas...</div>`;
   const [t, photos, s] = await Promise.all([db.getTask(id), db.listPhotos(id), db.getSettings()]);
   if (!t) throw new Error('Užduotis nerasta');
-  if (!t.defect_act) throw new Error('Aktas dar neparuoštas');
+  if (t.kind === 'nonconformity') doc = 'nc';
+  if (doc === 'nc' ? !t.nc_act : !t.defect_act) throw new Error('Aktas dar neparuoštas');
   if ((doc === 'works' || doc === 'both') && !t.works_act) doc = 'defect';
 
   const actPhotos = photos.filter(p => p.include_in_act);
@@ -18,20 +19,22 @@ export async function renderPrint(el, id, doc) {
   const figs = actPhotos.map((p, i) => ({ n: i + 1, url: urls[i], caption: p.caption, w: p.width, h: p.height }));
 
   const parts = [];
+  if (doc === 'nc') parts.push(ncSheet(t, s, figs.length));
   if (doc === 'defect' || doc === 'both') parts.push(defectSheet(t, s, figs.length));
   if (doc === 'works' || doc === 'both') parts.push(worksSheet(t, s));
   if (figs.length) parts.push(photoSheet(t, s, figs));
 
-  const titles = { defect: 'defektavimo aktas', works: 'numatomų darbų aktas', both: 'aktai' };
+  const titles = { defect: 'defektavimo aktas', works: 'numatomų darbų aktas', both: 'aktai', nc: 'neatikties aktas' };
   document.title = `${t.act_number || ''} ${t.address || ''} ${titles[doc]}`.trim();
 
   el.innerHTML = `
     <div class="print-bar no-print">
       <a class="btn ghost" href="#/u/${t.id}/aktai">${icon('back')} Atgal</a>
       <div class="pb-docs">
+        ${doc === 'nc' ? `<a class="chip on" href="#/spausdinti/${t.id}/nc">Neatikties aktas</a>` : `
         <a class="chip ${doc === 'defect' ? 'on' : ''}" href="#/spausdinti/${t.id}/defect">Defektavimo</a>
         ${t.works_act ? `<a class="chip ${doc === 'works' ? 'on' : ''}" href="#/spausdinti/${t.id}/works">Numatomų darbų</a>
-        <a class="chip ${doc === 'both' ? 'on' : ''}" href="#/spausdinti/${t.id}/both">Abu</a>` : ''}
+        <a class="chip ${doc === 'both' ? 'on' : ''}" href="#/spausdinti/${t.id}/both">Abu</a>` : ''}`}
       </div>
       <button class="btn primary" id="do-print">${icon('print')} Spausdinti / PDF</button>
     </div>
@@ -110,6 +113,59 @@ function defectSheet(t, s, nFigs) {
       ${!t.works_act && !nFigs ? '—' : ''}
     </p>
     ${signLines(s, true)}
+  </section>`;
+}
+
+function ncSheet(t, s, nFigs) {
+  const a = t.nc_act;
+  const addr = [t.address, t.city].filter(Boolean).join(', ') + (t.stairwell ? `, ${t.stairwell} laiptinė` : '');
+  const field = (l, v) => `<tr><th>${l}</th><td>${v ? esc(v) : '&nbsp;'}</td></tr>`;
+  const signRow = (pos, sig, name, posNote) => `
+    <div class="sign-row">
+      <div class="sign-cell wide"><div class="sign-val">${esc(pos)}</div><div class="under">${posNote}</div></div>
+      <div class="sign-cell"><div class="sign-val">${sig ? `<img class="sig" src="${sig}" alt="">` : ''}</div><div class="under">(parašas)</div></div>
+      <div class="sign-cell"><div class="sign-val">${esc(name)}</div><div class="under">(vardas, pavardė)</div></div>
+    </div>`;
+  return `
+  <section class="sheet">
+    ${header(s, 'Neatikties aktas')}
+    <div class="doc-top">
+      <div class="lined">${esc(s.org_name)}</div><div class="under">(organizacijos pavadinimas)</div>
+      <h2>Neatikties aktas</h2>
+      <div class="date-no"><span class="lined">${esc(fmtDate(t.act_date))}</span> Nr. <span class="lined">${esc(t.act_number || '')}</span></div>
+      <div class="under">(data)</div>
+      <div class="lined narrow">${esc(s.city || t.city || '')}</div><div class="under">(sudarymo vieta)</div>
+    </div>
+    <table class="fields">
+      ${field('Objektas', addr)}
+      ${field('Rangovas', t.contractor)}
+      ${field('Vertinami darbai', a.work || t.service_type)}
+      ${field('Neatitikties nustatymo data', fmtDate(t.inspection_date) || fmtDate(t.act_date))}
+      ${field('Neatikties lygis', a.severity)}
+      ${field('Pašalinti iki', fmtDate(t.due_date))}
+    </table>
+    <table class="grid defects">
+      <thead><tr>
+        <th class="no">Eil. Nr.</th>
+        <th>Nustatyta neatiktis</th>
+        <th>Pažeidžiamas reikalavimas</th>
+        <th>Rangovas privalo</th>
+      </tr></thead>
+      <tbody>
+        ${(a.items || []).map((o, i) => `<tr>
+          <td class="no">${i + 1}</td>
+          <td>${nl2br(o.description)}${(o.photos || []).length ? `<div class="ph-ref">Nuotr.: ${o.photos.map(n => `${n} pav.`).join(', ')}</div>` : ''}</td>
+          <td>${nl2br(o.requirement)}</td>
+          <td>${nl2br(o.action)}</td>
+        </tr>`).join('')}
+      </tbody>
+    </table>
+    ${a.summary ? `<p class="summary"><b>Išvada.</b> ${esc(a.summary)}</p>` : ''}
+    <p class="attach">Pridedama: ${nFigs ? `nuotraukų fiksacija (${nFigs} nuotr.).` : '—'}</p>
+    <div class="signs">
+      ${signRow(s.engineer_position, s.signature, s.engineer_name, '(aktą surašiusio asmens pareigos)')}
+      ${signRow(t.contractor ? `Rangovo atstovas, ${t.contractor}` : 'Rangovo atstovas', '', '', '(rangovo atstovo pareigos; su aktu susipažinau)')}
+    </div>
   </section>`;
 }
 

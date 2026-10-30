@@ -22,7 +22,8 @@ const P = {
   x: '<path d="M18 6L6 18M6 6l12 12"/>',
   check: '<path d="M20 6L9 17l-5-5"/>',
   search: '<circle cx="11" cy="11" r="8"/><path d="M21 21l-4.3-4.3"/>',
-  file: '<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6M16 13H8M16 17H8M10 9H8"/>'
+  file: '<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6M16 13H8M16 17H8M10 9H8"/>',
+  alert: '<path d="M10.3 3.9L1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/><path d="M12 9v4M12 17h.01"/>'
 };
 
 export function icon(name, cls = '') {

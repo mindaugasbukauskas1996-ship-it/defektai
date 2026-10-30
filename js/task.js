@@ -35,8 +35,18 @@ const TABS = [
   { id: 'aktai', label: 'Aktai' }
 ];
 
+const TABS_NC = [
+  { id: 'info', label: 'Informacija' },
+  { id: 'foto', label: 'Nuotraukos' },
+  { id: 'apziura', label: 'Aprašymas' },
+  { id: 'aktai', label: 'Aktas' }
+];
+
+const isNc = t => t.kind === 'nonconformity';
+
 function draw() {
   const t = S.task;
+  const nc = isNc(t);
   const actPhotos = S.photos.filter(p => p.include_in_act).length;
   S.el.innerHTML = `
     <div class="task-head">
@@ -44,6 +54,8 @@ function draw() {
       <div class="th-title">
         <h1>${esc(t.address || '(be adreso)')}${t.city ? `, ${esc(t.city)}` : ''}</h1>
         <div class="th-sub">
+          ${nc ? `<span class="tag nc">${icon('alert')} Neatiktis</span>` : ''}
+          ${nc && t.contractor ? `<span class="tag">${esc(t.contractor)}</span>` : ''}
           ${t.stairwell ? `<span class="tag">${esc(t.stairwell)} laiptinė</span>` : ''}
           ${t.apartment ? `<span class="tag">bt. ${esc(t.apartment)}</span>` : ''}
           ${t.priority === 'skubus' ? `<span class="badge prio">Skubus</span>` : ''}
@@ -55,7 +67,7 @@ function draw() {
       </select>
     </div>
     <nav class="tabs" id="tabs">
-      ${TABS.map(x => `<a href="#/u/${t.id}/${x.id}" class="${S.tab === x.id ? 'on' : ''}">${x.label}${x.id === 'foto' ? ` <span class="cnt">${S.photos.length}</span>` : ''}${x.id === 'aktai' && t.defect_act ? ' <span class="dot"></span>' : ''}</a>`).join('')}
+      ${(nc ? TABS_NC : TABS).map(x => `<a href="#/u/${t.id}/${x.id}" class="${S.tab === x.id ? 'on' : ''}">${x.label}${x.id === 'foto' ? ` <span class="cnt">${S.photos.length}</span>` : ''}${x.id === 'aktai' && (t.defect_act || t.nc_act) ? ' <span class="dot"></span>' : ''}</a>`).join('')}
     </nav>
     <div id="tab-body"></div>`;
 
@@ -68,7 +80,7 @@ function draw() {
   const body = $('#tab-body');
   if (S.tab === 'foto') return drawPhotos(body);
   if (S.tab === 'apziura') return drawInspection(body);
-  if (S.tab === 'aktai') return drawActs(body);
+  if (S.tab === 'aktai') return nc ? drawNcActs(body) : drawActs(body);
   return drawInfo(body, actPhotos);
 }
 
@@ -101,9 +113,10 @@ function drawInfo(body) {
       <div class="card">
         <div class="card-title">Užduotis</div>
         <div class="problem">${esc(t.problem || 'Problema neaprašyta')}</div>
-        ${row('Paslauga', t.service_type)}
-        ${row('Prioritetas', priorityLabel(t.priority))}
-        ${row('Atlikti iki', fmtDate(t.due_date))}
+        ${row(isNc(t) ? 'Rangovas' : '', isNc(t) ? t.contractor : '')}
+        ${row(isNc(t) ? 'Darbai' : 'Paslauga', t.service_type)}
+        ${isNc(t) ? '' : row('Prioritetas', priorityLabel(t.priority))}
+        ${row(isNc(t) ? 'Pašalinti iki' : 'Atlikti iki', fmtDate(t.due_date))}
         ${row('Būsena', statusLabel(t.status))}
         ${row('Sukurta', fmtDateTime(t.created_at))}
       </div>
@@ -122,8 +135,8 @@ function drawInfo(body) {
       <div class="card-title">Toliau</div>
       <div class="steps">
         <a class="step ${S.photos.length ? 'done' : ''}" href="#/u/${t.id}/foto">${icon('camera')}<span>1. Nufotografuoti ir pažymėti</span><small>${S.photos.length} nuotr.</small></a>
-        <a class="step ${t.field_notes ? 'done' : ''}" href="#/u/${t.id}/apziura">${icon('edit')}<span>2. Aprašyti situaciją</span><small>${t.field_notes ? 'aprašyta' : 'neaprašyta'}</small></a>
-        <a class="step ${t.defect_act ? 'done' : ''}" href="#/u/${t.id}/aktai">${icon('spark')}<span>3. Sugeneruoti aktą</span><small>${t.defect_act ? 'paruoštas' : 'neparuoštas'}</small></a>
+        <a class="step ${t.field_notes ? 'done' : ''}" href="#/u/${t.id}/apziura">${icon('edit')}<span>2. ${isNc(t) ? 'Aprašyti / padiktuoti neatitiktį' : 'Aprašyti situaciją'}</span><small>${t.field_notes ? 'aprašyta' : 'neaprašyta'}</small></a>
+        <a class="step ${(isNc(t) ? t.nc_act : t.defect_act) ? 'done' : ''}" href="#/u/${t.id}/aktai">${icon('spark')}<span>3. Sugeneruoti ${isNc(t) ? 'neatikties ' : ''}aktą</span><small>${(isNc(t) ? t.nc_act : t.defect_act) ? 'paruoštas' : 'neparuoštas'}</small></a>
       </div>
     </div>
     <div class="row-actions">
@@ -281,26 +294,37 @@ const HINTS = [
   'Ką rekomenduojate daryti?'
 ];
 
+const HINTS_NC = [
+  'Kas neatitinka ir kur?',
+  'Koks reikalavimas pažeistas (projektas, instrukcija, norma)?',
+  'Matmenys / apimtis',
+  'Ar tai kelia pavojų?',
+  'Ką rangovas turi pataisyti?'
+];
+
 function drawInspection(body) {
   body = fresh(body);
   const t = S.task;
+  const nc = isNc(t);
   body.innerHTML = `
     <div class="card form-grid">
-      <label>Apžiūros data<input type="date" name="inspection_date" value="${esc(fmtDate(t.inspection_date) || today())}"></label>
-      <label>Apžiūros tikslas<select name="inspection_purpose">
+      <label>${nc ? 'Neatikties nustatymo data' : 'Apžiūros data'}<input type="date" name="inspection_date" value="${esc(fmtDate(t.inspection_date) || today())}"></label>
+      ${nc ? '' : `<label>Apžiūros tikslas<select name="inspection_purpose">
         ${PURPOSES.map(p => `<option ${p === t.inspection_purpose ? 'selected' : ''}>${esc(p)}</option>`).join('')}
-      </select></label>
+      </select></label>`}
       <div class="span2 save-ind" id="save-ind"></div>
       <div class="span4 notes-head">
-        <span class="lbl">Ką radote vietoje? Aprašykite laisvai – DI suformuluos aktą.</span>
+        <span class="lbl">${nc ? 'Kokios neatitiktys nustatytos? Padiktuokite arba aprašykite laisvai – DI suformuluos aktą.' : 'Ką radote vietoje? Aprašykite laisvai – DI suformuluos aktą.'}</span>
         <button type="button" class="btn small" id="dictate" hidden>${icon('mic')} Diktuoti</button>
       </div>
-      <textarea class="span4 notes" name="field_notes" rows="12" placeholder="Pvz.: Ant stogo virš 7 laiptinės užakusi įlaja, aplink ją ~3 m² atšokusi bituminė danga. Šalia senas antenos stovas, prakiurusi danga aplink jį. Laiptinėje 5 aukšte ties el. skydine šlapios lubos ~2 m², nutekėjimo žymės ant sienos. El. skydinė drėgna...">${esc(t.field_notes)}</textarea>
-      <div class="span4 hints">${HINTS.map(h => `<span class="hint">${esc(h)}</span>`).join('')}</div>
+      <textarea class="span4 notes" name="field_notes" rows="12" placeholder="${nc
+        ? 'Pvz.: Rangovas sumontavo įlają be hidroizoliacijos prilydymo, aplink ją matomi tarpai. Bituminė danga klota ant drėgno pagrindo, susidariusios pūslės ~2 m². Nepašalintos statybinės atliekos.'
+        : 'Pvz.: Ant stogo virš 7 laiptinės užakusi įlaja, aplink ją ~3 m² atšokusi bituminė danga. Šalia senas antenos stovas, prakiurusi danga aplink jį. Laiptinėje 5 aukšte ties el. skydine šlapios lubos ~2 m², nutekėjimo žymės ant sienos. El. skydinė drėgna...'}">${esc(t.field_notes)}</textarea>
+      <div class="span4 hints">${(nc ? HINTS_NC : HINTS).map(h => `<span class="hint">${esc(h)}</span>`).join('')}</div>
     </div>
     <div class="row-actions">
       <a class="btn" href="#/u/${t.id}/foto">${icon('camera')} Nuotraukos (${S.photos.length})</a>
-      <a class="btn primary" href="#/u/${t.id}/aktai" id="to-acts">${icon('spark')} Toliau – aktai</a>
+      <a class="btn primary" href="#/u/${t.id}/aktai" id="to-acts">${icon('spark')} Toliau – ${nc ? 'aktas' : 'aktai'}</a>
     </div>`;
 
   const ind = $('#save-ind');
@@ -525,7 +549,7 @@ async function generate(body, { force = false, instruction = '' }) {
 }
 
 async function ensureActNumber(patch) {
-  if (!S.task.act_number) patch.act_number = await db.nextActNumber();
+  if (!S.task.act_number) patch.act_number = await db.nextActNumber(S.task.kind);
   if (!S.task.act_date) patch.act_date = today();
 }
 
@@ -698,5 +722,198 @@ function bindActEditor(body) {
     if (!txt) return toast('Įrašykite, ką pataisyti', 'error');
     await persist.flush();
     generate(body, { instruction: txt });
+  });
+}
+
+// ---------------------------------------------------------------------
+// Neatikties aktas (rangovo darbų neatitiktys)
+// ---------------------------------------------------------------------
+
+const SEVERITIES = ['Nežymi', 'Esminė', 'Kritinė'];
+
+function emptyNcItem() { return { description: '', requirement: '', action: '', photos: [] }; }
+
+function drawNcActs(body) {
+  body = fresh(body);
+  const t = S.task;
+  const a = t.nc_act;
+  const nPhotos = S.photos.filter(p => p.include_in_act).length;
+  const hasInput = (t.field_notes || '').trim() || (t.problem || '').trim();
+
+  body.innerHTML = `
+    <div class="card">
+      <div class="card-title">Neatikties aktas</div>
+      <div class="gen-info muted small">
+        DI gaus: objekto ir rangovo duomenis, ${t.field_notes ? `jūsų aprašymą (${t.field_notes.length} simb.)` : '<b class="warn">aprašymo nėra</b>'},
+        ${nPhotos} nuotr.${S.photos.some(p => p.annotated_path && p.include_in_act) ? ' (su žymėjimais)' : ''}.
+        ${!t.field_notes ? `<a href="#/u/${t.id}/apziura">Aprašyti neatitiktį</a>` : ''}
+      </div>
+      <div class="gen-actions">
+        <button class="btn primary big" id="gen-nc" ${hasInput || nPhotos ? '' : 'disabled'}>${icon('spark')} ${a ? 'Generuoti iš naujo' : 'Generuoti su DI'}</button>
+        ${!a ? `<button class="btn ghost" id="manual-nc">Pildyti rankiniu būdu</button>` : ''}
+      </div>
+    </div>
+    ${a ? drawNcEditor() : ''}`;
+
+  $('#gen-nc').addEventListener('click', () => generateNc(body, {}));
+  const man = $('#manual-nc');
+  if (man) man.addEventListener('click', async () => {
+    const patch = { nc_act: { work: t.service_type || '', severity: 'Esminė', summary: '', items: [emptyNcItem()] } };
+    await ensureActNumber(patch);
+    await save(patch);
+    drawNcActs(body);
+  });
+  if (a) bindNcEditor(body);
+}
+
+async function generateNc(body, { instruction = '' }) {
+  const t = S.task;
+  const overlay = showBusy(instruction ? 'DI taiso aktą...' : 'DI analizuoja aprašymą ir nuotraukas...');
+  try {
+    const actPhotos = S.photos.filter(p => p.include_in_act);
+    const photos = [];
+    for (let i = 0; i < actPhotos.length; i++) {
+      const p = actPhotos[i];
+      photos.push({ n: i + 1, caption: p.caption || '', annotated: !!p.annotated_path, ...(await db.photoForAI(p)) });
+    }
+    const res = await db.ai('generate_nc', {
+      instruction,
+      current: instruction ? t.nc_act : undefined,
+      task: {
+        address: t.address, city: t.city, stairwell: t.stairwell, contractor: t.contractor,
+        work_name: t.service_type, problem: t.problem, description: t.description,
+        field_notes: t.field_notes, inspection_date: t.inspection_date
+      },
+      photos
+    });
+    if (!(res.items || []).length) throw new Error('DI negrąžino neatikčių. Papildykite aprašymą ir bandykite dar kartą.');
+    const patch = {
+      nc_act: {
+        work: res.work || t.service_type || '',
+        severity: SEVERITIES.includes(res.severity) ? res.severity : 'Esminė',
+        summary: res.summary || '',
+        items: res.items.map(i => ({
+          description: i.description || '', requirement: i.requirement || '', action: i.action || '', photos: i.photos || []
+        }))
+      },
+      ai_assumptions: res.assumptions || [],
+      act_generated_at: new Date().toISOString()
+    };
+    if (!t.problem && patch.nc_act.items[0]) patch.problem = patch.nc_act.items[0].description.slice(0, 140);
+    if (['nauja', 'planuota', 'apziureta'].includes(t.status)) patch.status = 'aktas';
+    await ensureActNumber(patch);
+    await save(patch);
+    toast(instruction ? 'Aktas pataisytas' : 'Aktas paruoštas – peržiūrėkite ir pataisykite, jei reikia', 'ok', 4500);
+  } catch (e) {
+    console.error(e);
+    toast(e.message || String(e), 'error', 8000);
+  } finally {
+    overlay.remove();
+    draw();
+  }
+}
+
+function drawNcEditor() {
+  const t = S.task;
+  const a = t.nc_act;
+  const assumptions = t.ai_assumptions || [];
+  const ta = (v, attrs, rows = 3) => `<textarea rows="${rows}" ${attrs}>${esc(v)}</textarea>`;
+  return `
+    <div class="card act-ed">
+      <div class="act-ed-head">
+        <div class="card-title">Neatikties aktas</div>
+        <span class="save-ind" id="act-save"></span>
+      </div>
+      <div class="form-grid">
+        <label>Akto Nr.<input data-f="act_number" value="${esc(t.act_number)}"></label>
+        <label>Data<input type="date" data-f="act_date" value="${esc(fmtDate(t.act_date))}"></label>
+        <label>Neatikties lygis<select data-n="severity">${SEVERITIES.map(s => `<option ${s === a.severity ? 'selected' : ''}>${s}</option>`).join('')}</select></label>
+        <label>Pašalinti iki<input type="date" data-f="due_date" value="${esc(fmtDate(t.due_date))}"></label>
+        <label class="span2">Rangovas<input data-f="contractor" value="${esc(t.contractor)}"></label>
+        <label class="span2">Vertinami darbai<input data-n="work" value="${esc(a.work)}"></label>
+      </div>
+      <div class="obj-list">
+        ${a.items.map((o, i) => `
+          <div class="obj" data-ii="${i}">
+            <div class="obj-head">
+              <b class="obj-no">${i + 1}.</b>
+              <input class="obj-ph" data-i="photos" value="${esc((o.photos || []).join(', '))}" placeholder="Nuotr. Nr." title="Susijusių nuotraukų numeriai">
+              <button class="btn icon-only small danger-ghost" data-act="del-item" title="Šalinti">${icon('trash')}</button>
+            </div>
+            <div class="obj-body">
+              <label>Nustatyta neatiktis${ta(o.description, 'data-i="description"')}</label>
+              <label>Pažeidžiamas reikalavimas${ta(o.requirement, 'data-i="requirement"')}</label>
+              <label>Rangovas privalo${ta(o.action, 'data-i="action"')}</label>
+            </div>
+          </div>`).join('')}
+      </div>
+      <button class="btn small" data-act="add-item">${icon('plus')} Pridėti neatiktį</button>
+      <label class="block-lbl">Išvada / reikalavimas rangovui${ta(a.summary, 'data-n="summary"', 2)}</label>
+    </div>
+
+    ${assumptions.length ? `
+    <div class="card assumptions">
+      <div class="card-title">DI prielaidos (į aktą nepatenka – patikrinkite)</div>
+      <ul>${assumptions.map(x => `<li>${esc(x)}</li>`).join('')}</ul>
+    </div>` : ''}
+
+    <div class="card refine">
+      <div class="card-title">${icon('spark')} Pataisyti su DI</div>
+      <div class="refine-row">
+        <input id="refine-txt" placeholder="Pvz.: pridėk, kad nepateikti paslėptų darbų aktai; terminas 5 darbo dienos">
+        <button class="btn" id="refine-btn">Taisyti</button>
+      </div>
+    </div>
+
+    <div class="card print-box">
+      <div class="card-title">${icon('print')} Spausdinti / išsaugoti PDF</div>
+      <div class="gen-actions">
+        <a class="btn primary" href="#/spausdinti/${t.id}/nc">${icon('file')} Neatikties aktas</a>
+      </div>
+    </div>`;
+}
+
+function bindNcEditor(body) {
+  const ind = () => $('#act-save', body);
+  const persist = debounce(async () => {
+    const i = ind(); if (i) i.textContent = 'Saugoma...';
+    try {
+      const t = S.task;
+      await save({ nc_act: t.nc_act, act_number: t.act_number, act_date: t.act_date, due_date: t.due_date, contractor: t.contractor });
+      const j = ind(); if (j) j.textContent = 'Išsaugota';
+    } catch (e) { toast(e.message, 'error'); }
+  }, 900);
+
+  body.addEventListener('input', e => {
+    const el = e.target;
+    const t = S.task;
+    if (el.dataset.f) t[el.dataset.f] = el.value || null;
+    else if (el.dataset.n) t.nc_act[el.dataset.n] = el.value;
+    else if (el.dataset.i) {
+      const o = t.nc_act.items[+el.closest('[data-ii]').dataset.ii];
+      o[el.dataset.i] = el.dataset.i === 'photos'
+        ? el.value.split(/[ ,;]+/).map(Number).filter(n => n > 0) : el.value;
+    } else return;
+    persist();
+  });
+
+  body.addEventListener('click', async e => {
+    const b = e.target.closest('[data-act]');
+    if (!b) return;
+    const t = S.task;
+    if (b.dataset.act === 'add-item') t.nc_act.items.push(emptyNcItem());
+    else if (b.dataset.act === 'del-item') {
+      if (!await confirmDialog('Pašalinti šią neatiktį iš akto?', 'Pašalinti')) return;
+      t.nc_act.items.splice(+b.closest('[data-ii]').dataset.ii, 1);
+    } else return;
+    await persist.flush();
+    drawNcActs(body.closest('#tab-body') || body);
+  });
+
+  $('#refine-btn', body).addEventListener('click', async () => {
+    const txt = $('#refine-txt', body).value.trim();
+    if (!txt) return toast('Įrašykite, ką pataisyti', 'error');
+    await persist.flush();
+    generateNc(body, { instruction: txt });
   });
 }

@@ -17,6 +17,8 @@ export const DEFAULT_SETTINGS = {
   city: 'Klaipėda',
   act_prefix: 'DA',
   next_act_no: 1,
+  nc_prefix: 'NA',
+  next_nc_no: 1,
   form_code: 'Forma VP08FA',
   department: 'TECHNINIAI INŽ.',
   service_types: [
@@ -88,7 +90,7 @@ export function onAuthChange(cb) {
 export async function listTasks() {
   if (isDemo) return (await idbAll('tasks')).sort((a, b) => b.created_at.localeCompare(a.created_at));
   const { data, error } = await sb.from('tasks')
-    .select('id,created_at,updated_at,status,priority,service_type,address,city,apartment,stairwell,contact_name,contact_phone,problem,due_date,act_number')
+    .select('id,created_at,updated_at,status,priority,service_type,address,city,apartment,stairwell,contact_name,contact_phone,problem,due_date,act_number,kind,contractor')
     .order('created_at', { ascending: false }).limit(1000);
   if (error) throw error;
   return data;
@@ -107,7 +109,7 @@ export async function createTask(obj) {
     const t = {
       id: uuid(), created_at: now, updated_at: now, status: 'nauja', priority: 'iprastas',
       inspection_purpose: 'Neeilinė', act_mode: 'defect', ai_questions: [], ai_assumptions: [],
-      defect_act: null, works_act: null, ...obj
+      defect_act: null, works_act: null, kind: 'defect', nc_act: null, ...obj
     };
     await idbPut('tasks', t);
     return t;
@@ -302,8 +304,13 @@ export async function saveSettings(data) {
 }
 
 /** Suteikia kitą akto numerį ir padidina skaitiklį. */
-export async function nextActNumber() {
+export async function nextActNumber(kind = 'defect') {
   const s = await getSettings(true);
+  if (kind === 'nonconformity') {
+    const no = Number(s.next_nc_no) || 1;
+    await saveSettings({ ...s, next_nc_no: no + 1 });
+    return `${s.nc_prefix || ''}${String(no).padStart(4, '0')}`;
+  }
   const no = Number(s.next_act_no) || 1;
   await saveSettings({ ...s, next_act_no: no + 1 });
   return `${s.act_prefix || ''}${String(no).padStart(4, '0')}`;

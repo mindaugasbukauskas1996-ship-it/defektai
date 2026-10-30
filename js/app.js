@@ -42,6 +42,7 @@ function renderShell() {
   $('#nav-top').innerHTML = `
     <a href="#/" data-nav="list">${icon('list')}<span>Užduotys</span></a>
     <a href="#/nauja" data-nav="new">${icon('plus')}<span>Nauja</span></a>
+    <a href="#/neatiktis" data-nav="nc">${icon('alert')}<span>Neatiktis</span></a>
     <a href="#/nustatymai" data-nav="settings">${icon('settings')}<span>Nustatymai</span></a>`;
   $('#nav-bottom').innerHTML = $('#nav-top').innerHTML;
   $('#demo-banner').innerHTML = db.isDemo
@@ -68,6 +69,7 @@ async function route() {
 
   try {
     if (parts[0] === 'nauja') { setActiveNav('new'); return await renderTaskForm(null); }
+    if (parts[0] === 'neatiktis') { setActiveNav('nc'); return await renderTaskForm(null, 'nonconformity'); }
     if (parts[0] === 'nustatymai') { setActiveNav('settings'); return await renderSettings(); }
     if (parts[0] === 'u' && parts[1]) {
       setActiveNav('list');
@@ -128,17 +130,21 @@ const STATUS_ORDER = { nauja: 0, planuota: 1, apziureta: 2, aktas: 3, baigta: 4 
 async function renderList() {
   view().innerHTML = `<div class="loading">Kraunama...</div>`;
   const tasks = await db.listTasks();
-  const chips = [{ id: 'aktyvios', label: 'Aktyvios' }, ...STATUSES, { id: 'visos', label: 'Visos' }];
+  const chips = [{ id: 'aktyvios', label: 'Aktyvios' }, ...STATUSES, { id: 'neatiktys', label: 'Neatiktys' }, { id: 'visos', label: 'Visos' }];
 
   const counts = {};
   tasks.forEach(t => { counts[t.status] = (counts[t.status] || 0) + 1; });
   counts.aktyvios = tasks.filter(t => t.status !== 'baigta').length;
+  counts.neatiktys = tasks.filter(t => t.kind === 'nonconformity').length;
   counts.visos = tasks.length;
 
   view().innerHTML = `
     <div class="page-head">
       <h1>Užduotys</h1>
-      <a class="btn primary hide-mobile" href="#/nauja">${icon('plus')} Nauja užduotis</a>
+      <span class="head-btns hide-mobile">
+        <a class="btn" href="#/neatiktis">${icon('alert')} Nauja neatiktis</a>
+        <a class="btn primary" href="#/nauja">${icon('plus')} Nauja užduotis</a>
+      </span>
     </div>
     <div class="list-tools">
       <div class="search">${icon('search')}<input id="q" type="search" placeholder="Ieškoti: adresas, problema, telefonas..." value="${esc(listFilter.q)}"></div>
@@ -152,9 +158,10 @@ async function renderList() {
     const q = listFilter.q.trim().toLowerCase();
     let arr = tasks.filter(t => {
       if (listFilter.status === 'aktyvios' && t.status === 'baigta') return false;
-      if (!['aktyvios', 'visos'].includes(listFilter.status) && t.status !== listFilter.status) return false;
+      if (listFilter.status === 'neatiktys' && t.kind !== 'nonconformity') return false;
+      if (!['aktyvios', 'visos', 'neatiktys'].includes(listFilter.status) && t.status !== listFilter.status) return false;
       if (!q) return true;
-      return [t.address, t.city, t.problem, t.contact_name, t.contact_phone, t.stairwell, t.act_number, t.service_type]
+      return [t.address, t.city, t.problem, t.contact_name, t.contact_phone, t.stairwell, t.act_number, t.service_type, t.contractor]
         .some(v => v && String(v).toLowerCase().includes(q));
     });
     arr.sort((a, b) =>
@@ -174,11 +181,13 @@ async function renderList() {
       <a class="task-card st-${esc(t.status)}" href="#/u/${t.id}">
         <div class="tc-main">
           <div class="tc-addr">${esc(t.address || '(be adreso)')}${t.city ? `, ${esc(t.city)}` : ''}
+            ${t.kind === 'nonconformity' ? `<span class="tag nc">${icon('alert')} Neatiktis</span>` : ''}
             ${t.stairwell ? `<span class="tag">${esc(t.stairwell)} laipt.</span>` : ''}
             ${t.apartment ? `<span class="tag">bt. ${esc(t.apartment)}</span>` : ''}
           </div>
           <div class="tc-problem">${esc(t.problem || 'Problema neaprašyta')}</div>
           <div class="tc-meta">
+            ${t.contractor ? `<span>Rangovas: ${esc(t.contractor)}</span>` : ''}
             ${t.service_type ? `<span>${esc(t.service_type)}</span>` : ''}
             ${t.contact_name || t.contact_phone ? `<span>${esc([t.contact_name, t.contact_phone].filter(Boolean).join(' · '))}</span>` : ''}
             ${t.act_number ? `<span>Aktas ${esc(t.act_number)}</span>` : ''}
@@ -207,10 +216,11 @@ async function renderList() {
 // Užduoties forma (nauja / redagavimas)
 // ---------------------------------------------------------------------
 
-async function renderTaskForm(id) {
+async function renderTaskForm(id, kind = 'defect') {
   const s = await db.getSettings();
-  const t = id ? await db.getTask(id) : { city: s.city, priority: 'iprastas', status: 'nauja' };
+  const t = id ? await db.getTask(id) : { city: s.city, priority: 'iprastas', status: 'nauja', kind };
   if (id && !t) throw new Error('Užduotis nerasta');
+  if (t.kind === 'nonconformity') return renderNcForm(id, t, s);
 
   const opt = (list, val) => list.map(o => {
     const v = typeof o === 'string' ? o : o.id;
@@ -298,6 +308,54 @@ async function renderTaskForm(id) {
 }
 
 // ---------------------------------------------------------------------
+// Neatikties forma (nauja / redagavimas)
+// ---------------------------------------------------------------------
+
+function renderNcForm(id, t, s) {
+  const back = id ? `#/u/${id}` : '#/';
+  view().innerHTML = `
+    <div class="page-head">
+      <a class="btn ghost" href="${back}">${icon('back')} Atgal</a>
+      <h1>${id ? 'Redaguoti neatiktį' : 'Nauja neatiktis'}</h1>
+    </div>
+    <form id="task-form" class="card form-grid">
+      <label class="span2">Objekto adresas *<input name="address" required value="${esc(t.address)}" placeholder="Taikos pr. 55"></label>
+      <label>Miestas<input name="city" value="${esc(t.city)}"></label>
+      <label>Laiptinė<input name="stairwell" value="${esc(t.stairwell)}"></label>
+      <label class="span2">Rangovas *<input name="contractor" required value="${esc(t.contractor)}" placeholder="UAB „Statyba“"></label>
+      <label class="span2">Kokius darbus atlieka<input name="service_type" list="nc-works" value="${esc(t.service_type)}" placeholder="Stogo dangos remontas">
+        <datalist id="nc-works">${s.service_types.map(x => `<option value="${esc(x)}">`).join('')}</datalist></label>
+      <label>Pašalinti iki<input name="due_date" type="date" value="${esc(fmtDate(t.due_date))}"></label>
+      ${id ? `<label>Būsena<select name="status">${STATUSES.map(o => `<option value="${o.id}" ${o.id === t.status ? 'selected' : ''}>${esc(o.label)}</option>`).join('')}</select></label>` : ''}
+      <label class="span4">Neatikties santrauka (galima palikti tuščią – DI parašys)<input name="problem" value="${esc(t.problem)}" placeholder="Neteisingai sumontuota įlaja"></label>
+      <label class="span4">Papildoma informacija<textarea name="description" rows="3">${esc(t.description)}</textarea></label>
+      <input type="hidden" name="kind" value="nonconformity">
+      <div class="span4 form-actions">
+        <a class="btn ghost" href="${back}">Atšaukti</a>
+        <button class="btn primary" type="submit">${icon('check')} ${id ? 'Išsaugoti' : 'Toliau – nuotraukos'}</button>
+      </div>
+    </form>`;
+
+  const form = $('#task-form');
+  form.addEventListener('submit', async e => {
+    e.preventDefault();
+    const data = Object.fromEntries(new FormData(form).entries());
+    for (const k of Object.keys(data)) if (data[k] === '') data[k] = null;
+    data.address = data.address || '';
+    const btn = form.querySelector('button[type=submit]');
+    btn.disabled = true;
+    try {
+      const saved = id ? await db.updateTask(id, data) : await db.createTask(data);
+      toast('Išsaugota', 'ok');
+      go(id ? `#/u/${saved.id}` : `#/u/${saved.id}/foto`);
+    } catch (err) {
+      toast(err.message, 'error');
+      btn.disabled = false;
+    }
+  });
+}
+
+// ---------------------------------------------------------------------
 // Nustatymai
 // ---------------------------------------------------------------------
 
@@ -322,6 +380,8 @@ async function renderSettings() {
         <label>Skyrius<input name="department" value="${esc(s.department)}"></label>
         <label>Akto Nr. prefiksas<input name="act_prefix" value="${esc(s.act_prefix)}"></label>
         <label>Kitas akto Nr.<input name="next_act_no" type="number" min="1" value="${esc(s.next_act_no)}"></label>
+        <label>Neatikties akto Nr. prefiksas<input name="nc_prefix" value="${esc(s.nc_prefix)}"></label>
+        <label>Kitas neatikties akto Nr.<input name="next_nc_no" type="number" min="1" value="${esc(s.next_nc_no)}"></label>
         <div class="span4 sig-row">
           <div>
             <div class="lbl">Parašas / spaudas (PNG, nebūtina)</div>
@@ -394,6 +454,7 @@ async function renderSettings() {
     const data = {
       ...s, ...f, commission, signature,
       next_act_no: Number(f.next_act_no) || 1,
+      next_nc_no: Number(f.next_nc_no) || 1,
       service_types: String(f.service_types || '').split('\n').map(x => x.trim()).filter(Boolean)
     };
     try {
