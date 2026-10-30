@@ -344,3 +344,9 @@ textarea.notes { font-size: 16px; min-height: 260px; }
 @media (max-width: 420px) {
   .photo-grid { grid-template-columns: 1fr; }
 }
+
+/* Neatiktys */
+.tag.nc { background: #fdecea; color: #b42318; display: inline-flex; align-items: center; gap: 4px; }
+.tag.nc .ic { width: 13px; height: 13px; }
+.head-btns { display: inline-flex; gap: 8px; }
+.obj-no { min-width: 28px; }
