@@ -1,9 +1,60 @@
 -- =====================================================================
 -- Defektų aktai – duomenų bazės schema (Supabase / PostgreSQL)
 -- Paleiskite visą failą: Supabase → SQL Editor → New query → Run
+-- Failas idempotentiškas: galima paleisti pakartotinai (ir senai bazei atnaujinti).
 -- =====================================================================
 
 create extension if not exists "pgcrypto";
+
+-- ---------- Profiliai ir rolės ----------
+-- Pirma sukurta paskyra tampa administratoriumi (role = 'admin'), kitos – 'user'.
+create table if not exists public.profiles (
+  id         uuid primary key references auth.users(id) on delete cascade,
+  email      text,
+  full_name  text,
+  role       text not null default 'user' check (role in ('admin','user')),
+  created_at timestamptz not null default now()
+);
+
+create or replace function public.is_admin() returns boolean
+language sql stable security definer set search_path = public as $$
+  select exists (select 1 from public.profiles where id = auth.uid() and role = 'admin')
+$$;
+revoke all on function public.is_admin() from public, anon;
+grant execute on function public.is_admin() to authenticated;
+
+create or replace function public.handle_new_user() returns trigger
+language plpgsql security definer set search_path = public as $$
+begin
+  insert into public.profiles (id, email, role)
+  values (new.id, new.email, case when exists (select 1 from public.profiles) then 'user' else 'admin' end)
+  on conflict (id) do nothing;
+  return new;
+end $$;
+revoke all on function public.handle_new_user() from public, anon, authenticated;
+
+drop trigger if exists on_auth_user_created on auth.users;
+create trigger on_auth_user_created after insert on auth.users
+  for each row execute function public.handle_new_user();
+
+-- esamos paskyros (seniausia – admin)
+insert into public.profiles (id, email, role)
+select id, email,
+       case when id = (select id from auth.users order by created_at limit 1) then 'admin' else 'user' end
+from auth.users
+on conflict (id) do nothing;
+
+create or replace function public.guard_profile_role() returns trigger
+language plpgsql set search_path = public as $$
+begin
+  if new.role is distinct from old.role and not public.is_admin() then
+    raise exception 'Tik administratorius gali keisti roles';
+  end if;
+  return new;
+end $$;
+drop trigger if exists profiles_guard_role on public.profiles;
+create trigger profiles_guard_role before update on public.profiles
+  for each row execute function public.guard_profile_role();
 
 -- ---------- Užduotys ----------
 create table if not exists public.tasks (
@@ -42,8 +93,18 @@ alter table public.tasks add column if not exists kind       text not null defau
 alter table public.tasks add column if not exists contractor text;                            -- rangovas
 alter table public.tasks add column if not exists nc_act     jsonb;                           -- neatikties aktas
 
+-- Priskyrimas: sukūrusi paskyra automatiškai tampa atsakinga (admin gali perskirti)
+alter table public.tasks add column if not exists assigned_to uuid references auth.users(id) on delete set null default auth.uid();
+alter table public.tasks add column if not exists created_by  uuid references auth.users(id) on delete set null default auth.uid();
+
+update public.tasks
+set assigned_to = coalesce(assigned_to, (select id from public.profiles where role = 'admin' order by created_at limit 1)),
+    created_by  = coalesce(created_by,  (select id from public.profiles where role = 'admin' order by created_at limit 1))
+where assigned_to is null or created_by is null;
+
 create index if not exists tasks_status_idx on public.tasks (status);
 create index if not exists tasks_created_idx on public.tasks (created_at desc);
+create index if not exists tasks_assigned_idx on public.tasks (assigned_to);
 
 -- ---------- Nuotraukos ----------
 create table if not exists public.photos (
@@ -62,12 +123,24 @@ create table if not exists public.photos (
 
 create index if not exists photos_task_idx on public.photos (task_id, sort);
 
--- ---------- Nustatymai (viena eilutė) ----------
-create table if not exists public.settings (
-  id    int primary key default 1 check (id = 1),
-  data  jsonb not null default '{}'::jsonb
+-- ---------- Nustatymai: kiekvienai paskyrai savi ----------
+create table if not exists public.user_settings (
+  user_id uuid primary key references auth.users(id) on delete cascade,
+  data    jsonb not null default '{}'::jsonb
 );
-insert into public.settings (id, data) values (1, '{}'::jsonb) on conflict (id) do nothing;
+
+-- senos (bendros) lentelės `settings` duomenys perkeliami admin paskyrai
+do $$
+begin
+  if to_regclass('public.settings') is not null then
+    insert into public.user_settings (user_id, data)
+    select (select id from public.profiles where role = 'admin' order by created_at limit 1), s.data
+    from public.settings s
+    where s.id = 1 and exists (select 1 from public.profiles where role = 'admin')
+    on conflict (user_id) do nothing;
+    drop policy if exists "auth all settings" on public.settings;
+  end if;
+end $$;
 
 -- ---------- updated_at ----------
 create or replace function public.touch_updated_at() returns trigger
@@ -77,24 +150,52 @@ drop trigger if exists tasks_touch on public.tasks;
 create trigger tasks_touch before update on public.tasks
   for each row execute function public.touch_updated_at();
 
--- ---------- Saugumas (RLS): tik prisijungę vartotojai ----------
-alter table public.tasks    enable row level security;
-alter table public.photos   enable row level security;
-alter table public.settings enable row level security;
+-- ---------- Saugumas (RLS) ----------
+alter table public.profiles      enable row level security;
+alter table public.tasks         enable row level security;
+alter table public.photos        enable row level security;
+alter table public.user_settings enable row level security;
 
+-- profiliai: kiekvienas mato save, admin – visus
+drop policy if exists "profiles select" on public.profiles;
+drop policy if exists "profiles update" on public.profiles;
+create policy "profiles select" on public.profiles
+  for select to authenticated using (id = auth.uid() or public.is_admin());
+create policy "profiles update" on public.profiles
+  for update to authenticated using (id = auth.uid() or public.is_admin())
+  with check (id = auth.uid() or public.is_admin());
+
+-- užduotys: tik priskirtos paskyrai; admin mato ir skirsto visas
 drop policy if exists "auth all tasks" on public.tasks;
-create policy "auth all tasks" on public.tasks
-  for all to authenticated using (true) with check (true);
+drop policy if exists "tasks select" on public.tasks;
+drop policy if exists "tasks insert" on public.tasks;
+drop policy if exists "tasks update" on public.tasks;
+drop policy if exists "tasks delete" on public.tasks;
+create policy "tasks select" on public.tasks
+  for select to authenticated using (assigned_to = auth.uid() or public.is_admin());
+create policy "tasks insert" on public.tasks
+  for insert to authenticated
+  with check (created_by = auth.uid() and (assigned_to = auth.uid() or public.is_admin()));
+create policy "tasks update" on public.tasks
+  for update to authenticated using (assigned_to = auth.uid() or public.is_admin())
+  with check (assigned_to = auth.uid() or public.is_admin());
+create policy "tasks delete" on public.tasks
+  for delete to authenticated using (assigned_to = auth.uid() or public.is_admin());
 
+-- nuotraukos: matomos tik su matoma užduotimi
 drop policy if exists "auth all photos" on public.photos;
-create policy "auth all photos" on public.photos
-  for all to authenticated using (true) with check (true);
+drop policy if exists "photos via task" on public.photos;
+create policy "photos via task" on public.photos
+  for all to authenticated
+  using (exists (select 1 from public.tasks t where t.id = photos.task_id))
+  with check (exists (select 1 from public.tasks t where t.id = photos.task_id));
 
-drop policy if exists "auth all settings" on public.settings;
-create policy "auth all settings" on public.settings
-  for all to authenticated using (true) with check (true);
+-- nustatymai: tik savi
+drop policy if exists "own settings" on public.user_settings;
+create policy "own settings" on public.user_settings
+  for all to authenticated using (user_id = auth.uid()) with check (user_id = auth.uid());
 
--- ---------- Nuotraukų saugykla (privati) ----------
+-- ---------- Nuotraukų saugykla (privati; aplanko pavadinimas = užduoties id) ----------
 insert into storage.buckets (id, name, public)
 values ('photos', 'photos', false)
 on conflict (id) do nothing;
@@ -103,12 +204,20 @@ drop policy if exists "auth read photos"   on storage.objects;
 drop policy if exists "auth write photos"  on storage.objects;
 drop policy if exists "auth update photos" on storage.objects;
 drop policy if exists "auth delete photos" on storage.objects;
+drop policy if exists "photos read via task"   on storage.objects;
+drop policy if exists "photos write via task"  on storage.objects;
+drop policy if exists "photos update via task" on storage.objects;
+drop policy if exists "photos delete via task" on storage.objects;
 
-create policy "auth read photos" on storage.objects
-  for select to authenticated using (bucket_id = 'photos');
-create policy "auth write photos" on storage.objects
-  for insert to authenticated with check (bucket_id = 'photos');
-create policy "auth update photos" on storage.objects
-  for update to authenticated using (bucket_id = 'photos');
-create policy "auth delete photos" on storage.objects
-  for delete to authenticated using (bucket_id = 'photos');
+create policy "photos read via task" on storage.objects
+  for select to authenticated using (bucket_id = 'photos' and exists
+    (select 1 from public.tasks t where t.id::text = (storage.foldername(name))[1]));
+create policy "photos write via task" on storage.objects
+  for insert to authenticated with check (bucket_id = 'photos' and exists
+    (select 1 from public.tasks t where t.id::text = (storage.foldername(name))[1]));
+create policy "photos update via task" on storage.objects
+  for update to authenticated using (bucket_id = 'photos' and exists
+    (select 1 from public.tasks t where t.id::text = (storage.foldername(name))[1]));
+create policy "photos delete via task" on storage.objects
+  for delete to authenticated using (bucket_id = 'photos' and exists
+    (select 1 from public.tasks t where t.id::text = (storage.foldername(name))[1]));
