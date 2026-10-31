@@ -20,6 +20,32 @@ export const UNITS = [
 
 const MAX_PHOTOS = 12;
 
+const BUILDING_LABELS = {
+  construction: 'Konstruktyvas', built_year: 'Statybos metai', apartments: 'Butų skaičius', stairwells: 'Laiptinių skaičius',
+  usable_area: 'Naudingas plotas, m²', area: 'Plotas, m²', basement_area: 'Rūsio plotas, m²', renovation: 'Renovacijos būklė',
+  roof_type: 'Stogo tipas', roof_cover: 'Stogo danga', roof_area: 'Stogo plotas, m²', roof_condition: 'Stogo būklė',
+  heat_point: 'Šilumos punkto tipas'
+};
+
+// Pastato (objekto) kontekstas iš objektų registro.
+function buildingBlock(payload) {
+  const b = payload.building;
+  if (!b) return '';
+  const rows = Object.entries(BUILDING_LABELS).filter(([k]) => b[k] || b[k] === 0).map(([k, l]) => `- ${l}: ${b[k]}`);
+  if (!rows.length) return '';
+  return '\nPASTATO KONTEKSTAS (iš objektų registro; faktai iš inžinieriaus aprašymo ir nuotraukų turi pirmenybę):\n' + rows.join('\n') + '\n';
+}
+
+const DETAIL_GUIDE = {
+  narrow: 'SIAURAI. Aprašyk glaustai: tik pagrindiniai defektai (paprastai 1–3 objektai), kiekvienam 1–2 trumpi sakiniai defektams ir 1–2 sakiniai rekomenduojamiems darbams. Problema – vienas trumpas sakinys, išvada – 1 sakinys. Be galimų priežasčių ir be gretutinių ar profilaktinių darbų (numatomų darbų akte – tik pagrindiniai darbai).',
+  medium: 'VIDUTINIŠKAI. Įprastas aktų išsamumas: defektai ir rekomenduojami darbai aprašomi aiškiai, bet be nereikalingų detalių; problema – 1 sakinys, išvada – 1–3 sakiniai; gretutinius darbus įtrauk tik jei jie būtini.',
+  wide: 'PLAČIAI. Aprašyk išsamiai: kiekvieną pažeistą elementą ir susijusią sistemą aprašyk atskirai (objektų gali būti daugiau), nurodyk defektų pobūdį, mastą, matomas galimas priežastis ir pasekmes (rizikas). Rekomenduojamus darbus surašyk eilės tvarka, su gretutiniais ir profilaktiniais darbais, ir nurodyk, ką dar verta patikrinti. Problema – 2–3 sakiniai, išvada – 3–5 sakiniai. Numatomų darbų akte įtrauk visus gretutinius darbus (demontavimą, atliekų išvežimą, pastolius, paruošimą, apdailos atstatymą). Plačiai = išsamiai apie tai, kas žinoma, ir pagrįstos išvados; neišgalvok faktų, kurių nėra aprašyme ar nuotraukose.'
+};
+
+function detailBlock(payload) {
+  const d = DETAIL_GUIDE[payload.detail] ? payload.detail : 'medium';
+  return `\nAPRAŠYMO IŠSAMUMAS: ${DETAIL_GUIDE[d]}\n`;
+}
 const LESSON_DESC = 'Pildyk TIK kai pateiktas inžinieriaus nurodymas taisyti aktą. Jei nurodymas išreiškia BENDRĄ pageidavimą, kuris tiktų ir būsimiems aktams (stilius, visada įtraukiami darbai, terminai, formuluotės), parašyk jį vienu trumpu bendru sakiniu be konkretaus adreso ar kiekių. Jei nurodymas liečia tik šį aktą (konkretūs matmenys, vieta, faktas) – praleisk šį lauką.';
 
 // ---------------------------------------------------------------------
@@ -48,6 +74,10 @@ Papildomi klausimai:
 - Jei trūksta informacijos, kuri ESMINGAI pakeistų aktą (pvz., nežinomas pažeisto ploto dydis, kai reikia kiekių; neaišku, kuri sistema pažeista; neaišku, ar defektas bendrojo naudojimo objekte), grąžink status = "questions" ir iki 5 trumpų, konkrečių klausimų su galimais atsakymų variantais.
 - Neklausk to, kas jau aprašyta ar matyti nuotraukose. Neklausk smulkmenų, kurias galima pažymėti kaip prielaidą.
 - Jei force = true arba į klausimus jau atsakyta ir informacijos pakanka – NEKLAUSK, o parenk aktą, o neaiškumus surašyk į assumptions.
+
+Pastato kontekstas ir išsamumas:
+- Jei pateiktas „PASTATO KONTEKSTAS“, atsižvelk į jį: blokinių ir plytinių namų defektų priežastys bei remonto sprendimai skiriasi (pvz., blokiniuose – tarppanelinių siūlių sandarinimas, plytiniuose – mūro remontas); stogo tipas ir danga lemia darbų pobūdį ir medžiagas; stogo, rūsio ir kitus plotus naudok tik kaip foną ir viršutinę ribą kiekiams – pažeisto ploto neišgalvok. Faktai iš inžinieriaus aprašymo ir nuotraukų turi pirmenybę.
+- Laikykis nurodyto „APRAŠYMO IŠSAMUMO“ lygio (siaurai / vidutiniškai / plačiai): jis nustato, kiek išsamiai rašai problemą, defektus, darbus ir išvadą.
 
 Inžinieriaus bendri pageidavimai:
 - Jei pateikti „INŽINIERIAUS BENDRI PAGEIDAVIMAI“, laikykis jų kaip nuolatinių rašymo ir turinio taisyklių, nebent jos prieštarauja šio akto faktams.
@@ -171,6 +201,7 @@ export function buildActRequest(payload, model = DEFAULT_MODEL) {
     ? 'full – parengti defektavimo aktą IR numatomų darbų aktą su mato vienetais ir kiekiais'
     : 'defect – parengti TIK defektavimo aktą su rekomendacijomis (works_act = null)'}\n`;
   text += `force = ${payload.force ? 'true (klausimų neužduoti)' : 'false'}\n\n`;
+  text += detailBlock(payload);
   text += 'UŽDUOTIES DUOMENYS\n';
   text += line('Adresas', [t.address, t.city].filter(Boolean).join(', '));
   text += line('Butas', t.apartment);
@@ -195,6 +226,7 @@ export function buildActRequest(payload, model = DEFAULT_MODEL) {
   } else if (payload.instruction) {
     text += `\nPAPILDOMAS INŽINIERIAUS NURODYMAS: ${payload.instruction}\n`;
   }
+  text += buildingBlock(payload);
   text += lessonsBlock(payload);
 
   const photos = (payload.photos || []).slice(0, MAX_PHOTOS);
@@ -240,6 +272,9 @@ Rašymo taisyklės:
 - work: kokie rangovo darbai vertinami (pvz., „Stogo dangos remontas“). Jei neaišku – naudok užduoties duomenis.
 - summary: 1–3 sakiniai: kas nustatyta ir ko reikalaujama.
 - Jokių klausimų: jei kažko trūksta, parink protingą formuluotę ir įrašyk į assumptions.
+
+Pastato kontekstas:
+- Jei pateiktas „PASTATO KONTEKSTAS“, atsižvelk į jį vertindamas neatitiktis ir reikalavimus (konstruktyvas, stogo tipas ir danga, plotai, šilumos punktas). Faktai iš inžinieriaus aprašymo ir nuotraukų turi pirmenybę.
 
 Inžinieriaus bendri pageidavimai:
 - Jei pateikti „INŽINIERIAUS BENDRI PAGEIDAVIMAI“, laikykis jų kaip nuolatinių rašymo ir turinio taisyklių, nebent jos prieštarauja šio akto faktams.
@@ -302,6 +337,7 @@ export function buildNcRequest(payload, model = DEFAULT_MODEL) {
     text += `\nINŽINIERIAUS NURODYMAS, KAIP PATAISYTI: ${payload.instruction}\n`;
     text += 'Pataisyk aktą pagal nurodymą, kitas dalis palik nepakeistas.\n';
   }
+  text += buildingBlock(payload);
   text += lessonsBlock(payload);
 
   const photos = (payload.photos || []).slice(0, MAX_PHOTOS);
