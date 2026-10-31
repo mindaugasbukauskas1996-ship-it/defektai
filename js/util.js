@@ -166,7 +166,7 @@ export function splitAddress(raw) {
   const i = clean.indexOf(',');
   const city = i >= 0 ? clean.slice(i + 1).split(',')[0].trim() : '';
   const left = (i >= 0 ? clean.slice(0, i) : clean).trim();
-  const m = /^(.*\S)\s+(\d[\w\/\-]*)$/.exec(left);
+  const m = /^(.*\S)\s+(\d[\w\/\-]*(?:\s+[A-Za-z]\d+)?)$/.exec(left);   // „14C“, „10 K1“
   return { address: clean, city, street: m ? m[1] : left, house: m ? m[2] : '' };
 }
 
