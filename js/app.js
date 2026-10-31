@@ -275,6 +275,7 @@ function bindReportPicker(form, reports, used, objects) {
     const email = /@/.test(r.contact || '') ? r.contact.trim() : '';
     set('description', [r.description, email ? `El. paštas: ${email}` : ''].filter(Boolean).join('\n\n'));
     set('problem', shortProblem(r.description, r.work_label || r.act_type || ''));
+    set('contact_name', r.contact_name);
     set('contact_phone', extractPhone(r.contact) || extractPhone(r.description));
     el('report_no').value = r.reg_no;
     let am = form.querySelector('input[name=act_mode]');

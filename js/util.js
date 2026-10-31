@@ -229,26 +229,30 @@ export function buildingSummary(o) {
 
 /**
  * Pranešimų CSV (be antraštės, skirtukas „;“). Aprašymai gali turėti eilučių lūžių ir „;“, todėl įrašai
- * atskiriami pagal pradžią „V26-0000000;YYYY-MM-DD HH:MM;“, o aprašymas imamas tarp 8 pirmųjų ir 17 paskutinių laukų.
+ * atskiriami pagal pradžią „V26-0000000;YYYY-MM-DD HH:MM;“, o aprašymas imamas tarp 8 pirmųjų ir paskutinių laukų.
+ * Eksportas turi 26 stulpelius (17 galinių) arba 27 – kai gale pridėtas kontaktinio asmens vardas (18 galinių).
  */
 export function parseReports(text) {
   text = String(text || '').replace(/^\uFEFF/, '');
-  const recs = text.split(/\r?\n+(?=V\d\d-\d+(?:-\d+)?;\d{4}-\d\d-\d\d \d\d:\d\d;)/);
-  const out = [];
-  for (const rec of recs) {
-    const p = rec.replace(/[\r\n\s]+$/, '').split(';');
-    if (p.length < 26 || !/^V\d\d-/.test(p[0].trim())) continue;
-    const t = p.slice(-17);
-    out.push({
+  const recs = text.split(/\r?\n+(?=V\d\d-\d+(?:-\d+)?;\d{4}-\d\d-\d\d \d\d:\d\d;)/)
+    .map(r => r.replace(/[\r\n\s]+$/, '').split(';'))
+    .filter(p => p.length >= 26 && /^V\d\d-/.test(p[0].trim()));
+  // dažniausias stulpelių skaičius nustato eksporto versiją (aprašymuose gali būti papildomų „;“)
+  const freq = {};
+  recs.forEach(p => { freq[p.length] = (freq[p.length] || 0) + 1; });
+  const mode = Number(Object.keys(freq).sort((a, b) => freq[b] - freq[a])[0] || 26);
+  const tailN = mode >= 27 ? 18 : 17;
+  return recs.map(p => {
+    const t = p.slice(-tailN);
+    return {
       reg_no: p[0].trim(), date: p[1].trim(), address: p[2], report_type: p[3], department: p[4], service_type: p[5],
-      description: p.slice(8, p.length - 17).join(';').trim(),
+      description: p.slice(8, p.length - tailN).join(';').trim(),
       status: t[0], priority_code: t[3], engineer: t[4], manager: t[5], order_type: t[6], apartment: t[7],
-      work_label: t[8], act_type: t[9], city: t[10], reporter: t[11], property_type: t[14], contact: t[16]
-    });
-  }
-  return out;
+      work_label: t[8], act_type: t[9], city: t[10], reporter: t[11], property_type: t[14], contact: t[16],
+      contact_name: tailN === 18 ? t[17] : ''
+    };
+  });
 }
-
 /** Pirmas telefono numeris iš teksto (+370... arba 86...). */
 export function extractPhone(s) {
   const m = /(\+?370[\s-]?\d[\d\s-]{6,}\d|\b8[\s-]?6\d{2}[\s-]?\d{5}\b)/.exec(String(s || ''));

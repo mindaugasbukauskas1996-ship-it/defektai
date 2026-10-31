@@ -432,7 +432,7 @@ export async function importReports(list, assignedTo) {
       description: txt(r.description), status: txt(r.status), priority_code: txt(r.priority_code),
       engineer: txt(r.engineer), manager: txt(r.manager), order_type: txt(r.order_type), apartment: txt(r.apartment),
       work_label: txt(r.work_label), act_type: txt(r.act_type), reporter: txt(r.reporter),
-      contact: txt(r.contact), property_type: txt(r.property_type), assigned_to: assignedTo || null
+      contact: txt(r.contact), contact_name: txt(r.contact_name), property_type: txt(r.property_type), assigned_to: assignedTo || null
     });
   }
   const out = [...rows.values()];
