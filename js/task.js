@@ -7,7 +7,7 @@ import { icon } from './icons.js';
 import {
   $, $$, esc, nl2br, toast, confirmDialog, debounce, today, fmtDate, fmtDateTime,
   STATUSES, statusLabel, priorityLabel, PURPOSES, processImage, telHref, mapsHref,
-  fmtQty, parseQty
+  fmtQty, parseQty, buildingSummary
 } from './util.js';
 import { openAnnotator } from './annotator.js';
 
@@ -21,7 +21,8 @@ export async function renderTask(el, id, tab) {
   const [task, photos, settings, me] = await Promise.all([db.getTask(id), db.listPhotos(id), db.getSettings(), db.getProfile()]);
   if (!task) throw new Error('Užduotis nerasta');
   const people = me.role === 'admin' ? await db.listProfiles() : [];
-  S = { el, task, photos, settings, tab, saving: false, me, people };
+  const object = (await db.getObject(task.object_id).catch(() => null)) || (await db.findObject(task.address, task.city).catch(() => null));
+  S = { el, task, photos, settings, tab, saving: false, me, people, object };
   draw();
 }
 
@@ -98,6 +99,43 @@ async function save(patch) {
 }
 
 // ---------------------------------------------------------------------
+// Pastato (objekto) kontekstas
+// ---------------------------------------------------------------------
+
+function buildingCard(o) {
+  if (!o) return '';
+  const row = (l, v) => v || v === 0 ? `<div class="kv"><span>${l}</span><b>${esc(v)}</b></div>` : '';
+  const has = [o.construction, o.built_year, o.apartments, o.stairwells, o.usable_area, o.area, o.basement_area, o.renovation,
+    o.roof_type, o.roof_cover, o.roof_area, o.roof_condition, o.heat_point].some(v => v || v === 0);
+  return `
+    <div class="card bld-card">
+      <div class="card-title">Pastatas</div>
+      ${has ? `
+      <div class="grid2">
+        <div>
+          ${row('Konstruktyvas', o.construction)}${row('Statybos metai', o.built_year)}${row('Butų skaičius', o.apartments)}
+          ${row('Laiptinių skaičius', o.stairwells)}${row('Naudingas plotas, m²', o.usable_area)}${row('Plotas, m²', o.area)}
+          ${row('Rūsio plotas, m²', o.basement_area)}${row('Renovacija', o.renovation)}
+        </div>
+        <div>
+          ${row('Stogo tipas', o.roof_type)}${row('Stogo danga', o.roof_cover)}${row('Stogo plotas, m²', o.roof_area)}
+          ${row('Stogo būklė', o.roof_condition)}${row('Šilumos punktas', o.heat_point)}
+        </div>
+      </div>
+      <p class="muted small">Ši informacija perduodama DI kaip kontekstas kuriant aktus.</p>` : `<p class="muted small">Pastato duomenų (konstruktyvas, stogas, plotai, šilumos punktas) dar nėra. Jie bus rodomi čia ir perduodami DI, kai bus importuoti.</p>`}
+    </div>`;
+}
+
+/** Pastato laukai DI užklausai (tik užpildyti). */
+function buildingForAI(o) {
+  if (!o) return undefined;
+  const keys = ['construction', 'built_year', 'apartments', 'stairwells', 'usable_area', 'area', 'basement_area',
+    'renovation', 'roof_type', 'roof_cover', 'roof_area', 'roof_condition', 'heat_point'];
+  const b = {};
+  keys.forEach(k => { if (o[k] || o[k] === 0) b[k] = o[k]; });
+  return Object.keys(b).length ? b : undefined;
+}
+// ---------------------------------------------------------------------
 // Informacija
 // ---------------------------------------------------------------------
 
@@ -135,6 +173,7 @@ function drawInfo(body) {
         ${row('Vadybininkas', t.manager)}
       </div>
     </div>
+    ${buildingCard(S.object)}
     ${t.description ? `<div class="card"><div class="card-title">Pranešimo tekstas</div><div class="msg">${nl2br(t.description)}</div></div>` : ''}
     <div class="card next-steps">
       <div class="card-title">Toliau</div>
@@ -414,6 +453,11 @@ function drawActs(body) {
           <b>Defektinis + numatomų darbų aktas</b><span>Papildomai darbų lentelė su mato vnt. ir kiekiais</span>
         </label>
       </div>
+      <div class="card-title" style="margin-top:12px">Kiek plačiai aprašyti?</div>
+      <div class="detail-pick">
+        ${[['narrow', 'Siaurai', 'Trumpai: tik esminiai defektai ir darbai'], ['medium', 'Vidutiniškai', 'Įprastas aprašymas ir darbų sąrašas'], ['wide', 'Plačiai', 'Išsamiai: priežastys, eiliškumas, gretutiniai darbai']]
+          .map(([v, l, d]) => `<label class="${(t.act_detail || 'medium') === v ? 'on' : ''}"><input type="radio" name="detail" value="${v}" ${(t.act_detail || 'medium') === v ? 'checked' : ''}><b>${l}</b><span>${d}</span></label>`).join('')}
+      </div>
       <div class="gen-info muted small">
         DI gaus: užduoties duomenis, ${t.field_notes ? `jūsų aprašymą (${t.field_notes.length} simb.)` : '<b class="warn">aprašymo nėra</b>'},
         ${nPhotos} nuotr.${S.photos.some(p => p.annotated_path && p.include_in_act) ? ' (su žymėjimais)' : ''}${answered.length ? `, ${answered.length} atsakymus į klausimus` : ''}.
@@ -433,6 +477,12 @@ function drawActs(body) {
         ${answered.map((q, i) => `<div class="qa"><b>${i + 1}. ${esc(q.question)}</b><div>${esc(q.answer || '— (neatsakyta)')}</div></div>`).join('')}
         <button class="btn ghost small" id="clear-qa">Išvalyti atsakymus</button>
       </details>` : ''}`;
+
+  // Išsamumas
+  $$('input[name=detail]', body).forEach(r => r.addEventListener('change', async e => {
+    await save({ act_detail: e.target.value });
+    drawActs(body);
+  }));
 
   // Režimas
   $$('input[name=mode]', body).forEach(r => r.addEventListener('change', async e => {
@@ -524,6 +574,8 @@ async function generate(body, { force = false, instruction = '' }) {
     }
     const payload = {
       mode, force: force || !!instruction, instruction,
+      detail: t.act_detail || 'medium',
+      building: buildingForAI(S.object),
       task: {
         address: t.address, city: t.city, apartment: t.apartment, stairwell: t.stairwell,
         service_type: t.service_type, problem: t.problem, description: t.description,
@@ -806,6 +858,7 @@ async function generateNc(body, { instruction = '' }) {
       instruction,
       current: instruction ? t.nc_act : undefined,
       lessons: await db.activeLessons('nonconformity').catch(() => []),
+      building: buildingForAI(S.object),
       task: {
         address: t.address, city: t.city, stairwell: t.stairwell, contractor: t.contractor,
         work_name: t.service_type, problem: t.problem, description: t.description,

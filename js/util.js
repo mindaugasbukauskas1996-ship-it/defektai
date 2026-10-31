@@ -149,3 +149,75 @@ export function mapsHref(address, city) {
   const q = [address, city].filter(Boolean).join(', ');
   return 'https://www.google.com/maps/search/?api=1&query=' + encodeURIComponent(q);
 }
+
+// ---------------------------------------------------------------------
+// Adresai ir CSV (objektų bei laiptinių kodų importui)
+// ---------------------------------------------------------------------
+
+/** Palyginimo raktas: be diakritikų, tarpų ir skyrybos („Vytauto g.“ → „vytautog“). */
+export function normKey(s) {
+  return String(s || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]+/g, '');
+}
+
+/** „Gintaro Įlankos g.   14, Neringa“ → { address, street, house, city }. */
+export function splitAddress(raw) {
+  const clean = String(raw || '').replace(/\s+/g, ' ').trim();
+  const i = clean.lastIndexOf(',');
+  const city = i >= 0 ? clean.slice(i + 1).trim() : '';
+  const left = (i >= 0 ? clean.slice(0, i) : clean).trim();
+  const m = /^(.*\S)\s+(\d[\w\/\-]*)$/.exec(left);
+  return { address: clean, city, street: m ? m[1] : left, house: m ? m[2] : '' };
+}
+
+/** Skaičius iš CSV langelio („1 234,5“ → 1234.5), tuščia → null. */
+export function parseNum(v) {
+  const s = String(v ?? '').replace(/\s/g, '').replace(',', '.');
+  if (!s) return null;
+  const n = Number(s);
+  return isNaN(n) ? null : n;
+}
+
+/** Paprastas CSV skaitytuvas su kabutėmis. Skirtukas nustatomas automatiškai (; arba ,). */
+export function parseCsv(text) {
+  text = String(text || '').replace(/^\uFEFF/, '');
+  const head = text.split(/\r?\n/, 1)[0] || '';
+  const delim = (head.match(/;/g) || []).length >= (head.match(/,/g) || []).length ? ';' : ',';
+  const rows = [];
+  let row = [], cur = '', q = false;
+  for (let i = 0; i < text.length; i++) {
+    const c = text[i];
+    if (q) {
+      if (c === '"') { if (text[i + 1] === '"') { cur += '"'; i++; } else q = false; }
+      else cur += c;
+    } else if (c === '"') q = true;
+    else if (c === delim) { row.push(cur); cur = ''; }
+    else if (c === '\n' || c === '\r') {
+      if (c === '\r' && text[i + 1] === '\n') i++;
+      row.push(cur); cur = '';
+      if (row.some(x => x.trim() !== '')) rows.push(row);
+      row = [];
+    } else cur += c;
+  }
+  row.push(cur);
+  if (row.some(x => x.trim() !== '')) rows.push(row);
+  return rows;
+}
+
+/** Failo turinys kaip tekstas: UTF-8, o jei sugadinta – Windows-1257 (Excel CSV). */
+export async function readTextFile(file) {
+  const buf = await file.arrayBuffer();
+  const t = new TextDecoder('utf-8').decode(buf);
+  return t.includes('\uFFFD') ? new TextDecoder('windows-1257').decode(buf) : t;
+}
+
+/** Trumpa pastato santrauka rodymui: „blokinis · 1985 m. · 60 butų · stogas: plokščias, bitumas“. */
+export function buildingSummary(o) {
+  if (!o) return '';
+  const roof = [o.roof_type, o.roof_cover].filter(Boolean).join(', ');
+  return [
+    o.construction, o.built_year ? `${o.built_year} m.` : '', o.apartments ? `${o.apartments} butai` : '',
+    o.stairwells ? `${o.stairwells} laipt.` : '', o.usable_area ? `naud. plotas ${o.usable_area} m²` : '',
+    roof ? `stogas: ${roof}` : '', o.roof_area ? `stogo plotas ${o.roof_area} m²` : '',
+    o.roof_condition ? `stogo būklė: ${o.roof_condition}` : '', o.heat_point ? `šilumos punktas: ${o.heat_point}` : ''
+  ].filter(Boolean).join(' · ');
+}

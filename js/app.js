@@ -7,7 +7,7 @@ import * as db from './data.js';
 import { icon } from './icons.js';
 import {
   $, $$, esc, toast, confirmDialog, today, fmtDate, STATUSES, statusLabel,
-  PRIORITIES, priorityLabel
+  PRIORITIES, priorityLabel, buildingSummary, parseCsv, readTextFile
 } from './util.js';
 import { renderTask } from './task.js';
 import { renderPrint } from './print.js';
@@ -229,17 +229,74 @@ async function renderList() {
 // Užduoties forma (nauja / redagavimas)
 // ---------------------------------------------------------------------
 
+const objDatalist = objects => `<datalist id="obj-list">${objects.map(o => `<option value="${esc(o.address)}">`).join('')}</datalist>`;
+
+/** Objekto pasirinkimas iš sąrašo: užpildo adresą, miestą, vadybininką, laiptinių kodus. */
+function bindObjectPicker(form, objects, t, withCodes) {
+  if (!objects.length) return;
+  const byAddr = new Map(objects.map(o => [o.address.toLowerCase(), o]));
+  const byId = new Map(objects.map(o => [o.id, o]));
+  const el = n => form.elements[n];
+  const hint = $('#obj-hint');
+  const stairList = $('#stair-list');
+  let codes = [];
+
+  const flash = input => { if (input) { input.classList.remove('flash'); void input.offsetWidth; input.classList.add('flash'); } };
+  const fillStair = c => {
+    if (el('stairwell')) { el('stairwell').value = c.stairwell; flash(el('stairwell')); }
+    if (el('entry_code') && c.code) { el('entry_code').value = c.code; flash(el('entry_code')); }
+  };
+
+  const apply = async (o, fill) => {
+    el('object_id').value = o.id;
+    if (fill) {
+      el('address').value = [o.street, o.house].filter(Boolean).join(' ') || o.address;
+      if (o.city) el('city').value = o.city;
+      if (el('manager') && o.manager) { el('manager').value = o.manager; flash(el('manager')); }
+    }
+    codes = withCodes ? await db.codesFor(o).catch(() => []) : [];
+    if (stairList) stairList.innerHTML = codes.map(c => `<option value="${esc(c.stairwell)}">${esc(c.code)}</option>`).join('');
+    const parts = [];
+    const sum = buildingSummary(o);
+    parts.push(sum ? `Pastatas: ${sum}` : 'Pastato duomenų (stogas, konstruktyvas...) dar nėra.');
+    if (withCodes) parts.push(codes.length ? `Laiptinių kodai: ${codes.map(c => `${c.stairwell || '–'} → ${c.code}`).join('; ')}` : 'Laiptinių kodų šiam namui nerasta.');
+    if (hint) hint.textContent = parts.join(' · ');
+    if (withCodes && fill && codes.length === 1) fillStair(codes[0]);
+  };
+
+  el('address').addEventListener('input', () => {
+    const o = byAddr.get(el('address').value.replace(/\s+/g, ' ').trim().toLowerCase());
+    if (o) apply(o, true);
+  });
+  el('address').addEventListener('change', async () => {
+    const o = await db.findObject(el('address').value, el('city').value);
+    if (o) { if (el('object_id').value !== o.id) apply(o, false); }
+    else { el('object_id').value = ''; if (hint) hint.textContent = ''; codes = []; if (stairList) stairList.innerHTML = ''; }
+  });
+  if (el('stairwell')) {
+    const fromStair = () => {
+      const c = codes.find(x => x.stairwell === el('stairwell').value.trim());
+      if (c && c.code && el('entry_code')) { el('entry_code').value = c.code; flash(el('entry_code')); }
+    };
+    el('stairwell').addEventListener('input', fromStair);
+    el('stairwell').addEventListener('change', fromStair);
+  }
+
+  if (t.object_id && byId.has(t.object_id)) apply(byId.get(t.object_id), false);
+  else if (t.address) db.findObject(t.address, t.city).then(o => { if (o) apply(o, false); });
+}
 async function renderTaskForm(id, kind = 'defect') {
   const s = await db.getSettings();
   const t = id ? await db.getTask(id) : { city: s.city, priority: 'iprastas', status: 'nauja', kind };
   if (id && !t) throw new Error('Užduotis nerasta');
   const me = await db.getProfile();
+  const objects = await db.listObjects().catch(() => []);
   const people = me.role === 'admin' ? await db.listProfiles() : [];
   const assignee = people.length > 1 ? `
       <label class="span2">Atsakingas darbuotojas<select name="assigned_to">
         ${people.map(p => `<option value="${esc(p.id)}" ${p.id === (t.assigned_to || me.id) ? 'selected' : ''}>${esc(db.profileName(p))}${p.id === me.id ? ' (aš)' : ''}</option>`).join('')}
       </select></label>` : '';
-  if (t.kind === 'nonconformity') return renderNcForm(id, t, s, assignee);
+  if (t.kind === 'nonconformity') return renderNcForm(id, t, s, assignee, objects);
 
   const opt = (list, val) => list.map(o => {
     const v = typeof o === 'string' ? o : o.id;
@@ -263,9 +320,11 @@ async function renderTaskForm(id, kind = 'defect') {
     </div>
 
     <form id="task-form" class="card form-grid">
-      <label class="span2">Adresas *<input name="address" required value="${esc(t.address)}" placeholder="Taikos pr. 55"></label>
+      <label class="span2">Adresas *<input name="address" required autocomplete="off" list="obj-list" value="${esc(t.address)}" placeholder="${objects.length ? 'Pradėkite rašyti ir pasirinkite objektą iš sąrašo' : 'Taikos pr. 55'}">${objDatalist(objects)}</label>
+      <input type="hidden" name="object_id" value="${esc(t.object_id)}">
+      <div class="span4 obj-hint muted small" id="obj-hint"></div>
       <label>Miestas<input name="city" value="${esc(t.city)}"></label>
-      <label>Laiptinė<input name="stairwell" value="${esc(t.stairwell)}" placeholder="7"></label>
+      <label>Laiptinė<input name="stairwell" list="stair-list" autocomplete="off" value="${esc(t.stairwell)}" placeholder="7"><datalist id="stair-list"></datalist></label>
       <label>Butas<input name="apartment" value="${esc(t.apartment)}"></label>
       <label>Laiptinės kodas<input name="entry_code" value="${esc(t.entry_code)}" placeholder="pvz. 1234#"></label>
       <label>Kontaktinis asmuo<input name="contact_name" value="${esc(t.contact_name)}"></label>
@@ -285,6 +344,7 @@ async function renderTaskForm(id, kind = 'defect') {
     </form>`;
 
   const form = $('#task-form');
+  bindObjectPicker(form, objects, t, true);
 
   $('#btn-parse').addEventListener('click', async () => {
     const text = $('#raw-msg').value.trim();
@@ -331,7 +391,7 @@ async function renderTaskForm(id, kind = 'defect') {
 // Neatikties forma (nauja / redagavimas)
 // ---------------------------------------------------------------------
 
-function renderNcForm(id, t, s, assignee = '') {
+function renderNcForm(id, t, s, assignee = '', objects = []) {
   const back = id ? `#/u/${id}` : '#/';
   view().innerHTML = `
     <div class="page-head">
@@ -339,7 +399,8 @@ function renderNcForm(id, t, s, assignee = '') {
       <h1>${id ? 'Redaguoti neatiktį' : 'Nauja neatiktis'}</h1>
     </div>
     <form id="task-form" class="card form-grid">
-      <label class="span2">Objekto adresas *<input name="address" required value="${esc(t.address)}" placeholder="Taikos pr. 55"></label>
+      <label class="span2">Objekto adresas *<input name="address" required autocomplete="off" list="obj-list" value="${esc(t.address)}" placeholder="${objects.length ? 'Pradėkite rašyti ir pasirinkite objektą iš sąrašo' : 'Taikos pr. 55'}">${objDatalist(objects)}</label>
+      <input type="hidden" name="object_id" value="${esc(t.object_id)}">
       <label>Miestas<input name="city" value="${esc(t.city)}"></label>
       <label>Laiptinė<input name="stairwell" value="${esc(t.stairwell)}"></label>
       <label class="span2">Rangovas *<input name="contractor" required value="${esc(t.contractor)}" placeholder="UAB „Statyba“"></label>
@@ -358,6 +419,7 @@ function renderNcForm(id, t, s, assignee = '') {
     </form>`;
 
   const form = $('#task-form');
+  bindObjectPicker(form, objects, t, false);
   form.addEventListener('submit', async e => {
     e.preventDefault();
     const data = Object.fromEntries(new FormData(form).entries());
@@ -376,6 +438,62 @@ function renderNcForm(id, t, s, assignee = '') {
   });
 }
 
+// ---------------------------------------------------------------------
+// Objektų ir laiptinių kodų importas (tik admin)
+// ---------------------------------------------------------------------
+
+const CODES_REPO_URL = 'https://raw.githubusercontent.com/mindaugasbukauskas1996-ship-it/laiptiniu-kodai/main/index.html';
+
+async function renderImport() {
+  const box = $('#import-card');
+  const [objs, nCodes] = await Promise.all([db.listObjects(true), db.countCodes()]);
+  box.innerHTML = `
+    <div class="card import-card">
+      <div class="card-title">Objektai ir laiptinių kodai</div>
+      <p class="muted small">Objektai pasirenkami iš sąrašo kuriant užduotį, o DI gauna pastato informaciją (konstruktyvas, stogas, plotai, šilumos punktas). Bazėje dabar: <b>${objs.length}</b> objektų, <b>${nCodes}</b> laiptinių kodų.</p>
+
+      <div class="imp-block">
+        <div class="lbl">Objektų CSV</div>
+        <p class="muted small">Stulpeliai (kaip sistemos eksporte, skirtukas „;“): Adresas; PA vadybininkas; Projektas; Butų sk.; Konstruktyvas; Laiptinių sk.; Naudingas plotas; Plotas; Rūsio plotas; Renovacijos būklė; Statybos metai; Stogo būklė; Stogo danga; Stogo plotas; Stogo tipas; Šilumos punkto tipas. Pakartotinis importas atnaujina objektus pagal adresą (tuščios reikšmės perrašo senas).</p>
+        <div class="imp-row"><input type="file" id="imp-obj-file" accept=".csv,text/csv"><button class="btn" id="imp-obj" type="button">Importuoti objektus</button></div>
+      </div>
+
+      <div class="imp-block">
+        <div class="lbl">Laiptinių kodai</div>
+        <p class="muted small">Importas pakeičia visą kodų sąrašą. Šaltinis: repozitorija „laiptiniu-kodai“ arba CSV (Miestas; Gatvė; Namo nr.; Laiptinė; Kodas).</p>
+        <div class="imp-row"><button class="btn" id="imp-codes-repo" type="button">Importuoti iš „laiptiniu-kodai“</button></div>
+        <div class="imp-row"><input type="file" id="imp-codes-file" accept=".csv,text/csv"><button class="btn" id="imp-codes" type="button">Importuoti iš CSV</button></div>
+      </div>
+      <div id="imp-msg" class="muted small"></div>
+    </div>`;
+
+  const msg = t => { $('#imp-msg').textContent = t; };
+  const run = async (btn, label, fn) => {
+    btn.disabled = true; const old = btn.textContent; btn.textContent = label;
+    try { const n = await fn(); msg(n); toast(n, 'ok', 5000); await renderImport(); }
+    catch (e) { console.error(e); msg('Klaida: ' + (e.message || e)); toast(e.message || String(e), 'error', 8000); btn.disabled = false; btn.textContent = old; }
+  };
+
+  $('#imp-obj').addEventListener('click', () => {
+    const f = $('#imp-obj-file').files[0];
+    if (!f) return toast('Pasirinkite CSV failą', 'error');
+    run($('#imp-obj'), 'Importuojama...', async () => `Importuota objektų: ${await db.importObjects(parseCsv(await readTextFile(f)))}`);
+  });
+  $('#imp-codes').addEventListener('click', () => {
+    const f = $('#imp-codes-file').files[0];
+    if (!f) return toast('Pasirinkite CSV failą', 'error');
+    run($('#imp-codes'), 'Importuojama...', async () => `Importuota kodų: ${await db.importCodes(parseCsv(await readTextFile(f)))}`);
+  });
+  $('#imp-codes-repo').addEventListener('click', () => {
+    run($('#imp-codes-repo'), 'Kraunama...', async () => {
+      const res = await fetch(CODES_REPO_URL, { cache: 'no-store' });
+      if (!res.ok) throw new Error('Nepavyko atsisiųsti kodų repozitorijos (' + res.status + ')');
+      const m = /EMBEDDED_CSV\s*=\s*`([\s\S]*?)`/.exec(await res.text());
+      if (!m) throw new Error('Repozitorijoje nerasta kodų lentelės (EMBEDDED_CSV)');
+      return `Importuota kodų: ${await db.importCodes(parseCsv(m[1]))}`;
+    });
+  });
+}
 // ---------------------------------------------------------------------
 // DI išmoktos taisyklės (Nustatymuose)
 // ---------------------------------------------------------------------
@@ -518,7 +636,9 @@ async function renderSettings() {
         <button class="btn primary" type="submit">${icon('check')} Išsaugoti nustatymus</button>
       </div>
     </form>
-    <div id="lessons-card"></div>`;
+    <div id="lessons-card"></div>
+    ${account.role === 'admin' && !db.isDemo ? '<div id="import-card"></div>' : ''}`;
+  if (account.role === 'admin' && !db.isDemo) renderImport().catch(e => { $('#import-card').innerHTML = `<div class="card error">Importo skiltis neįkrauta: ${esc(e.message)}</div>`; });
   renderLessons(account).catch(e => { $('#lessons-card').innerHTML = `<div class="card error">Nepavyko įkelti DI taisyklių: ${esc(e.message)}</div>`; });
 
   let signature = s.signature || '';

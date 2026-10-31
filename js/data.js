@@ -4,7 +4,7 @@
 // =====================================================================
 
 import { CONFIG } from './config.js';
-import { uuid, blobToDataURL } from './util.js';
+import { uuid, blobToDataURL, normKey, splitAddress, parseNum } from './util.js';
 
 export const isDemo = !CONFIG.SUPABASE_URL;
 
@@ -354,6 +354,117 @@ export async function nextActNumber(kind = 'defect') {
   const no = Number(s.next_act_no) || 1;
   await saveSettings({ ...s, next_act_no: no + 1 });
   return `${s.act_prefix || ''}${String(no).padStart(4, '0')}`;
+}
+
+// ---------------------------------------------------------------------
+// Objektai (pastatai) ir laiptinių kodai
+// ---------------------------------------------------------------------
+
+let objectsCache = null;
+
+/** Visi objektai (kešuojama; skaitoma puslapiais, nes API riboja eilučių skaičių). */
+export async function listObjects(force = false) {
+  if (isDemo) return [];
+  if (objectsCache && !force) return objectsCache;
+  const all = [];
+  for (let from = 0; ; from += 1000) {
+    const { data, error } = await sb.from('objects').select('*').order('address').range(from, from + 999);
+    if (error) throw error;
+    all.push(...data);
+    if (data.length < 1000) break;
+  }
+  objectsCache = all;
+  return all;
+}
+
+export async function getObject(id) {
+  if (!id || isDemo) return null;
+  return (await listObjects()).find(o => o.id === id) || null;
+}
+
+/** Randa objektą pagal užduoties adresą (pvz. „Taikos pr. 55“ + „Klaipėda“). */
+export async function findObject(address, city) {
+  if (isDemo || !address) return null;
+  const a = splitAddress(city ? `${address}, ${city}` : address);
+  const sk = normKey(a.street), hk = normKey(a.house);
+  if (!sk || !hk) return null;
+  const hits = (await listObjects()).filter(o => o.street_key === sk && o.house_key === hk);
+  if (hits.length <= 1) return hits[0] || null;
+  return hits.find(o => normKey(o.city) === normKey(a.city)) || null;
+}
+
+export async function countCodes() {
+  if (isDemo) return 0;
+  const { count, error } = await sb.from('stair_codes').select('id', { count: 'exact', head: true });
+  if (error) throw error;
+  return count || 0;
+}
+
+/** Objekto laiptinių kodai: [{ stairwell, code }] (surikiuota pagal laiptinę). */
+export async function codesFor(obj) {
+  if (isDemo || !obj || !obj.street_key || !obj.house_key) return [];
+  const { data, error } = await sb.from('stair_codes').select('city,stairwell,code')
+    .eq('street_key', obj.street_key).eq('house_key', obj.house_key);
+  if (error) throw error;
+  const same = data.filter(r => normKey(r.city) === normKey(obj.city));
+  const rows = same.length ? same : (new Set(data.map(r => normKey(r.city))).size <= 1 ? data : []);
+  const by = new Map();
+  rows.forEach(r => { const k = String(r.stairwell || ''); if (!by.has(k)) by.set(k, r.code); });
+  return [...by.entries()].map(([stairwell, code]) => ({ stairwell, code }))
+    .sort((a, b) => a.stairwell.localeCompare(b.stairwell, 'lt', { numeric: true }));
+}
+
+const txt = v => { const s = String(v ?? '').trim(); return s || null; };
+const int = v => { const n = parseNum(v); return n === null ? null : Math.round(n); };
+const chunks = (arr, n) => Array.from({ length: Math.ceil(arr.length / n) }, (_, i) => arr.slice(i * n, i * n + n));
+
+/** Objektų CSV (16 stulpelių, kaip įmonės sistemos eksportas): įrašo arba atnaujina pagal adresą. */
+export async function importObjects(rows) {
+  if (rows.length && /adresas/i.test(rows[0][0] || '')) rows = rows.slice(1);
+  const map = new Map();
+  for (const r of rows) {
+    const a = splitAddress(r[0]);
+    if (!a.address) continue;
+    map.set(a.address.toLowerCase(), {
+      address: a.address, city: txt(a.city), street: txt(a.street), house: txt(a.house),
+      street_key: normKey(a.street), house_key: normKey(a.house),
+      manager: txt(r[1]), project: txt(r[2]), apartments: int(r[3]), construction: txt(r[4]),
+      stairwells: int(r[5]), usable_area: parseNum(r[6]), area: parseNum(r[7]), basement_area: parseNum(r[8]),
+      renovation: txt(r[9]), built_year: int(r[10]), roof_condition: txt(r[11]), roof_cover: txt(r[12]),
+      roof_area: parseNum(r[13]), roof_type: txt(r[14]), heat_point: txt(r[15])
+    });
+  }
+  const list = [...map.values()];
+  for (const part of chunks(list, 250)) {
+    const { error } = await sb.from('objects').upsert(part, { onConflict: 'address' });
+    if (error) throw error;
+  }
+  objectsCache = null;
+  return list.length;
+}
+
+/** Laiptinių kodų CSV (Miestas;Gatvė;Namo nr.;Laiptinė;Kodas): pakeičia visą sąrašą. */
+export async function importCodes(rows) {
+  if (rows.length && /miestas/i.test(rows[0][0] || '')) rows = rows.slice(1);
+  const seen = new Set();
+  const list = [];
+  for (const r of rows) {
+    const [city, street, house, stairwell, code] = r.map(x => String(x ?? '').trim());
+    if (!street || !code) continue;
+    const k = [city, street, house, stairwell, code].join('|');
+    if (seen.has(k)) continue;
+    seen.add(k);
+    list.push({ city: city || null, street, house, stairwell: stairwell || null, code,
+      street_key: normKey(street), house_key: normKey(house) });
+  }
+  if (!list.length) throw new Error('Faile nerasta kodų');
+  const del = await sb.from('stair_codes').delete().not('id', 'is', null);
+  if (del.error) throw del.error;
+  for (const part of chunks(list, 500)) {
+    const { error } = await sb.from('stair_codes').insert(part);
+    if (error) throw error;
+  }
+  return list.length;
 }
 
 // ---------------------------------------------------------------------
