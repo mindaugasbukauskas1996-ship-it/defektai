@@ -6,7 +6,7 @@ Su vartotoju bendrauk **lietuviškai**. Vartotojas – Mindaugas, darbų valdyto
 ## Kas tai
 Naršyklės programėlė (PWA) daugiabučių techniniams inžinieriams: užduotys (defektai, rangovų neatitiktys), nuotraukų žymėjimas, aktai su DI (Claude), peržiūra su redagavimu, PDF ir Word eksportas. Keli darbuotojai, vienas admin.
 
-Aktų tipai: **defektavimo aktas** (forma VP08FA), **numatomų darbų aktas** (su kiekiais, neprivalomas), **nuotraukų fiksacijos lapas**, **neatikties aktas** (rangovo darbų neatitiktys).
+Aktų tipai: **defektavimo aktas** (forma VP08FA), **numatomų darbų aktas** (su kiekiais, neprivalomas), **nuotraukų fiksacijos lapas**, **neatikties aktas** (rangovo darbų neatitiktys), **metinės (kasmetinės) apžiūros aktas** (`kind = 'annual'`, žr. žemiau).
 
 ## Adresai ir prieigos
 - Programėlė: https://mindaugasbukauskas1996-ship-it.github.io/defektai/ (GitHub Pages, repo `mindaugasbukauskas1996-ship-it/defektai`, vieša, šaka `main`, šaknis).
@@ -40,6 +40,13 @@ Aktų tipai: **defektavimo aktas** (forma VP08FA), **numatomų darbų aktas** (s
 - `tasks` – užduotys: `kind` (`defect`/`nonconformity`), adresas, kontaktai, `field_notes`, `defect_act`/`works_act`/`nc_act` (jsonb), `act_mode` (`defect`/`full`), `act_detail` (`narrow`/`medium`/`wide`), `assigned_to`, `created_by`, `object_id`, `report_no`, `contractor`, `act_number`…
 - `photos` (+ bucket `photos`; aplanko pavadinimas = užduoties id), `user_settings` (nustatymai **kiekvienai paskyrai**; senoji `settings` lentelė nebenaudojama, be politikų), `profiles` (`role` admin/user, **`active`**), `ai_lessons` (DI išmoktos taisyklės), `objects` (791 pastatas su stogo/konstruktyvo/plotų info), `stair_codes` (~2000 laiptinių kodų), `reports` (inžinieriaus pranešimai pagal registracijos Nr.).
 - **Saugumas (RLS)**: visa prieiga tik `authenticated` **ir aktyviai** paskyrai (`is_active()`); paprasta paskyra mato tik jai priskirtas užduotis / pranešimus; admin (`is_admin()`) mato ir skirsto viską. Naujos paskyros **neaktyvios**, kol admin neaktyvuoja (Nustatymai → Paskyros). DI funkcija irgi tikrina aktyvumą. Rolės/aktyvumo keisti gali tik admin.
+
+### Metinė apžiūra (`js/annual.js`)
+- Maršrutas `#/metine`: visų objektų sąrašas su filtrais (neapžiūrėti / apžiūrėti šiemet, vadybininkas), „Pradėti“ sukuria užduotį `kind='annual'` su `annual_act` (jsonb): `general` (adresas, unikalus Nr., metai, plotas, paskirtis, vadovas, kategorija, pagrindas, metodas, data), `sections[].items[]` (`id,no,name,str,status ok|defects|skip,brief,text,prev,keep`), `conclusions[]`.
+- Akto Nr.: `<prefiksas>-<gatvės raidė>-<namo nr.>` (pvz. MBB-K-9; prefiksas ir kv. atestato Nr. – Nustatymuose).
+- Šablonas (`ANNUAL_TEMPLATE`) pagal 2026-05 pavyzdį: 1 Laikančios konstrukcijos / atitvarai, 2 Durys / langai, 3 Inžinerinės sistemos, 4 Kiti. Atskiras akto elementas gali būti pridėtas kiekvienoje apžiūroje (`x_` id); šablono redagavimo ekrano dar nėra.
+- Greita lentelė (`apziura` skiltis): „Defektų nėra / Yra defektų / Praleisti“, diktavimas, nuotraukos prie elemento (`photos.ref`), praėjusių metų tekstas („Naudoti kaip pernai“). Aktas (`aktai` skiltis): DI generavimas, tekstų redagavimas, peržiūra (`doc = 'annual'`), Word.
+- DI: **atskira Edge funkcija `ai-annual`** (`supabase/functions/ai-annual/index.ts`, `verify_jwt=false`, tikrina aktyvumą). Klientas: `db.aiAnnual`. Funkcijos diegimas reikalauja vartotojo leidimo (klasifikatorius atmeta).
 
 ### DI (Edge Function `ai`, `verify_jwt = false`, vartotoją tikrina pati)
 Veiksmai: `parse_task` (laiškas → laukai), `generate_act` (defektų + numatomų darbų aktai arba klausimai), `generate_nc` (neatikties aktas). Gauna: užduotį, nuotraukas (su žymėjimais), `detail` (išsamumas), `building` (pastato kontekstas iš `objects`), `lessons` (vartotojo išmoktos taisyklės). Atsakyme gali būti `lesson` – bendra taisyklė iš „Pataisyti su DI“ nurodymo; ji saugoma `ai_lessons`. Modelis: env `ANTHROPIC_MODEL`, numatytas `claude-sonnet-5-5`. `ANTHROPIC_API_KEY` – tik Supabase paslaptyse, **niekada** ne kode/pokalbyje.

@@ -26,6 +26,13 @@ Vaidmenys: **Inžinierius** (darbuotojas), **Admin**, **Rangovas** (tik gauna ak
 - ✅ **Peržiūra su redagavimu** tiesiai A4 vaizde; pakeitimai išsaugomi sistemoje.
 - ✅ Eksportas **PDF** (spausdinimas) ir **Word (.docx)** (iš redaktoriaus ir iš peržiūros).
 
+### Metinė apžiūra
+- ✅ Inžinierius – matyti visų namų sąrašą su būsena „apžiūrėta šiemet / ne“ ir vienu paspaudimu pradėti metinę.
+- ✅ Inžinierius – kiekvieną elementą pažymėti „Defektų nėra / Yra defektų / Praleisti“, padiktuoti pastabą ir pridėti nuotrauką, o DI parašo aktą (STR punktai, išvados).
+- ✅ Inžinierius – pradėti nuo praėjusių metų to paties namo akto („kaip pernai“).
+- ✅ Akto Nr. `MBB-<raidė>-<namo nr.>`, peržiūra su redagavimu, Word ir PDF.
+- ⬜ Šablono (elementų sąrašo) ir standartinių išvadų redagavimas Nustatymuose; masinis metinių planavimas pagal vadybininką / mėnesį; unikalaus Nr. importas objektams.
+
 ### Paskyros ir saugumas
 - ✅ Kiekviena paskyra mato **tik jai priskirtas** užduotis; kūrėjas automatiškai tampa atsakingu.
 - ✅ **Admin** skirsto užduotis, mato visas, filtruoja pagal darbuotoją.

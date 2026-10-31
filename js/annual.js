@@ -289,6 +289,8 @@ export function drawAnnualActTab(body, ctx) {
   const t = S.task, a = t.annual_act, g = a.general;
   const persist = debounce(() => save({ annual_act: a, act_number: t.act_number, act_date: t.act_date }), 800);
   const gf = (k, label, span = '') => `<label class="${span}">${label}<input data-g="${k}" value="${esc(g[k] ?? '')}"></label>`;
+  // kol DI neparašė – defektų elementuose rodome inžinieriaus pastabą (ir rankiniam užpildymui)
+  allItems(a).forEach(it => { if (it.status === 'defects' && !it.keep && it.text === OK_TEXT) it.text = it.brief ? `Pastaba: ${it.brief}` : ''; });
   const used = allItems(a).filter(x => x.status !== 'skip');
   const nDef = used.filter(x => x.status === 'defects').length;
 
