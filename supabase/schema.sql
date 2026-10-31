@@ -335,11 +335,13 @@ create table if not exists public.reports (
   reporter      text,
   contact       text,
   contact_name  text,                         -- kontaktinis asmuo (gyventojas)
+  stairwell     text,                         -- laiptinė (iš pranešimo)
   property_type text,
   assigned_to   uuid references auth.users(id) on delete set null,
   imported_at   timestamptz not null default now()
 );
 alter table public.reports add column if not exists contact_name text;
+alter table public.reports add column if not exists stairwell text;
 create index if not exists reports_assigned_idx on public.reports (assigned_to);
 
 alter table public.reports enable row level security;
