@@ -95,25 +95,30 @@ function resetCaches() { meCache = null; settingsCache = null; }
 
 /** Prisijungusios paskyros profilis: { id, email, full_name, role: 'admin' | 'user' }. */
 export async function getProfile(force = false) {
-  if (isDemo) return { id: 'demo', email: 'demo', full_name: '', role: 'admin' };
+  if (isDemo) return { id: 'demo', email: 'demo', full_name: '', role: 'admin', active: true };
   if (meCache && !force) return meCache;
   const { data: s } = await sb.auth.getSession();
   const u = s.session && s.session.user;
   if (!u) return null;
-  const r = await sb.from('profiles').select('id,email,full_name,role').eq('id', u.id).maybeSingle();
+  const r = await sb.from('profiles').select('id,email,full_name,role,active').eq('id', u.id).maybeSingle();
   if (r.error) throw r.error;
-  meCache = r.data || { id: u.id, email: u.email, full_name: '', role: 'user' };
+  meCache = r.data || { id: u.id, email: u.email, full_name: '', role: 'user', active: false };
   return meCache;
 }
 
-/** Visos paskyros (RLS: tik adminui; paprastas vartotojas mato tik save). */
-export async function listProfiles() {
+/** Paskyros (RLS: tik adminui; paprastas vartotojas mato tik save). Pagal nutylėjimą – tik aktyvios; all = true – ir laukiančios. */
+export async function listProfiles(all = false) {
   if (isDemo) return [];
-  const { data, error } = await sb.from('profiles').select('id,email,full_name,role').order('created_at');
+  const { data, error } = await sb.from('profiles').select('id,email,full_name,role,active').order('created_at');
   if (error) throw error;
-  return data;
+  return all ? data : data.filter(p => p.active);
 }
 
+/** Admin: aktyvuoja arba išjungia paskyros prieigą. */
+export async function setProfileActive(id, active) {
+  const { error } = await sb.from('profiles').update({ active }).eq('id', id);
+  if (error) throw error;
+}
 export const profileName = p => (p && (p.full_name || p.email)) || '';
 
 // ---------------------------------------------------------------------

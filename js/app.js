@@ -68,6 +68,10 @@ async function route() {
   document.body.classList.toggle('logged', true);
 
   try {
+    if (!db.isDemo) {                               // neaktyvuota paskyra duomenų nemato
+      const me = await db.getProfile();
+      if (!me.active) return renderPending(me);
+    }
     if (parts[0] === 'nauja') { setActiveNav('new'); return await renderTaskForm(null); }
     if (parts[0] === 'neatiktis') { setActiveNav('nc'); return await renderTaskForm(null, 'nonconformity'); }
     if (parts[0] === 'nustatymai') { setActiveNav('settings'); return await renderSettings(); }
@@ -91,6 +95,19 @@ async function route() {
 // ---------------------------------------------------------------------
 // Prisijungimas
 // ---------------------------------------------------------------------
+
+function renderPending(me) {
+  document.body.classList.remove('logged');
+  view().innerHTML = `
+    <div class="login card">
+      <h1>Laukiama aktyvavimo</h1>
+      <p class="muted">Paskyra <b>${esc(me.email || '')}</b> sukurta, bet dar neaktyvuota. Kreipkitės į administratorių, kad ją aktyvuotų.</p>
+      <button class="btn primary block" id="pend-retry" type="button">Patikrinti dar kartą</button>
+      <button class="btn ghost block" id="pend-out" type="button" style="margin-top:8px">Atsijungti</button>
+    </div>`;
+  $('#pend-retry').addEventListener('click', async () => { await db.getProfile(true); route(); });
+  $('#pend-out').addEventListener('click', async () => { await db.signOut(); user = null; route(); });
+}
 
 function renderLogin() {
   document.body.classList.remove('logged');
@@ -664,7 +681,7 @@ async function renderLessons(account) {
 async function renderSettings() {
   const s = await db.getSettings(true);
   const account = await db.getProfile(true);
-  const accounts = account.role === 'admin' ? await db.listProfiles() : [];
+  const accounts = account.role === 'admin' ? await db.listProfiles(true) : [];
   const comm =(s.commission || []).concat([{ position: '', name: '' }]).slice(0, 4);
 
   view().innerHTML = `
@@ -682,8 +699,10 @@ async function renderSettings() {
         ${account.role === 'admin' ? `
         <div class="span4">
           <div class="lbl">Paskyros (užduotis skirstote užduoties kortelėje)</div>
-          <ul class="acct-list">${accounts.map(p => `<li><b>${esc(db.profileName(p))}</b> <span class="muted small">${esc(p.email || '')}${p.role === 'admin' ? ' · admin' : ''}</span></li>`).join('')}</ul>
-          <div class="muted small">Nauja paskyra kuriama Supabase: Authentication → Users → Add user (Auto Confirm User). Ji atsiras čia po pirmo prisijungimo.</div>
+          <ul class="acct-list">${accounts.map(p => `<li><b>${esc(db.profileName(p))}</b> <span class="muted small">${esc(p.email || '')}${p.role === 'admin' ? ' · admin' : ''}</span>
+            ${p.id === account.id ? '' : `<label class="chk" title="Ar paskyra gali naudotis programa"><input type="checkbox" data-acc="${esc(p.id)}" ${p.active ? 'checked' : ''}> aktyvi</label>`}
+            ${p.active ? '' : '<span class="tag nc">laukia aktyvavimo</span>'}</li>`).join('')}</ul>
+          <div class="muted small">Nauja paskyra kuriama Supabase: Authentication → Users → Add user (Auto Confirm User). Ji atsiras čia po pirmo prisijungimo ir veiks tik kai pažymėsite 
         </div>` : ''}
       </div>`}
       <div class="card form-grid">
@@ -758,6 +777,15 @@ async function renderSettings() {
   });
   const del = $('#sig-del');
   if (del) del.addEventListener('click', () => { signature = ''; $('.sig-prev').innerHTML = '<span class="muted small">nėra</span>'; });
+
+  $('#set-form').addEventListener('change', async e => {          // paskyrų aktyvavimas (admin)
+    const cb = e.target.closest('[data-acc]');
+    if (!cb) return;
+    try {
+      await db.setProfileActive(cb.dataset.acc, cb.checked);
+      toast(cb.checked ? 'Paskyra aktyvuota' : 'Paskyra išjungta', 'ok');
+    } catch (err) { toast(err.message, 'error'); cb.checked = !cb.checked; }
+  });
 
   const lo = $('#btn-logout');
   if (lo) lo.addEventListener('click', async () => {
