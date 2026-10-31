@@ -675,8 +675,8 @@ function drawActEditor() {
         <label>Akto Nr.<input data-f="act_number" value="${esc(t.act_number)}"></label>
         <label>Data<input type="date" data-f="act_date" value="${esc(fmtDate(t.act_date))}"></label>
         <label>Skubumas<select data-d="urgency">${['Avarinis', 'Skubus', 'Planinis'].map(u => `<option ${u === d.urgency ? 'selected' : ''}>${u}</option>`).join('')}</select></label>
-        <label>Apžiūros tikslas<input data-d="purpose" value="${esc(d.purpose)}"></label>
-        <label class="span4">Problema<input data-d="problem" value="${esc(d.problem)}"></label>
+        <label>Apžiūros tikslas<textarea rows="1" data-d="purpose">${esc(d.purpose)}</textarea></label>
+        <label class="span4">Problema<textarea rows="1" data-d="problem">${esc(d.problem)}</textarea></label>
       </div>
       <div class="obj-list">
         ${d.objects.map((o, i) => `
@@ -745,7 +745,17 @@ function drawActEditor() {
     </div>`;
 }
 
+/** Tekstų laukai užauga pagal turinį – be slinkties juostų. */
+const fitTa = ta => { ta.style.height = 'auto'; ta.style.height = (ta.scrollHeight + 2) + 'px'; };
+function autosize(root) {
+  $$('.act-ed textarea', root).forEach(fitTa);
+  requestAnimationFrame(() => $$('.act-ed textarea', root).forEach(fitTa));   // po šriftų / maketo nusistovėjimo
+}
+window.addEventListener('resize', debounce(() => { const b = document.getElementById('tab-body'); if (b) autosize(b); }, 200));
+
 function bindActEditor(body) {
+  autosize(body);
+  body.addEventListener('input', e => { if (e.target.matches && e.target.matches('.act-ed textarea')) fitTa(e.target); });
   const ind = () => $('#act-save', body);
   const persist = debounce(async () => {
     const i = ind(); if (i) i.textContent = 'Saugoma...';
@@ -957,6 +967,8 @@ function drawNcEditor() {
 }
 
 function bindNcEditor(body) {
+  autosize(body);
+  body.addEventListener('input', e => { if (e.target.matches && e.target.matches('.act-ed textarea')) fitTa(e.target); });
   const ind = () => $('#act-save', body);
   const persist = debounce(async () => {
     const i = ind(); if (i) i.textContent = 'Saugoma...';

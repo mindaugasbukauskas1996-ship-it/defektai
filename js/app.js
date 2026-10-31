@@ -702,7 +702,7 @@ async function renderSettings() {
           <ul class="acct-list">${accounts.map(p => `<li><b>${esc(db.profileName(p))}</b> <span class="muted small">${esc(p.email || '')}${p.role === 'admin' ? ' · admin' : ''}</span>
             ${p.id === account.id ? '' : `<label class="chk" title="Ar paskyra gali naudotis programa"><input type="checkbox" data-acc="${esc(p.id)}" ${p.active ? 'checked' : ''}> aktyvi</label>`}
             ${p.active ? '' : '<span class="tag nc">laukia aktyvavimo</span>'}</li>`).join('')}</ul>
-          <div class="muted small">Nauja paskyra kuriama Supabase: Authentication → Users → Add user (Auto Confirm User). Ji atsiras čia po pirmo prisijungimo ir veiks tik kai pažymėsite 
+          <div class="muted small">Nauja paskyra kuriama Supabase: Authentication → Users → Add user (Auto Confirm User). Ji atsiras čia po pirmo prisijungimo ir veiks tik kai pažymėsite „aktyvi“. Nepažįstamų paskyrų neaktyvuokite.</div>
         </div>` : ''}
       </div>`}
       <div class="card form-grid">
