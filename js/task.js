@@ -742,6 +742,12 @@ function drawActEditor() {
         ${w ? `<a class="btn" href="#/spausdinti/${t.id}/works">${icon('file')} Numatomų darbų aktas</a>
         <a class="btn" href="#/spausdinti/${t.id}/both">${icon('file')} Abu viename PDF</a>` : ''}
       </div>
+      <div class="gen-actions docx-row">
+        <span class="muted small">Atsisiųsti Word (.docx):</span>
+        <button class="btn" type="button" data-docx="defect">${icon('file')} Defektavimo aktas</button>
+        ${w ? `<button class="btn" type="button" data-docx="works">${icon('file')} Numatomų darbų aktas</button>
+        <button class="btn" type="button" data-docx="both">${icon('file')} Abu viename Word</button>` : ''}
+      </div>
     </div>`;
 }
 
@@ -753,7 +759,31 @@ function autosize(root) {
 }
 window.addEventListener('resize', debounce(() => { const b = document.getElementById('tab-body'); if (b) autosize(b); }, 200));
 
+/** Word (.docx) atsisiuntimas tiesiai iš akto redaktoriaus (naudoja dabartinius, net ir dar neišsaugotus, duomenis). */
+async function downloadDocx(doc, btn) {
+  const old = btn.innerHTML;
+  btn.disabled = true; btn.innerHTML = '<span class="spinner"></span> Ruošiama...';
+  try {
+    const actPhotos = S.photos.filter(p => p.include_in_act);
+    const urls = await Promise.all(actPhotos.map(p => db.photoUrl(p, true)));
+    const figs = actPhotos.map((p, i) => ({ n: i + 1, url: urls[i], caption: p.caption, w: p.width, h: p.height }));
+    const { exportDocx } = await import('./docx.js');
+    const name = await exportDocx({ t: S.task, s: S.settings, doc, figs });
+    toast(`Word failas paruoštas: ${name}`, 'ok', 5000);
+  } catch (err) {
+    console.error(err);
+    toast('Nepavyko sukurti Word failo: ' + (err.message || err), 'error', 8000);
+  } finally { btn.disabled = false; btn.innerHTML = old; }
+}
+function bindDocx(body) {
+  body.addEventListener('click', e => {
+    const b = e.target.closest('[data-docx]');
+    if (b) downloadDocx(b.dataset.docx, b);
+  });
+}
+
 function bindActEditor(body) {
+  bindDocx(body);
   autosize(body);
   body.addEventListener('input', e => { if (e.target.matches && e.target.matches('.act-ed textarea')) fitTa(e.target); });
   const ind = () => $('#act-save', body);
@@ -963,10 +993,15 @@ function drawNcEditor() {
       <div class="gen-actions">
         <a class="btn primary" href="#/spausdinti/${t.id}/nc">${icon('file')} Neatikties aktas</a>
       </div>
+      <div class="gen-actions docx-row">
+        <span class="muted small">Atsisiųsti Word (.docx):</span>
+        <button class="btn" type="button" data-docx="nc">${icon('file')} Neatikties aktas</button>
+      </div>
     </div>`;
 }
 
 function bindNcEditor(body) {
+  bindDocx(body);
   autosize(body);
   body.addEventListener('input', e => { if (e.target.matches && e.target.matches('.act-ed textarea')) fitTa(e.target); });
   const ind = () => $('#act-save', body);
