@@ -221,3 +221,30 @@ create policy "photos update via task" on storage.objects
 create policy "photos delete via task" on storage.objects
   for delete to authenticated using (bucket_id = 'photos' and exists
     (select 1 from public.tasks t where t.id::text = (storage.foldername(name))[1]));
+
+-- ---------- DI išmoktos taisyklės (savos kiekvienai paskyrai) ----------
+create table if not exists public.ai_lessons (
+  id          uuid primary key default gen_random_uuid(),
+  user_id     uuid not null default auth.uid() references auth.users(id) on delete cascade,
+  kind        text not null default 'defect' check (kind in ('defect','nonconformity')),
+  text        text not null,
+  active      boolean not null default true,
+  source_task uuid references public.tasks(id) on delete set null,
+  created_at  timestamptz not null default now()
+);
+create index if not exists ai_lessons_user_idx on public.ai_lessons (user_id, kind);
+
+alter table public.ai_lessons enable row level security;
+drop policy if exists "lessons select" on public.ai_lessons;
+drop policy if exists "lessons insert" on public.ai_lessons;
+drop policy if exists "lessons update" on public.ai_lessons;
+drop policy if exists "lessons delete" on public.ai_lessons;
+create policy "lessons select" on public.ai_lessons
+  for select to authenticated using (user_id = auth.uid() or public.is_admin());
+create policy "lessons insert" on public.ai_lessons
+  for insert to authenticated with check (user_id = auth.uid());
+create policy "lessons update" on public.ai_lessons
+  for update to authenticated using (user_id = auth.uid() or public.is_admin())
+  with check (user_id = auth.uid() or public.is_admin());
+create policy "lessons delete" on public.ai_lessons
+  for delete to authenticated using (user_id = auth.uid() or public.is_admin());

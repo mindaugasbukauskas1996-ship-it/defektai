@@ -26,6 +26,8 @@ export const UNITS = [
 
 const MAX_PHOTOS = 12;
 
+const LESSON_DESC = 'Pildyk TIK kai pateiktas inžinieriaus nurodymas taisyti aktą. Jei nurodymas išreiškia BENDRĄ pageidavimą, kuris tiktų ir būsimiems aktams (stilius, visada įtraukiami darbai, terminai, formuluotės), parašyk jį vienu trumpu bendru sakiniu be konkretaus adreso ar kiekių. Jei nurodymas liečia tik šį aktą (konkretūs matmenys, vieta, faktas) – praleisk šį lauką.';
+
 // ---------------------------------------------------------------------
 // Akto generavimas
 // ---------------------------------------------------------------------
@@ -52,6 +54,10 @@ Papildomi klausimai:
 - Jei trūksta informacijos, kuri ESMINGAI pakeistų aktą (pvz., nežinomas pažeisto ploto dydis, kai reikia kiekių; neaišku, kuri sistema pažeista; neaišku, ar defektas bendrojo naudojimo objekte), grąžink status = "questions" ir iki 5 trumpų, konkrečių klausimų su galimais atsakymų variantais.
 - Neklausk to, kas jau aprašyta ar matyti nuotraukose. Neklausk smulkmenų, kurias galima pažymėti kaip prielaidą.
 - Jei force = true arba į klausimus jau atsakyta ir informacijos pakanka – NEKLAUSK, o parenk aktą, o neaiškumus surašyk į assumptions.
+
+Inžinieriaus bendri pageidavimai:
+- Jei pateikti „INŽINIERIAUS BENDRI PAGEIDAVIMAI“, laikykis jų kaip nuolatinių rašymo ir turinio taisyklių, nebent jos prieštarauja šio akto faktams.
+- Kai inžinierius prašo pataisyti aktą, laukelyje lesson įrašyk bendrą taisyklę tik jei nurodymas tinka ir kitiems aktams.
 
 Rezultatą VISADA pateik iškviesdamas įrankį „pateikti_rezultata“.`;
 
@@ -124,7 +130,8 @@ const ACT_TOOL = {
       assumptions: {
         type: 'array', items: { type: 'string' },
         description: 'Prielaidos, kurias padarei dėl trūkstamos informacijos (rodomos tik inžinieriui).'
-      }
+      },
+      lesson: { type: 'string', description: LESSON_DESC }
     },
     required: ['status']
   }
@@ -142,6 +149,15 @@ function imageBlock(p) {
 function line(label, value) {
   return value ? `${label}: ${value}\n` : '';
 }
+
+// Inžinieriaus bendri pageidavimai, išmokti iš ankstesnių pataisymų (siunčia naršyklė).
+function lessonsBlock(payload) {
+  const ls = (payload.lessons || []).map(x => String(x || '').trim()).filter(Boolean).slice(0, 30);
+  if (!ls.length) return '';
+  return '\nINŽINIERIAUS BENDRI PAGEIDAVIMAI (išmokta iš ankstesnių pataisymų – taikyk šiame akte, nebent prieštarauja faktams):\n' +
+    ls.map((x, i) => `${i + 1}. ${x}`).join('\n') + '\n';
+}
+
 
 /**
  * payload = {
@@ -185,6 +201,7 @@ export function buildActRequest(payload, model = DEFAULT_MODEL) {
   } else if (payload.instruction) {
     text += `\nPAPILDOMAS INŽINIERIAUS NURODYMAS: ${payload.instruction}\n`;
   }
+  text += lessonsBlock(payload);
 
   const photos = (payload.photos || []).slice(0, MAX_PHOTOS);
   text += photos.length
@@ -230,6 +247,10 @@ Rašymo taisyklės:
 - summary: 1–3 sakiniai: kas nustatyta ir ko reikalaujama.
 - Jokių klausimų: jei kažko trūksta, parink protingą formuluotę ir įrašyk į assumptions.
 
+Inžinieriaus bendri pageidavimai:
+- Jei pateikti „INŽINIERIAUS BENDRI PAGEIDAVIMAI“, laikykis jų kaip nuolatinių rašymo ir turinio taisyklių, nebent jos prieštarauja šio akto faktams.
+- Kai inžinierius prašo pataisyti aktą, laukelyje lesson įrašyk bendrą taisyklę tik jei nurodymas tinka ir kitiems aktams.
+
 Rezultatą VISADA pateik iškviesdamas įrankį „pateikti_neatiktis“.`;
 
 const NC_TOOL = {
@@ -254,7 +275,8 @@ const NC_TOOL = {
         }
       },
       summary: { type: 'string', description: 'Trumpa išvada ir reikalavimas rangovui.' },
-      assumptions: { type: 'array', items: { type: 'string' }, description: 'Prielaidos, kurias padarei (rodomos tik inžinieriui).' }
+      assumptions: { type: 'array', items: { type: 'string' }, description: 'Prielaidos, kurias padarei (rodomos tik inžinieriui).' },
+      lesson: { type: 'string', description: LESSON_DESC }
     },
     required: ['work', 'severity', 'items', 'summary']
   }
@@ -286,6 +308,7 @@ export function buildNcRequest(payload, model = DEFAULT_MODEL) {
     text += `\nINŽINIERIAUS NURODYMAS, KAIP PATAISYTI: ${payload.instruction}\n`;
     text += 'Pataisyk aktą pagal nurodymą, kitas dalis palik nepakeistas.\n';
   }
+  text += lessonsBlock(payload);
 
   const photos = (payload.photos || []).slice(0, MAX_PHOTOS);
   text += photos.length
