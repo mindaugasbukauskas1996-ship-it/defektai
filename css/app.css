@@ -380,3 +380,9 @@ textarea.notes { font-size: 16px; min-height: 260px; }
 /* Pranešimo pasirinkimas */
 .report-pick input { width: 100%; max-width: 420px; }
 #rep-hint.warn { color: #b42318; font-weight: 600; }
+
+/* Akto redaktorius: tekstas telpa be slinkties */
+.act-ed textarea { overflow-y: hidden; resize: none; min-height: 44px; }
+.act-ed .obj-body textarea { min-height: 72px; }
+.act-ed .form-grid label textarea { min-height: 44px; }
+.act-ed .form-grid { align-items: start; }
