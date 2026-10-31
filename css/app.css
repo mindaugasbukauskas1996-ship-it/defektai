@@ -356,3 +356,12 @@ textarea.notes { font-size: 16px; min-height: 260px; }
 .tc-meta .assignee { font-weight: 600; color: #175cd3; }
 .acct-list { margin: 6px 0; padding-left: 18px; }
 .kv select { max-width: 60%; }
+
+/* DI taisyklės */
+.lessons { list-style: none; margin: 8px 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+.lessons li { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.lessons li.off .les-txt { opacity: .5; text-decoration: line-through; }
+.les-txt { flex: 1 1 260px; min-width: 0; }
+.les-add { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 10px; }
+.les-add input { flex: 1 1 260px; min-width: 0; }
+.lessons-card { margin-top: 14px; }
