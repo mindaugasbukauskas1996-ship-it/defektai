@@ -259,12 +259,17 @@ function bindReportPicker(form, reports, used, objects) {
     flash(sel);
   };
 
-  const apply = r => {
+  const apply = async r => {
     const a = splitAddress(r.address || '');
     el('address').value = [a.street, a.house].filter(Boolean).join(' ') || a.address;
     el('city').value = a.city || r.city || el('city').value;
     flash(el('address'));
     el('address').dispatchEvent(new Event('change'));            // suranda objektą ir laiptinių kodus
+    await form._objReady;                                        // palaukiam, kol užsikraus laiptinių kodai
+    if (r.stairwell && el('stairwell')) {
+      el('stairwell').value = r.stairwell; flash(el('stairwell'));
+      el('stairwell').dispatchEvent(new Event('input', { bubbles: true }));   // užpildo laiptinės kodą
+    }
     set('apartment', r.apartment);
     set('manager', r.manager);
     setTimeout(() => {                                           // jei pranešime vadybininko nėra – iš objekto
@@ -335,10 +340,13 @@ function bindObjectPicker(form, objects, t, withCodes) {
     const o = byAddr.get(el('address').value.replace(/\s+/g, ' ').trim().toLowerCase());
     if (o) apply(o, true);
   });
-  el('address').addEventListener('change', async () => {
-    const o = await db.findObject(el('address').value, el('city').value);
-    if (o) { if (el('object_id').value !== o.id) apply(o, false); }
-    else { el('object_id').value = ''; if (hint) hint.textContent = ''; codes = []; if (stairList) stairList.innerHTML = ''; }
+  el('address').addEventListener('change', () => {
+    // form._objReady – kad kiti (pvz. pranešimo pasirinkimas) galėtų palaukti, kol bus užkrauti laiptinių kodai
+    form._objReady = (async () => {
+      const o = await db.findObject(el('address').value, el('city').value);
+      if (o) { if (el('object_id').value !== o.id) await apply(o, false); }
+      else { el('object_id').value = ''; if (hint) hint.textContent = ''; codes = []; if (stairList) stairList.innerHTML = ''; }
+    })();
   });
   if (el('stairwell')) {
     const fromStair = () => {

@@ -230,7 +230,7 @@ export function buildingSummary(o) {
 /**
  * Pranešimų CSV (be antraštės, skirtukas „;“). Aprašymai gali turėti eilučių lūžių ir „;“, todėl įrašai
  * atskiriami pagal pradžią „V26-0000000;YYYY-MM-DD HH:MM;“, o aprašymas imamas tarp 8 pirmųjų ir paskutinių laukų.
- * Eksportas turi 26 stulpelius (17 galinių) arba 27 – kai gale pridėtas kontaktinio asmens vardas (18 galinių).
+ * Eksportas: 26 stulpeliai (17 galinių); 27 – gale pridėtas kontaktinio asmens vardas (18); 28 – dar „N laiptinė“ (19).
  */
 export function parseReports(text) {
   text = String(text || '').replace(/^\uFEFF/, '');
@@ -241,7 +241,7 @@ export function parseReports(text) {
   const freq = {};
   recs.forEach(p => { freq[p.length] = (freq[p.length] || 0) + 1; });
   const mode = Number(Object.keys(freq).sort((a, b) => freq[b] - freq[a])[0] || 26);
-  const tailN = mode >= 27 ? 18 : 17;
+  const tailN = mode >= 28 ? 19 : mode >= 27 ? 18 : 17;
   return recs.map(p => {
     const t = p.slice(-tailN);
     return {
@@ -249,7 +249,8 @@ export function parseReports(text) {
       description: p.slice(8, p.length - tailN).join(';').trim(),
       status: t[0], priority_code: t[3], engineer: t[4], manager: t[5], order_type: t[6], apartment: t[7],
       work_label: t[8], act_type: t[9], city: t[10], reporter: t[11], property_type: t[14], contact: t[16],
-      contact_name: tailN === 18 ? t[17] : ''
+      contact_name: tailN >= 18 ? t[17] : '',
+      stairwell: tailN >= 19 ? ((/(\d+[A-Za-z]?)/.exec(t[18] || '') || [])[1] || '') : ''
     };
   });
 }
