@@ -11,7 +11,7 @@ Aktų tipai: **defektavimo aktas** (forma VP08FA), **numatomų darbų aktas** (s
 ## Adresai ir prieigos
 - Programėlė: https://mindaugasbukauskas1996-ship-it.github.io/defektai/ (GitHub Pages, repo `mindaugasbukauskas1996-ship-it/defektai`, vieša, šaka `main`, šaknis).
 - Supabase projekto ref: `jootkekxpxclbfughmpi` (URL ir publishable raktas – `js/config.js`, jie vieši pagal paskirtį; saugo RLS).
-- **Vietinis šaltinis (tiesa): `C:\Users\mindaugas.bukauskas\OneDrive - CSG\Desktop\Aktavimas\defektai_1\defektai`.** Git nėra įdiegtas – į GitHub failai keliami per naršyklę (žr. „Diegimo procedūra“).
+- **Vietinis šaltinis (tiesa): `C:\Users\mindaugas.bukauskas\OneDrive - CSG\Desktop\Aktavimas\defektai_1\defektai`.** **Aplankas yra Git repozitorija** (`origin` = GitHub repo, šaka `main`): Git ir `gh` įdiegti be admin teisių į `%LOCALAPPDATA%\Programs\Git\cmd` ir `%LOCALAPPDATA%\Programs\gh\bin` (PATH – naudotojo; naujame lange `git`/`gh` veikia, senuose galioja `$env:Path += ";$env:LOCALAPPDATA\Programs\Git\cmd;$env:LOCALAPPDATA\Programs\gh\bin"`). `gh` prisijungta kaip `mindaugasbukauskas1996-ship-it`.
 - Duomenų failai (NE repozitorijoje, yra gyventojų/objektų duomenų): `Aktavimas\objektai-info.csv`, `Aktavimas\pranesimai-tomas.csv`.
 - Prijungtos jungtys: Supabase, Claude in Chrome (GitHub prisijungęs vartotojo Chrome), Vercel/Gmail (nenaudojama).
 
@@ -47,7 +47,7 @@ Veiksmai: `parse_task` (laiškas → laukai), `generate_act` (defektų + numatom
 ## Diegimo procedūra (kaip viską išleisti)
 1. **DB pakeitimai**: Supabase jungtis `apply_migration` (pavadinimas snake_case) + tą patį įrašyti į `supabase/schema.sql`. Po RLS pakeitimų patikrinti su imituotais vaidmenimis (`set local role authenticated` + `request.jwt.claims`).
 2. **DI funkcija**: pakeitus `prompt.js`/`index.ts` → sugeneruoti vieno failo versiją (antraštė + `prompt.js` + `index.ts` be `import ... from './prompt.js'`) ir `deploy_edge_function` (name `ai`, entrypoint `index.ts`, `verify_jwt:false`, vienas failas `index.ts`). **Šį veiksmą saugos klasifikatorius gali atmesti – tada paprašyti vartotojo aiškaus leidimo.**
-3. **Sąsaja**: failus įkelti į GitHub per Claude in Chrome: `https://github.com/mindaugasbukauskas1996-ship-it/defektai/upload/main/<aplankas>` → `file_upload` į „Choose your files“ → „Commit changes“. Failai turi būti darbo aplanke (iš `Downloads`/scratchpad įkelti neleidžiama – pirma nukopijuoti). Tuščiam aplankui reikia egzistuojančio aplanko (sukurti per `new/main?filename=aplankas/.gitkeep`).
+3. **Sąsaja** (Git): `git add -A` → `git commit -m "trumpas aprašas"` → `git push` (šaka `main`). Pages atsinaujina per ~30 s. Prieš tai `git status`/`git diff`, kad matytųsi, kas keičiasi. Repo viešas – **niekada nekomituoti** CSV su duomenimis, paslapčių, `.env` (`.gitignore` tai dengia). Atsarginis būdas, jei Git neveiktų: įkelti per Claude in Chrome (`.../upload/main/<aplankas>` → `file_upload` → „Commit changes“; failai turi būti darbo aplanke).
 4. **Patikra gyvai**: palaukti ~30 s (Pages), tada naršyklės konsolėje `fetch('/defektai/js/x.js',{cache:'reload'})` visiems moduliams ir `location.reload()` – naršyklė iki 10 min. laiko senus modulius. JS įrankio išvestyje venk `=` ir `&` (blokuoja kaip „query string“).
 5. Dideli vienkartiniai duomenys (objektai, kodai, pranešimai) importuojami per **Nustatymai → Objektai ir laiptinių kodai** (admin), ne per SQL.
 
@@ -67,5 +67,5 @@ Veiksmai: `parse_task` (laiškas → laukai), `generate_act` (defektų + numatom
 - Supabase **„Allow new users to sign up“ turi būti išjungta** (patikrinti: `/auth/v1/settings` → `disable_signup`). Papildoma apsauga (aktyvavimas) jau yra.
 - Claude kreditų išlaidų limitas platform.claude.com; atsarginės kopijos (nemokamas planas jų nedaro); vieša `laiptiniu-kodai` repo atskleidžia kodus.
 - Pranešimo „prioriteto“ kodas (1/2/3) neperkeltas į užduoties prioritetą – neaišku reikšmė.
-- Nėra automatinių testų; nėra Git istorijos (siūlyti įdiegti Git + `gh`).
+- Nėra automatinių testų. Git istorija prasideda nuo 2026-10 (anksčiau failai keliami per naršyklę). `.git` yra OneDrive aplanke – jei OneDrive skųstųsi sinchronizacija, perkelti darbo kopiją į atskirą aplanką.
 - Pastato duomenys pildomi tik importu (nėra redagavimo ekrano).

@@ -1,0 +1,9 @@
+# Duomenys ir paslaptys niekada nekeliami į viešą repozitoriją
+*.csv
+*.xlsx
+.env
+.env.*
+*.key
+.claude/
+Thumbs.db
+.DS_Store

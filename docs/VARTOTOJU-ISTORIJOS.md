@@ -34,7 +34,7 @@ Vaidmenys: **Inžinierius** (darbuotojas), **Admin**, **Rangovas** (tik gauna ak
 - ✅ Admin importuoja **objektus, laiptinių kodus, pranešimus** (CSV).
 
 ## Planuojama / idėjos (prioriteto tvarka – tikslinti su vartotoju)
-1. ⬜ **Git + automatinis diegimas**: įdiegti Git ir GitHub CLI, kad pakeitimai keltųsi viena komanda, o istorija išliktų.
+1. ✅ **Git + GitHub CLI** įdiegti (be admin), pakeitimai keliami `git push`, istorija išlieka. ⬜ Likę: automatinis DI funkcijos diegimas per GitHub Actions (reikia paslapčių `SUPABASE_ACCESS_TOKEN`, `SUPABASE_PROJECT_REF`).
 2. ⬜ Admin: **pastato duomenų redagavimas** programėlėje (dabar tik CSV importu) ir objekto kortelė.
 3. ⬜ Pranešimas → užduotis: perkelti **prioritetą** (reikia išsiaiškinti 1/2/3 reikšmę), terminą; pranešimo statusas po akto parengimo; sąrašas „neapdoroti pranešimai“.
 4. ⬜ Pranešimų **automatinis atnaujinimas** (kasdienis importas arba tiesioginis ryšys su sistema, jei įmanoma).
