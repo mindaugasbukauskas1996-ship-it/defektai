@@ -512,6 +512,7 @@ function bindQuestions(body, pending) {
 
 async function generate(body, { force = false, instruction = '' }) {
   const t = S.task;
+  let learned = '';
   const mode = t.act_mode === 'full' ? 'full' : 'defect';
   const overlay = showBusy(instruction ? 'DI taiso aktą...' : 'DI analizuoja aprašymą ir nuotraukas...');
   try {
@@ -530,9 +531,11 @@ async function generate(body, { force = false, instruction = '' }) {
       },
       qa: (t.ai_questions || []).filter(q => q.done).map(q => ({ question: q.question, answer: q.answer })),
       current: instruction ? { defect_act: t.defect_act, works_act: t.works_act } : undefined,
+      lessons: await db.activeLessons('defect').catch(() => []),
       photos
     };
     const res = await db.ai('generate_act', payload);
+    if (instruction) learned = await learnLesson('defect', res.lesson, t.id);
 
     if (res.status === 'questions' && (res.questions || []).length && !force && !instruction) {
       const qs = (t.ai_questions || []).filter(q => q.done).concat(
@@ -550,7 +553,7 @@ async function generate(body, { force = false, instruction = '' }) {
       if (['nauja', 'planuota', 'apziureta'].includes(t.status)) patch.status = 'aktas';
       await ensureActNumber(patch);
       await save(patch);
-      toast(instruction ? 'Aktas pataisytas' : 'Aktas paruoštas – peržiūrėkite ir pataisykite, jei reikia', 'ok', 4500);
+      toast((instruction ? 'Aktas pataisytas.' : 'Aktas paruoštas – peržiūrėkite ir pataisykite, jei reikia') + learned, 'ok', learned ? 8000 : 4500);
     }
   } catch (e) {
     console.error(e);
@@ -559,6 +562,14 @@ async function generate(body, { force = false, instruction = '' }) {
     overlay.remove();
     draw();
   }
+}
+
+/** Išsaugo DI išskirtą bendrą taisyklę, kad kitų aktų generavimas ją taikytų. */
+async function learnLesson(kind, lesson, taskId) {
+  try {
+    const row = await db.addLesson(kind, lesson, taskId);
+    return row ? ` DI įsiminė taisyklę: „${row.text}“ (Nustatymai → DI taisyklės).` : '';
+  } catch (e) { console.warn('Nepavyko išsaugoti taisyklės', e); return ''; }
 }
 
 async function ensureActNumber(patch) {
@@ -664,6 +675,7 @@ function drawActEditor() {
 
     <div class="card refine">
       <div class="card-title">${icon('spark')} Pataisyti su DI</div>
+      <p class="muted small">Jei nurodymas tinka ir kitiems aktams, DI jį įsimins ir taikys ateityje (Nustatymai → DI taisyklės).</p>
       <div class="refine-row">
         <input id="refine-txt" placeholder="Pvz.: pridėk pastolius ir šiukšlių išvežimą; įlajos skersmuo 100 mm">
         <button class="btn" id="refine-btn">Taisyti</button>
@@ -781,6 +793,7 @@ function drawNcActs(body) {
 
 async function generateNc(body, { instruction = '' }) {
   const t = S.task;
+  let learned = '';
   const overlay = showBusy(instruction ? 'DI taiso aktą...' : 'DI analizuoja aprašymą ir nuotraukas...');
   try {
     const actPhotos = S.photos.filter(p => p.include_in_act);
@@ -792,6 +805,7 @@ async function generateNc(body, { instruction = '' }) {
     const res = await db.ai('generate_nc', {
       instruction,
       current: instruction ? t.nc_act : undefined,
+      lessons: await db.activeLessons('nonconformity').catch(() => []),
       task: {
         address: t.address, city: t.city, stairwell: t.stairwell, contractor: t.contractor,
         work_name: t.service_type, problem: t.problem, description: t.description,
@@ -800,6 +814,7 @@ async function generateNc(body, { instruction = '' }) {
       photos
     });
     if (!(res.items || []).length) throw new Error('DI negrąžino neatikčių. Papildykite aprašymą ir bandykite dar kartą.');
+    if (instruction) learned = await learnLesson('nonconformity', res.lesson, t.id);
     const patch = {
       nc_act: {
         work: res.work || t.service_type || '',
@@ -816,7 +831,7 @@ async function generateNc(body, { instruction = '' }) {
     if (['nauja', 'planuota', 'apziureta'].includes(t.status)) patch.status = 'aktas';
     await ensureActNumber(patch);
     await save(patch);
-    toast(instruction ? 'Aktas pataisytas' : 'Aktas paruoštas – peržiūrėkite ir pataisykite, jei reikia', 'ok', 4500);
+    toast((instruction ? 'Aktas pataisytas.' : 'Aktas paruoštas – peržiūrėkite ir pataisykite, jei reikia') + learned, 'ok', learned ? 8000 : 4500);
   } catch (e) {
     console.error(e);
     toast(e.message || String(e), 'error', 8000);
@@ -872,6 +887,7 @@ function drawNcEditor() {
 
     <div class="card refine">
       <div class="card-title">${icon('spark')} Pataisyti su DI</div>
+      <p class="muted small">Jei nurodymas tinka ir kitiems aktams, DI jį įsimins ir taikys ateityje (Nustatymai → DI taisyklės).</p>
       <div class="refine-row">
         <input id="refine-txt" placeholder="Pvz.: pridėk, kad nepateikti paslėptų darbų aktai; terminas 5 darbo dienos">
         <button class="btn" id="refine-btn">Taisyti</button>

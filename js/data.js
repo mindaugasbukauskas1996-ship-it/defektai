@@ -357,6 +357,61 @@ export async function nextActNumber(kind = 'defect') {
 }
 
 // ---------------------------------------------------------------------
+// DI išmoktos taisyklės (savos kiekvienai paskyrai)
+// ---------------------------------------------------------------------
+
+const LS_KEY = 'defektai-lessons';
+const lsRead = () => { try { return JSON.parse(localStorage.getItem(LS_KEY) || '[]'); } catch (_) { return []; } };
+const lsWrite = arr => localStorage.setItem(LS_KEY, JSON.stringify(arr));
+
+/** Visos matomos taisyklės (admin mato visų paskyrų). */
+export async function listLessons() {
+  if (isDemo) return lsRead();
+  const { data, error } = await sb.from('ai_lessons').select('*').order('created_at', { ascending: false }).limit(500);
+  if (error) throw error;
+  return data;
+}
+
+/** Aktyvių taisyklių tekstai šio tipo aktui (tik savos). */
+export async function activeLessons(kind) {
+  const me = await getProfile();
+  const all = await listLessons();
+  return all.filter(l => l.active && l.kind === kind && (isDemo || l.user_id === me.id))
+    .sort((a, b) => String(a.created_at).localeCompare(String(b.created_at)))
+    .slice(-30).map(l => l.text);
+}
+
+export async function addLesson(kind, text, sourceTask = null) {
+  text = String(text || '').trim();
+  if (!text) return null;
+  const me0 = await getProfile();
+  const mine = (await listLessons()).filter(l => isDemo || l.user_id === me0.id);
+  if (mine.some(l => l.kind === kind && l.text.trim().toLowerCase() === text.toLowerCase())) return null;
+  if (isDemo) {
+    const row = { id: uuid(), kind, text, active: true, source_task: sourceTask, created_at: new Date().toISOString() };
+    lsWrite([row, ...lsRead()]);
+    return row;
+  }
+  const me = await getProfile();
+  const { data, error } = await sb.from('ai_lessons')
+    .insert({ user_id: me.id, kind, text, source_task: sourceTask }).select('*').single();
+  if (error) throw error;
+  return data;
+}
+
+export async function updateLesson(id, patch) {
+  if (isDemo) { lsWrite(lsRead().map(l => l.id === id ? { ...l, ...patch } : l)); return; }
+  const { error } = await sb.from('ai_lessons').update(patch).eq('id', id);
+  if (error) throw error;
+}
+
+export async function deleteLesson(id) {
+  if (isDemo) { lsWrite(lsRead().filter(l => l.id !== id)); return; }
+  const { error } = await sb.from('ai_lessons').delete().eq('id', id);
+  if (error) throw error;
+}
+
+// ---------------------------------------------------------------------
 // DI
 // ---------------------------------------------------------------------
 

@@ -377,6 +377,68 @@ function renderNcForm(id, t, s, assignee = '') {
 }
 
 // ---------------------------------------------------------------------
+// DI išmoktos taisyklės (Nustatymuose)
+// ---------------------------------------------------------------------
+
+async function renderLessons(account) {
+  const box = $('#lessons-card');
+  const isAdmin = account.role === 'admin';
+  const [items, people] = await Promise.all([db.listLessons(), isAdmin ? db.listProfiles() : []]);
+  const owner = id => db.profileName(people.find(p => p.id === id));
+  const KIND = { defect: 'Defektų aktai', nonconformity: 'Neatiktys' };
+
+  box.innerHTML = `
+    <div class="card lessons-card">
+      <div class="card-title">${icon('spark')} DI išmoktos taisyklės</div>
+      <p class="muted small">Kai „Pataisyti su DI“ nurodymas tinka ir kitiems aktams, DI jį įsimena ir taiko kuriant naujus aktus. Čia galite taisyklę pakeisti, išjungti ar ištrinti.${isAdmin ? ' Kaip administratorius matote ir kitų paskyrų taisykles.' : ''}</p>
+      ${items.length ? `<ul class="lessons">${items.map(l => `
+        <li data-id="${esc(l.id)}" class="${l.active ? '' : 'off'}">
+          <label class="chk" title="Naudoti"><input type="checkbox" data-l="active" ${l.active ? 'checked' : ''}></label>
+          <span class="tag">${esc(KIND[l.kind] || l.kind)}</span>
+          ${isAdmin && l.user_id && l.user_id !== account.id ? `<span class="tag">${esc(owner(l.user_id))}</span>` : ''}
+          <input class="les-txt" data-l="text" value="${esc(l.text)}">
+          <button class="btn icon-only small danger-ghost" data-l="del" type="button" title="Ištrinti">${icon('trash')}</button>
+        </li>`).join('')}</ul>` : '<div class="muted small">Taisyklių dar nėra. Jos atsiras po pirmų pataisymų su DI.</div>'}
+      <div class="les-add">
+        <select id="les-kind"><option value="defect">Defektų aktai</option><option value="nonconformity">Neatiktys</option></select>
+        <input id="les-new" placeholder="Pridėti taisyklę ranka, pvz.: Visada įtrauk statybinių atliekų išvežimą">
+        <button class="btn" id="les-add" type="button">${icon('plus')} Pridėti</button>
+      </div>
+    </div>`;
+
+  box.onchange = async e => {
+    const el = e.target.closest('[data-l]');
+    if (!el) return;
+    const li = el.closest('li');
+    try {
+      if (el.dataset.l === 'active') { await db.updateLesson(li.dataset.id, { active: el.checked }); li.classList.toggle('off', !el.checked); }
+      else if (el.dataset.l === 'text') {
+        const v = el.value.trim();
+        if (!v) return renderLessons(account);
+        await db.updateLesson(li.dataset.id, { text: v });
+        toast('Taisyklė išsaugota', 'ok', 1500);
+      }
+    } catch (err) { toast(err.message, 'error'); }
+  };
+  box.onclick = async e => {
+    const b = e.target.closest('[data-l="del"]');
+    if (b) {
+      if (!await confirmDialog('Ištrinti šią taisyklę?', 'Ištrinti')) return;
+      try { await db.deleteLesson(b.closest('li').dataset.id); renderLessons(account); } catch (err) { toast(err.message, 'error'); }
+      return;
+    }
+    if (e.target.closest('#les-add')) {
+      const txt = $('#les-new').value.trim();
+      if (!txt) return toast('Įrašykite taisyklę', 'error');
+      try {
+        await db.addLesson($('#les-kind').value, txt);
+        renderLessons(account);
+      } catch (err) { toast(err.message, 'error'); }
+    }
+  };
+}
+
+// ---------------------------------------------------------------------
 // Nustatymai
 // ---------------------------------------------------------------------
 
@@ -455,7 +517,9 @@ async function renderSettings() {
       <div class="form-actions sticky-actions">
         <button class="btn primary" type="submit">${icon('check')} Išsaugoti nustatymus</button>
       </div>
-    </form>`;
+    </form>
+    <div id="lessons-card"></div>`;
+  renderLessons(account).catch(e => { $('#lessons-card').innerHTML = `<div class="card error">Nepavyko įkelti DI taisyklių: ${esc(e.message)}</div>`; });
 
   let signature = s.signature || '';
   $('#sig-file').addEventListener('change', async e => {
