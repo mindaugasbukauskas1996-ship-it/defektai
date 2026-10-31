@@ -412,3 +412,9 @@ textarea.notes { font-size: 16px; min-height: 260px; }
 .an-concl { display: grid; grid-template-columns: 26px 1fr auto; gap: 8px; align-items: start; margin-bottom: 8px; }
 .an-concl > span { padding-top: 10px; font-weight: 700; }
 .an-obj .tc-side { flex-direction: row; align-items: center; gap: 6px; flex-wrap: wrap; }
+
+/* Metinė: ankstesnių defektų pasirinkimas */
+.modal:has(.an-pick) { max-width: 560px; }
+.an-pick { max-height: 50vh; overflow: auto; margin: 10px 0; display: grid; gap: 6px; }
+.an-pick-row { display: flex; gap: 10px; align-items: flex-start; padding: 8px; border: 1px solid #e3e6ea; border-radius: 8px; cursor: pointer; font-size: 14px; }
+.an-pick-row input { margin-top: 4px; }

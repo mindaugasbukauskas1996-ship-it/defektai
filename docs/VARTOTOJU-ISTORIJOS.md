@@ -31,6 +31,7 @@ Vaidmenys: **Inžinierius** (darbuotojas), **Admin**, **Rangovas** (tik gauna ak
 - ✅ Inžinierius – kiekvieną elementą pažymėti „Defektų nėra / Yra defektų / Praleisti“, padiktuoti pastabą ir pridėti nuotrauką, o DI parašo aktą (STR punktai, išvados).
 - ✅ Inžinierius – pradėti nuo praėjusių metų to paties namo akto („kaip pernai“).
 - ✅ Akto Nr. `MBB-<raidė>-<namo nr.>`, peržiūra su redagavimu, Word ir PDF.
+- ✅ Inžinierius – pradėdamas metinę gauti **pasiūlymą įtraukti to namo defektų aktuose užfiksuotus defektus** (elementai pažymimi „Yra defektų“ su pastaba iš akto).
 - ⬜ Šablono (elementų sąrašo) ir standartinių išvadų redagavimas Nustatymuose; masinis metinių planavimas pagal vadybininką / mėnesį; unikalaus Nr. importas objektams.
 
 ### Paskyros ir saugumas

@@ -84,11 +84,79 @@ export function newAnnualAct(s, object, prev) {
   };
 }
 
+// Defektų aktų defektai → metinės apžiūros elementai (pagal raktažodžius; svarbi tvarka)
+const DEFECT_KEYS = [
+  ['stogas', /stog|čerp|lietvamz|skardin|parapet/i], ['balkonai', /balkon|lodž/i], ['ventiliacija', /ventil|kamin|ištraukim/i],
+  ['cokolis', /pamat|cokol|nuogrind|rūsi/i], ['silumos_punktas', /šilumos (punkt|mazg)/i], ['sildymas', /šildym|radiator/i],
+  ['elektra', /elektr|apšvietim|skydin|šviestuv/i], ['vamzdynai', /vamzd|vanden|kanaliz|nuotek/i],
+  ['langai', /lang/i], ['durys', /duri/i], ['laiptines', /laiptin|laiptų|laiptai|turėkl/i],
+  ['perdangos', /perdang|grind/i], ['sienos', /sien|fasad|siūl|plyš|tink|apdail|mūr/i]
+];
+const defectItemId = d => {
+  for (const txt of [d.system, d.defects]) {
+    const k = DEFECT_KEYS.find(([, re]) => re.test(txt || ''));
+    if (k) return k[0];
+  }
+  return '';
+};
+
+/** Visi užfiksuoti defektai iš objekto defektų aktų (plokščias sąrašas). */
+async function collectDefects(object) {
+  const acts = await db.findDefectActs(object.id);
+  const out = [];
+  acts.forEach(t => (t.defect_act.objects || []).forEach(o => {
+    if (!(o.defects || '').trim()) return;
+    out.push({ system: (o.system || '').trim(), defects: o.defects.trim(), works: (o.works || '').trim(),
+      actNo: t.act_number || '', date: t.act_date || t.created_at });
+  }));
+  return out;
+}
+
+/** Siūlo pasirinkti, kuriuos ankstesnių aktų defektus įtraukti. Grąžina pasirinktus (tuščią – jei praleista). */
+function pickDefects(list) {
+  return new Promise(resolve => {
+    const wrap = document.createElement('div');
+    wrap.className = 'modal-backdrop';
+    wrap.innerHTML = `<div class="modal" role="dialog" aria-modal="true">
+      <h3>Rasti ankstesni defektai</h3>
+      <p class="muted small">Šio namo defektų aktuose jau užfiksuota ${list.length} defektų. Pažymėtieji bus perkelti į metinę apžiūrą.</p>
+      <div class="an-pick">${list.map((d, i) => `<label class="an-pick-row"><input type="checkbox" data-i="${i}" checked>
+        <span><b>${esc(d.system || 'Defektas')}</b> <span class="muted small">${esc(fmtDate(d.date))}${d.actNo ? ' · ' + esc(d.actNo) : ''}</span><br>${esc(d.defects.length > 220 ? d.defects.slice(0, 220) + '…' : d.defects)}</span></label>`).join('')}</div>
+      <div class="modal-actions"><button class="btn ghost" data-r="0">Be defektų</button><button class="btn primary" data-r="1">Įtraukti pažymėtus</button></div></div>`;
+    wrap.addEventListener('click', e => {
+      const r = e.target.closest('[data-r]');
+      if (!r) return;
+      const chosen = r.dataset.r === '1' ? $$('input[data-i]', wrap).filter(c => c.checked).map(c => list[+c.dataset.i]) : [];
+      wrap.remove(); resolve(chosen);
+    });
+    document.getElementById('modal-root').appendChild(wrap);
+  });
+}
+
+/** Pažymi atitinkamus elementus „Yra defektų“ ir įrašo pastabą iš defektų akto. */
+function applyDefects(act, defects) {
+  defects.forEach(d => {
+    const note = `Pagal defektų aktą${d.actNo ? ' Nr. ' + d.actNo : ''} (${fmtDate(d.date)}): ${d.defects}${d.works ? `\nNumatyti darbai: ${d.works}` : ''}`;
+    const id = defectItemId(d);
+    let item = id && act.sections.flatMap(sec => sec.items).find(it => it.id === id);
+    if (!item) {                                                       // neatpažinta sistema – atskiras elementas
+      const sec = act.sections[act.sections.length - 1];
+      item = { id: 'x_' + Math.random().toString(36).slice(2, 8), no: `${sec.no}.${sec.items.length + 1}`, name: d.system || 'Kitas defektas',
+        str: '', status: 'ok', brief: '', text: OK_TEXT, prev: '' };
+      sec.items.push(item);
+    }
+    item.status = 'defects';
+    item.brief = item.brief ? `${item.brief}\n${note}` : note;
+  });
+}
+
 /** Sukuria metinės apžiūros užduotį pasirinktam objektui ir grąžina jos id. */
 export async function startAnnual(object) {
   const s = await db.getSettings();
   const prevTask = await db.findPreviousAnnual(object.id);
   const act = newAnnualAct(s, object, prevTask && prevTask.annual_act);
+  const found = await collectDefects(object).catch(() => []);
+  if (found.length) applyDefects(act, await pickDefects(found));
   const t = await db.createTask({
     kind: 'annual', address: [object.street, object.house].filter(Boolean).join(' '), city: object.city, object_id: object.id,
     manager: object.manager, problem: 'Kasmetinė apžiūra', service_type: 'Statinio periodinė apžiūra',
