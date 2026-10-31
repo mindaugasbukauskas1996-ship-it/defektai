@@ -84,3 +84,14 @@ h2.up { text-transform: uppercase; text-align: center; font-size: 13pt; margin: 
   .grid th { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
   .works tr.sec td { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
 }
+
+/* ---------- Redagavimas peržiūroje ---------- */
+[data-b] { white-space: pre-wrap; }
+[data-b]:empty::after { content: "\00a0"; }
+.pb-actions { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+#pv-save { min-width: 90px; text-align: right; }
+@media screen {
+  body.pv-edit [data-b] { cursor: text; border-radius: 2px; transition: background .12s; }
+  body.pv-edit [data-b]:hover { background: #fff8d6; }
+  body.pv-edit [data-b]:focus { background: #fff3b0; outline: 2px solid #f5b800; outline-offset: 1px; }
+}
