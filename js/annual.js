@@ -104,13 +104,19 @@ const defectItemId = d => {
 async function collectDefects(object) {
   const acts = await db.findDefectActs(object);
   const out = [];
-  acts.forEach(t => (t.defect_act.objects || []).forEach(o => {
-    if (!(o.defects || '').trim()) return;
-    out.push({ system: (o.system || '').trim(), defects: o.defects.trim(), works: (o.works || '').trim(),
-      actNo: t.act_number || '', date: t.act_date || t.created_at });
-  }));
+  for (const t of acts) {
+    const objs = (t.defect_act.objects || []).filter(o => (o.defects || '').trim());
+    // „N pav.“ defektų akte = N-oji į aktą įtraukta nuotrauka
+    const figs = objs.some(o => (o.photos || []).length) ? (await db.listPhotos(t.id)).filter(p => p.include_in_act) : [];
+    objs.forEach(o => out.push({ system: (o.system || '').trim(), defects: noFigRefs(o.defects), works: noFigRefs(o.works),
+      actNo: t.act_number || '', date: t.act_date || t.created_at,
+      photos: (o.photos || []).map(n => figs[n - 1]).filter(Boolean) }));
+  }
   return out;
 }
+
+/** Išmeta nuorodas į defektų akto paveikslėlius „(žr. 3, 7 pav.)“ – metinėje numeracija kita. */
+const noFigRefs = s => String(s || '').replace(/\s*\((?:žr\.?|pav\.)[^)]*\)/gi, '').replace(/\s+([.,;])/g, '$1').trim();
 
 /** Siūlo pasirinkti, kuriuos ankstesnių aktų defektus įtraukti. Grąžina pasirinktus (tuščią – jei praleista). */
 function pickDefects(list) {
@@ -146,6 +152,7 @@ function applyDefects(act, defects) {
       sec.items.push(item);
     }
     item.status = 'defects';
+    d.itemId = item.id;
     item.brief = item.brief ? `${item.brief}\n${note}` : note;
   });
 }
@@ -156,12 +163,20 @@ export async function startAnnual(object) {
   const prevTask = await db.findPreviousAnnual(object.id);
   const act = newAnnualAct(s, object, prevTask && prevTask.annual_act);
   const found = await collectDefects(object).catch(() => []);
-  if (found.length) applyDefects(act, await pickDefects(found));
+  const chosen = found.length ? await pickDefects(found) : [];
+  applyDefects(act, chosen);
   const t = await db.createTask({
     kind: 'annual', address: [object.street, object.house].filter(Boolean).join(' '), city: object.city, object_id: object.id,
     manager: object.manager, problem: 'Kasmetinė apžiūra', service_type: 'Statinio periodinė apžiūra',
     act_number: annualNumber(s, object), act_date: today(), inspection_date: today(), status: 'planuota', annual_act: act
   });
+  const seen = new Set(); let n = 0, failed = 0;                      // defektų akto nuotraukos → metinės elementams
+  for (const d of chosen) for (const p of d.photos || []) {
+    if (seen.has(p.id)) continue;
+    seen.add(p.id);
+    try { await db.copyPhoto(p, t.id, { ref: d.itemId, sort: n++ }); } catch (e) { failed++; console.warn(e); }
+  }
+  if (failed) toast(`Nepavyko perkelti ${failed} nuotraukų`, 'error');
   return t.id;
 }
 

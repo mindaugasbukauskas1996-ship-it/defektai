@@ -215,6 +215,26 @@ export async function addPhoto(taskId, blob, meta = {}) {
   return data;
 }
 
+/** Nukopijuoja nuotrauką (su žymėjimais) į kitą užduotį; saugykloje daroma sava kopija, kad trynimas nepaveiktų originalo. */
+export async function copyPhoto(photo, taskId, meta = {}) {
+  if (isDemo) return null;
+  const id = uuid();
+  const path = `${taskId}/${id}.jpg`;
+  let r = await sb.storage.from('photos').copy(photo.path, path);
+  if (r.error) throw r.error;
+  let annotated = null;
+  if (photo.annotated_path) {
+    annotated = `${taskId}/${id}_ann_${Date.now()}.jpg`;
+    r = await sb.storage.from('photos').copy(photo.annotated_path, annotated);
+    if (r.error) throw r.error;
+  }
+  const row = { id, task_id: taskId, path, annotated_path: annotated, annotations: photo.annotations || [], caption: photo.caption || '',
+    sort: meta.sort || 0, include_in_act: true, width: photo.width, height: photo.height, ref: meta.ref || null };
+  const { error } = await sb.from('photos').insert(row);
+  if (error) throw error;
+  return row;
+}
+
 export async function updatePhoto(id, patch) {
   if (isDemo) {
     const p = await idbGet('photos', id);
