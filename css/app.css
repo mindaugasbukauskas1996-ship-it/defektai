@@ -453,3 +453,22 @@ input:focus, select:focus, textarea:focus { outline: 2px solid rgba(0,188,98,.25
 .spinner.big { color: var(--green); }
 label, .lbl { color: #3d5a6c; }
 @media (max-width: 640px) { .brand .app-name { display: none; } }
+
+/* Montserrat platesnis už sisteminį šriftą – sumažiname dydžius */
+body { font-size: 13.5px; line-height: 1.45; letter-spacing: -.1px; }
+h1 { font-size: 20px; }
+.brand .logo { font-size: 18px; }
+.brand .app-name { font-size: 11px; }
+.topbar { height: 50px; gap: 16px; }
+.nav-top a { font-size: 13px; padding: 6px 10px; gap: 6px; }
+.ic { width: 16px; height: 16px; vertical-align: -3px; }
+.btn { font-size: 13px; min-height: 36px; padding: 6px 14px; }
+.btn.big { font-size: 14px; min-height: 42px; }
+.btn.small { font-size: 12px; min-height: 30px; padding: 3px 10px; }
+.chip { font-size: 12.5px; }
+label, .lbl { font-size: 12px; }
+input, select, textarea { font-size: 13.5px; min-height: 38px; }
+.card-title { font-size: 14px; }
+.small, .muted.small { font-size: 12px; }
+.tag { font-size: 11px; }
+.tabs a { font-size: 13px; }
