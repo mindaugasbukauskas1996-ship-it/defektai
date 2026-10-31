@@ -388,3 +388,27 @@ textarea.notes { font-size: 16px; min-height: 260px; }
 .act-ed .form-grid { align-items: start; }
 
 .docx-row { align-items: center; margin-top: 8px; }
+
+/* Metinė apžiūra */
+.an-row { border: 1px solid var(--line, #e4e7ec); border-radius: 10px; padding: 10px; margin-bottom: 10px; background: #fff; }
+.an-row.st-defects { border-color: #f5b4ab; background: #fffaf9; }
+.an-row.st-skip { opacity: .6; }
+.an-top { display: flex; justify-content: space-between; align-items: center; gap: 8px; margin-bottom: 8px; }
+.seg { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 8px; }
+.seg label { flex: 1 1 110px; text-align: center; padding: 9px 8px; border: 1px solid var(--line, #d0d5dd); border-radius: 8px; cursor: pointer; font-weight: 600; font-size: 14px; user-select: none; }
+.seg label.on.ok { background: #ecfdf3; border-color: #12b76a; color: #027a48; }
+.seg label.on.defects { background: #fef3f2; border-color: #f04438; color: #b42318; }
+.seg label.on.skip { background: #f2f4f7; border-color: #98a2b3; }
+.seg input { display: none; }
+.an-tools { display: flex; gap: 8px; flex-wrap: wrap; margin: 8px 0; }
+.an-tools .rec, .btn.rec { background: #fef3f2; border-color: #f04438; }
+.an-thumbs { display: flex; gap: 8px; flex-wrap: wrap; margin: 6px 0; }
+.an-th { position: relative; display: inline-block; }
+.an-th img { width: 84px; height: 84px; object-fit: cover; border-radius: 8px; border: 1px solid var(--line, #d0d5dd); display: block; background: #f2f4f7; }
+.an-th button { position: absolute; top: -6px; right: -6px; width: 22px; height: 22px; border-radius: 50%; border: 0; background: #b42318; color: #fff; cursor: pointer; line-height: 1; }
+.an-prev { margin-top: 6px; } .an-prev summary { cursor: pointer; color: var(--primary, #1d3a5f); font-weight: 600; font-size: 13px; }
+.pre { white-space: pre-wrap; margin: 6px 0; }
+.an-sec-h { margin: 14px 0 6px; color: var(--primary, #1d3a5f); }
+.an-concl { display: grid; grid-template-columns: 26px 1fr auto; gap: 8px; align-items: start; margin-bottom: 8px; }
+.an-concl > span { padding-top: 10px; font-weight: 700; }
+.an-obj .tc-side { flex-direction: row; align-items: center; gap: 6px; flex-wrap: wrap; }

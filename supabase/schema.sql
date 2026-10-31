@@ -432,3 +432,9 @@ create policy "lessons update" on public.ai_lessons for update to authenticated
   with check (public.is_active() and (user_id = auth.uid() or public.is_admin()));
 create policy "lessons delete" on public.ai_lessons for delete to authenticated
   using (public.is_active() and (user_id = auth.uid() or public.is_admin()));
+
+-- ---------- Metinė (kasmetinė) apžiūra ----------
+-- tasks.kind = 'annual'; aktas – annual_act (jsonb); nuotraukos susiejamos su elementu per photos.ref
+alter table public.tasks  add column if not exists annual_act jsonb;
+alter table public.photos add column if not exists ref text;
+create index if not exists tasks_object_kind_idx on public.tasks (object_id, kind);

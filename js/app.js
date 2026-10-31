@@ -11,6 +11,7 @@ import {
 } from './util.js';
 import { renderTask } from './task.js';
 import { renderPrint } from './print.js';
+import { renderAnnualList } from './annual.js';
 
 const view = () => document.getElementById('view');
 let user = null;
@@ -42,6 +43,7 @@ function renderShell() {
   $('#nav-top').innerHTML = `
     <a href="#/" data-nav="list">${icon('list')}<span>Užduotys</span></a>
     <a href="#/nauja" data-nav="new">${icon('plus')}<span>Nauja</span></a>
+    <a href="#/metine" data-nav="annual">${icon('file')}<span>Metinė</span></a>
     <a href="#/neatiktis" data-nav="nc">${icon('alert')}<span>Neatiktis</span></a>
     <a href="#/nustatymai" data-nav="settings">${icon('settings')}<span>Nustatymai</span></a>`;
   $('#nav-bottom').innerHTML = $('#nav-top').innerHTML;
@@ -73,6 +75,7 @@ async function route() {
       if (!me.active) return renderPending(me);
     }
     if (parts[0] === 'nauja') { setActiveNav('new'); return await renderTaskForm(null); }
+    if (parts[0] === 'metine') { setActiveNav('annual'); return await renderAnnualList(view(), go); }
     if (parts[0] === 'neatiktis') { setActiveNav('nc'); return await renderTaskForm(null, 'nonconformity'); }
     if (parts[0] === 'nustatymai') { setActiveNav('settings'); return await renderSettings(); }
     if (parts[0] === 'u' && parts[1]) {
@@ -150,12 +153,13 @@ async function renderList() {
   const isAdmin = me.role === 'admin';
   const people = isAdmin ? await db.listProfiles() : [];
   const pname = id => db.profileName(people.find(p => p.id === id));
-  const chips = [{ id: 'aktyvios', label: 'Aktyvios' }, ...STATUSES, { id: 'neatiktys', label: 'Neatiktys' }, { id: 'visos', label: 'Visos' }];
+  const chips = [{ id: 'aktyvios', label: 'Aktyvios' }, ...STATUSES, { id: 'neatiktys', label: 'Neatiktys' }, { id: 'metines', label: 'Metinės' }, { id: 'visos', label: 'Visos' }];
 
   const counts = {};
   tasks.forEach(t => { counts[t.status] = (counts[t.status] || 0) + 1; });
   counts.aktyvios = tasks.filter(t => t.status !== 'baigta').length;
   counts.neatiktys = tasks.filter(t => t.kind === 'nonconformity').length;
+  counts.metines = tasks.filter(t => t.kind === 'annual').length;
   counts.visos = tasks.length;
 
   view().innerHTML = `
@@ -186,7 +190,8 @@ async function renderList() {
       if (isAdmin && listFilter.who !== 'all' && t.assigned_to !== listFilter.who) return false;
       if (listFilter.status === 'aktyvios' && t.status === 'baigta') return false;
       if (listFilter.status === 'neatiktys' && t.kind !== 'nonconformity') return false;
-      if (!['aktyvios', 'visos', 'neatiktys'].includes(listFilter.status) && t.status !== listFilter.status) return false;
+      if (listFilter.status === 'metines' && t.kind !== 'annual') return false;
+      if (!['aktyvios', 'visos', 'neatiktys', 'metines'].includes(listFilter.status) && t.status !== listFilter.status) return false;
       if (!q) return true;
       return [t.address, t.city, t.problem, t.contact_name, t.contact_phone, t.stairwell, t.act_number, t.service_type, t.contractor, t.report_no]
         .some(v => v && String(v).toLowerCase().includes(q));
@@ -209,6 +214,7 @@ async function renderList() {
         <div class="tc-main">
           <div class="tc-addr">${esc(t.address || '(be adreso)')}${t.city ? `, ${esc(t.city)}` : ''}
             ${t.kind === 'nonconformity' ? `<span class="tag nc">${icon('alert')} Neatiktis</span>` : ''}
+            ${t.kind === 'annual' ? '<span class="tag">Metinė apžiūra</span>' : ''}
             ${t.stairwell ? `<span class="tag">${esc(t.stairwell)} laipt.</span>` : ''}
             ${t.apartment ? `<span class="tag">bt. ${esc(t.apartment)}</span>` : ''}
           </div>
@@ -719,6 +725,8 @@ async function renderSettings() {
         <label>Kitas akto Nr.<input name="next_act_no" type="number" min="1" value="${esc(s.next_act_no)}"></label>
         <label>Neatikties akto Nr. prefiksas<input name="nc_prefix" value="${esc(s.nc_prefix)}"></label>
         <label>Kitas neatikties akto Nr.<input name="next_nc_no" type="number" min="1" value="${esc(s.next_nc_no)}"></label>
+        <label>Metinės apžiūros Nr. prefiksas<input name="annual_prefix" value="${esc(s.annual_prefix)}" placeholder="MBB"></label>
+        <label class="span2">Kvalifikacijos atestato Nr. (metinėse apžiūrose)<input name="inspector_cert" value="${esc(s.inspector_cert)}" placeholder="35236"></label>
         <div class="span4 sig-row">
           <div>
             <div class="lbl">Parašas / spaudas (PNG, nebūtina)</div>

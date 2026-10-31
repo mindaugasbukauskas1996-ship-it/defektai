@@ -10,6 +10,7 @@ import {
   fmtQty, parseQty, buildingSummary
 } from './util.js';
 import { openAnnotator } from './annotator.js';
+import { drawAnnualInspection, drawAnnualActTab } from './annual.js';
 
 const UNITS = ['Vnt.', 'm', 'm²', 'm³', 'Komplektas', 'val.', 'kg', 'T', 'Ltr', 'cm', 'para',
   'Kalendorinė diena', 'kWh', 'Suma (€)', 'Objektų skaičius', 'Butų skaičius', 'Patalpų skaičius', 'metras ir diena'];
@@ -45,10 +46,17 @@ const TABS_NC = [
 ];
 
 const isNc = t => t.kind === 'nonconformity';
+const TABS_AN = [
+  { id: 'info', label: 'Informacija' },
+  { id: 'apziura', label: 'Apžiūra' },
+  { id: 'aktai', label: 'Aktas' }
+];
+const annualCtx = () => ({ S, save, draw, showBusy, downloadDocx, building: () => buildingForAI(S.object) });
 
 function draw() {
   const t = S.task;
   const nc = isNc(t);
+  const an = t.kind === 'annual';
   const actPhotos = S.photos.filter(p => p.include_in_act).length;
   S.el.innerHTML = `
     <div class="task-head">
@@ -57,6 +65,7 @@ function draw() {
         <h1>${esc(t.address || '(be adreso)')}${t.city ? `, ${esc(t.city)}` : ''}</h1>
         <div class="th-sub">
           ${nc ? `<span class="tag nc">${icon('alert')} Neatiktis</span>` : ''}
+          ${an ? '<span class="tag">Metinė apžiūra</span>' : ''}
           ${nc && t.contractor ? `<span class="tag">${esc(t.contractor)}</span>` : ''}
           ${t.report_no ? `<span class="tag">Pr. ${esc(t.report_no)}</span>` : ''}
           ${t.stairwell ? `<span class="tag">${esc(t.stairwell)} laiptinė</span>` : ''}
@@ -70,7 +79,7 @@ function draw() {
       </select>
     </div>
     <nav class="tabs" id="tabs">
-      ${(nc ? TABS_NC : TABS).map(x => `<a href="#/u/${t.id}/${x.id}" class="${S.tab === x.id ? 'on' : ''}">${x.label}${x.id === 'foto' ? ` <span class="cnt">${S.photos.length}</span>` : ''}${x.id === 'aktai' && (t.defect_act || t.nc_act) ? ' <span class="dot"></span>' : ''}</a>`).join('')}
+      ${(an ? TABS_AN : nc ? TABS_NC : TABS).map(x => `<a href="#/u/${t.id}/${x.id}" class="${S.tab === x.id ? 'on' : ''}">${x.label}${x.id === 'foto' ? ` <span class="cnt">${S.photos.length}</span>` : ''}${x.id === 'aktai' && (t.defect_act || t.nc_act || (an && t.status === 'aktas')) ? ' <span class="dot"></span>' : ''}</a>`).join('')}
     </nav>
     <div id="tab-body"></div>`;
 
@@ -81,6 +90,8 @@ function draw() {
   });
 
   const body = $('#tab-body');
+  if (an && S.tab === 'apziura') return drawAnnualInspection(fresh(body), annualCtx());
+  if (an && S.tab === 'aktai') return drawAnnualActTab(fresh(body), annualCtx());
   if (S.tab === 'foto') return drawPhotos(body);
   if (S.tab === 'apziura') return drawInspection(body);
   if (S.tab === 'aktai') return nc ? drawNcActs(body) : drawActs(body);
@@ -196,6 +207,11 @@ function drawInfo(body) {
       toast('Užduotis priskirta: ' + db.profileName(S.people.find(p => p.id === asg.value)), 'ok');
     } catch (e) { toast(e.message, 'error'); }
   });
+
+  if (t.kind === 'annual') {
+    const ns = $('.next-steps');
+    if (ns) ns.innerHTML = `<div class="card-title">Toliau</div><div class="steps"><a class="step" href="#/u/${t.id}/apziura">${icon('edit')}<span>1. Apžiūra: pažymėti elementus, nuotraukos</span></a><a class="step" href="#/u/${t.id}/aktai">${icon('spark')}<span>2. Sugeneruoti ir peržiūrėti aktą</span></a></div>`;
+  }
 
   const cc = $('#copy-code');
   if (cc) cc.addEventListener('click', () => {
@@ -764,11 +780,14 @@ async function downloadDocx(doc, btn) {
   const old = btn.innerHTML;
   btn.disabled = true; btn.innerHTML = '<span class="spinner"></span> Ruošiama...';
   try {
-    const actPhotos = S.photos.filter(p => p.include_in_act);
+    const annual = doc === 'annual';
+    const actPhotos = annual ? [] : S.photos.filter(p => p.include_in_act);
     const urls = await Promise.all(actPhotos.map(p => db.photoUrl(p, true)));
     const figs = actPhotos.map((p, i) => ({ n: i + 1, url: urls[i], caption: p.caption, w: p.width, h: p.height }));
+    const refPhotos = {};
+    if (annual) for (const p of S.photos.filter(x => x.ref)) (refPhotos[p.ref] = refPhotos[p.ref] || []).push({ url: await db.photoUrl(p, true) });
     const { exportDocx } = await import('./docx.js');
-    const name = await exportDocx({ t: S.task, s: S.settings, doc, figs });
+    const name = await exportDocx({ t: S.task, s: S.settings, doc, figs, refPhotos });
     toast(`Word failas paruoštas: ${name}`, 'ok', 5000);
   } catch (err) {
     console.error(err);

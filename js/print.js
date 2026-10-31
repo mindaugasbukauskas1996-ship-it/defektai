@@ -12,27 +12,31 @@ export async function renderPrint(el, id, doc) {
   const [t, photos, s] = await Promise.all([db.getTask(id), db.listPhotos(id), db.getSettings()]);
   if (!t) throw new Error('Užduotis nerasta');
   if (t.kind === 'nonconformity') doc = 'nc';
-  if (doc === 'nc' ? !t.nc_act : !t.defect_act) throw new Error('Aktas dar neparuoštas');
+  if (t.kind === 'annual') doc = 'annual';
+  if (doc === 'annual' ? !t.annual_act : doc === 'nc' ? !t.nc_act : !t.defect_act) throw new Error('Aktas dar neparuoštas');
   if ((doc === 'works' || doc === 'both') && !t.works_act) doc = 'defect';
 
-  const actPhotos = photos.filter(p => p.include_in_act);
+  const actPhotos = doc === 'annual' ? [] : photos.filter(p => p.include_in_act);
+  const refPhotos = {};
+  if (doc === 'annual') for (const p of photos.filter(x => x.ref)) (refPhotos[p.ref] = refPhotos[p.ref] || []).push({ url: await db.photoUrl(p, true) });
   const urls = await Promise.all(actPhotos.map(p => db.photoUrl(p, true)));
   const figs = actPhotos.map((p, i) => ({ n: i + 1, url: urls[i], caption: p.caption, w: p.width, h: p.height }));
 
   const parts = [];
+  if (doc === 'annual') parts.push(annualSheet(t, s, refPhotos));
   if (doc === 'nc') parts.push(ncSheet(t, s, figs.length));
   if (doc === 'defect' || doc === 'both') parts.push(defectSheet(t, s, figs.length));
   if (doc === 'works' || doc === 'both') parts.push(worksSheet(t, s));
   if (figs.length) parts.push(photoSheet(t, s, figs));
 
-  const titles = { defect: 'defektavimo aktas', works: 'numatomų darbų aktas', both: 'aktai', nc: 'neatikties aktas' };
+  const titles = { defect: 'defektavimo aktas', works: 'numatomų darbų aktas', both: 'aktai', nc: 'neatikties aktas', annual: 'metinės apžiūros aktas' };
   document.title = `${t.act_number || ''} ${t.address || ''} ${titles[doc]}`.trim();
 
   el.innerHTML = `
     <div class="print-bar no-print">
       <a class="btn ghost" href="#/u/${t.id}/aktai">${icon('back')} Atgal</a>
       <div class="pb-docs">
-        ${doc === 'nc' ? `<a class="chip on" href="#/spausdinti/${t.id}/nc">Neatikties aktas</a>` : `
+        ${doc === 'annual' ? `<a class="chip on" href="#/spausdinti/${t.id}/annual">Metinės apžiūros aktas</a>` : doc === 'nc' ? `<a class="chip on" href="#/spausdinti/${t.id}/nc">Neatikties aktas</a>` : `
         <a class="chip ${doc === 'defect' ? 'on' : ''}" href="#/spausdinti/${t.id}/defect">Defektavimo</a>
         ${t.works_act ? `<a class="chip ${doc === 'works' ? 'on' : ''}" href="#/spausdinti/${t.id}/works">Numatomų darbų</a>
         <a class="chip ${doc === 'both' ? 'on' : ''}" href="#/spausdinti/${t.id}/both">Abu</a>` : ''}`}
@@ -64,7 +68,7 @@ export async function renderPrint(el, id, doc) {
     try {
       await editing.flush();
       const { exportDocx } = await import('./docx.js');
-      const name = await exportDocx({ t, s, doc, figs });
+      const name = await exportDocx({ t, s, doc, figs, refPhotos });
       toast(`Word failas paruoštas: ${name}`, 'ok', 5000);
     } catch (err) {
       console.error(err);
@@ -77,7 +81,7 @@ export async function renderPrint(el, id, doc) {
 // Redagavimas peržiūroje
 // ---------------------------------------------------------------------
 
-const ROOTS = { t: t => t, d: t => t.defect_act, w: t => t.works_act, nc: t => t.nc_act };
+const ROOTS = { t: t => t, d: t => t.defect_act, w: t => t.works_act, nc: t => t.nc_act, an: t => t.annual_act };
 const DATE_PATHS = ['t.act_date', 't.due_date'];
 
 /** Įrašo reikšmę į duomenis pagal kelią (pvz. d.objects.0.defects). Grąžina false, jei reikšmė netinkama. */
@@ -94,7 +98,7 @@ function setPath(t, path, raw) {
     v = v || null;
   } else if (last === 'qty') v = parseQty(raw);
   else if (root === 't') v = raw.trim() || null;
-  else if (el_single(path)) v = raw.trim();
+  else if (el_single(path) || path.startsWith('an.general.')) v = raw.trim();
   obj[last] = v;
   return true;
 }
@@ -119,7 +123,7 @@ function bindEditing(root, t) {
     ind.textContent = 'Saugoma...';
     const patch = {
       act_number: t.act_number, act_date: t.act_date, manager: t.manager, contractor: t.contractor, due_date: t.due_date,
-      defect_act: t.defect_act, works_act: t.works_act, nc_act: t.nc_act
+      defect_act: t.defect_act, works_act: t.works_act, nc_act: t.nc_act, annual_act: t.annual_act
     };
     Object.keys(patch).forEach(k => { if (patch[k] === undefined) delete patch[k]; });
     try {
@@ -341,6 +345,54 @@ function ncSheet(t, s, nFigs) {
     <div class="signs">
       ${signRow(s.engineer_position, s.signature, s.engineer_name, '(aktą surašiusio asmens pareigos)')}
       ${signRow(t.contractor ? `Rangovo atstovas, ${t.contractor}` : 'Rangovo atstovas', '', '', '(rangovo atstovo pareigos; su aktu susipažinau)')}
+    </div>
+  </section>`;
+}
+
+function annualSheet(t, s, refPhotos) {
+  const a = t.annual_act, g = a.general;
+  const gi = (l, k) => `<tr><th>${l}</th><td data-b="an.general.${k}" data-single>${esc(g[k] ?? '')}</td></tr>`;
+  const sec = a.sections.map((sc, si) => {
+    const items = sc.items.map((it, ii) => ({ it, ii })).filter(x => x.it.status !== 'skip');
+    if (!items.length) return '';
+    return `<tr class="sec"><td class="no">${esc(sc.no)}.</td><td colspan="3">${esc(sc.title)}</td></tr>` + items.map(({ it, ii }) => `<tr>
+      <td class="no">${esc(it.no)}</td><td>${esc(it.name)}</td>
+      <td class="an-photos">${(refPhotos[it.id] || []).map(p => `<img src="${p.url}" alt="">`).join('')}</td>
+      <td data-b="an.sections.${si}.items.${ii}.text">${esc(it.text)}</td></tr>`).join('');
+  }).join('');
+  const signRow = (pos, name, sig) => `
+    <div class="sign-row">
+      <div class="sign-cell wide"><div class="sign-val">${esc(pos)}</div><div class="under">(pareigos)</div></div>
+      <div class="sign-cell"><div class="sign-val">${sig ? `<img class="sig" src="${sig}" alt="">` : ''}</div><div class="under">(parašas)</div></div>
+      <div class="sign-cell"><div class="sign-val">${esc(name)}</div><div class="under">(vardas, pavardė)</div></div>
+    </div>`;
+  return `
+  <section class="sheet">
+    <div class="doc-top">
+      <div class="lined">${esc([s.engineer_name, g.org].filter(Boolean).join('  '))}</div>
+      <div class="under">(už statinio techninę priežiūrą atsakingo asmens vardas, pavardė, organizacijos pavadinimas)</div>
+      <h2>STATINIO APŽIŪROS AKTAS</h2>
+      <div class="date-no"><span class="lined" data-b="t.act_date" data-single>${esc(fmtDate(t.act_date))}</span> Nr. <span class="lined" data-b="t.act_number" data-single>${esc(t.act_number || '')}</span></div>
+      <div class="under">(data)</div>
+      <div class="lined narrow">${esc(s.city || t.city || '')}</div><div class="under">(sudarymo vieta)</div>
+    </div>
+    <h3 class="an-h">BENDRIEJI DUOMENYS</h3>
+    <table class="fields">
+      ${gi('Statinio adresas', 'address')}${gi('Unikalus Nr.', 'unique_no')}${gi('Statybos metai', 'built_year')}${gi('Bendras plotas', 'total_area')}
+      ${gi('Statinio paskirtis', 'purpose')}${gi('Apžiūros vadovas', 'inspector')}${gi('Apžiūros kategorija', 'category')}
+      ${gi('Apžiūros pagrindas', 'basis')}${gi('Apžiūros metodas', 'method')}${gi('Pastato apžiūros data', 'date')}
+    </table>
+    <h3 class="an-h">APŽIŪROS DUOMENYS</h3>
+    <table class="grid an-grid">
+      <thead><tr><th class="no">Eil. Nr.</th><th>Apžiūrima dalis</th><th>Apžiūros nuotrauka</th><th>Pastabos / Rekomendacijos</th></tr></thead>
+      <tbody>${sec}</tbody>
+    </table>
+    <h3 class="an-h">BENDROS IŠVADOS / REKOMENDACIJOS</h3>
+    <div class="an-concls">${a.conclusions.map((c, i) => `<div class="an-concl-p"><span class="n">${i + 1}.</span><span data-b="an.conclusions.${i}">${esc(c)}</span></div>`).join('')}</div>
+    <h3 class="an-h">APŽIŪROS DALYVIAI</h3>
+    <div class="signs">
+      ${signRow(`Techninis inžinierius${s.inspector_cert ? ` (kv. atestato Nr. ${s.inspector_cert})` : ''}`, s.engineer_name, s.signature)}
+      ${signRow('Klientų atstovas', '', '')}${signRow('', '', '')}
     </div>
   </section>`;
 }

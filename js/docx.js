@@ -11,7 +11,7 @@ const DOCX_URL = 'https://cdn.jsdelivr.net/npm/docx@8.5.0/+esm';
 const PAGE_W = 11906, PAGE_H = 16838, MARGIN = 800;
 const W = PAGE_W - 2 * MARGIN;
 
-export async function exportDocx({ t, s, doc, figs }) {
+export async function exportDocx({ t, s, doc, figs, refPhotos = {} }) {
   const D = await import(DOCX_URL);
   const { Document, Packer, Paragraph, TextRun, Table, TableRow, TableCell, WidthType, AlignmentType,
     BorderStyle, ImageRun, VerticalAlign, ShadingType } = D;
@@ -164,6 +164,53 @@ export async function exportDocx({ t, s, doc, figs }) {
     return ch;
   }
 
+  async function annualSheet() {
+    const a = t.annual_act, g = a.general;
+    const gw = [Math.round(W * 0.30), Math.round(W * 0.70)];
+    const gr = (l, v) => row([cell(l, { w: gw[0], borders: ALL, fill: 'F3F4F6' }), cell(String(v ?? ''), { w: gw[1], borders: ALL })]);
+    const cw = [760, 2300, 2300, W - 760 - 2300 - 2300];
+    const body = [headRow(['Eil. Nr.', 'Apžiūrima dalis', 'Apžiūros nuotrauka', 'Pastabos / Rekomendacijos']
+      .map((h, i) => cell(h, { w: cw[i], bold: true, fill: 'E9ECEF', align: AlignmentType.CENTER, v: VerticalAlign.CENTER })))];
+    for (const sc of a.sections) {
+      const items = sc.items.filter(x => x.status !== 'skip');
+      if (!items.length) continue;
+      body.push(row([cell(`${sc.no}.`, { w: cw[0], bold: true, fill: 'F6F6F6' }), cell(sc.title, { w: cw[1] + cw[2] + cw[3], span: 3, bold: true, fill: 'F6F6F6' })]));
+      for (const it of items) {
+        const imgs = [];
+        for (const p of (refPhotos[it.id] || [])) {
+          try {
+            const blob = await (await fetch(p.url)).blob();
+            const bmp = await createImageBitmap(blob);
+            const k = Math.min(150 / bmp.width, 115 / bmp.height);
+            imgs.push(new Paragraph({ spacing: { after: 60 }, alignment: AlignmentType.CENTER, children: [new ImageRun({ data: new Uint8Array(await blob.arrayBuffer()), transformation: { width: Math.round(bmp.width * k), height: Math.round(bmp.height * k) }, type: 'jpg' })] }));
+          } catch (_) { /* nuotrauka praleidžiama */ }
+        }
+        body.push(row([cell(it.no, { w: cw[0] }), cell(it.name, { w: cw[1] }), cell(imgs.length ? imgs : [P('', { after: 0 })], { w: cw[2] }), cell(it.text || '', { w: cw[3] })]));
+      }
+    }
+    const ch = [
+      P([new TextRun({ text: [s.engineer_name, g.org].filter(Boolean).join('  '), size: SZ })], { align: AlignmentType.CENTER, border: true, after: 0 }),
+      small('(už statinio techninę priežiūrą atsakingo asmens vardas, pavardė, organizacijos pavadinimas)'),
+      P('STATINIO APŽIŪROS AKTAS', { bold: true, size: 28, align: AlignmentType.CENTER, before: 120, after: 120 }),
+      P(`${fmtDate(t.act_date)}      Nr. ${t.act_number || ''}`, { size: 22, align: AlignmentType.CENTER, after: 0 }), small('(data)'),
+      P(s.city || t.city || '', { align: AlignmentType.CENTER, border: true, after: 0 }), small('(sudarymo vieta)'),
+      P('BENDRIEJI DUOMENYS', { bold: true, before: 160, after: 80 }),
+      table(gw, [['Statinio adresas', g.address], ['Unikalus Nr.', g.unique_no], ['Statybos metai', g.built_year], ['Bendras plotas', g.total_area],
+        ['Statinio paskirtis', g.purpose], ['Apžiūros vadovas', g.inspector], ['Apžiūros kategorija', g.category], ['Apžiūros pagrindas', g.basis],
+        ['Apžiūros metodas', g.method], ['Pastato apžiūros data', g.date]].map(([l, v]) => gr(l, v))),
+      P('APŽIŪROS DUOMENYS', { bold: true, before: 200, after: 80 }),
+      table(cw, body),
+      P('BENDROS IŠVADOS / REKOMENDACIJOS', { bold: true, before: 200, after: 80 }),
+      ...a.conclusions.map((c, i) => P(`${i + 1}. ${c}`, { align: AlignmentType.JUSTIFIED, after: 80 })),
+      P('APŽIŪROS DALYVIAI', { bold: true, before: 200, after: 80 })
+    ];
+    ch.push(await signBlock([
+      { position: `Techninis inžinierius${s.inspector_cert ? ` (kv. atestato Nr. ${s.inspector_cert})` : ''}`, name: s.engineer_name, sig: true },
+      { position: 'Klientų atstovas', name: '' }, { position: '', name: '' }
+    ], '(pareigos)'));
+    return ch;
+  }
+
   async function photoSheet() {
     const colW = Math.floor(W / 2);
     const items = [];
@@ -199,6 +246,7 @@ export async function exportDocx({ t, s, doc, figs }) {
   // ---------- dokumentas ----------
   const sections = [];
   const add = children => sections.push({ properties: { page: { size: { width: PAGE_W, height: PAGE_H }, margin: { top: MARGIN, right: MARGIN, bottom: MARGIN, left: MARGIN } } }, children });
+  if (doc === 'annual') add(await annualSheet());
   if (doc === 'nc') add(await ncSheet());
   if (doc === 'defect' || doc === 'both') add(await defectSheet());
   if (doc === 'works' || doc === 'both') add(await worksSheet());
@@ -211,7 +259,7 @@ export async function exportDocx({ t, s, doc, figs }) {
     sections
   });
   const blob = await Packer.toBlob(document_);
-  const labels = { defect: 'defektavimo aktas', works: 'numatomu darbu aktas', both: 'aktai', nc: 'neatikties aktas' };
+  const labels = { defect: 'defektavimo aktas', works: 'numatomu darbu aktas', both: 'aktai', nc: 'neatikties aktas', annual: 'metines apziuros aktas' };
   const name = `${t.act_number || 'aktas'} ${t.address || ''} ${labels[doc] || ''}`.replace(/[\\/:*?"<>|]+/g, ' ').replace(/\s+/g, ' ').trim() + '.docx';
   const a = document.createElement('a');
   a.href = URL.createObjectURL(blob);

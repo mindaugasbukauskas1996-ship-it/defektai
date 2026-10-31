@@ -95,3 +95,14 @@ h2.up { text-transform: uppercase; text-align: center; font-size: 13pt; margin: 
   body.pv-edit [data-b]:hover { background: #fff8d6; }
   body.pv-edit [data-b]:focus { background: #fff3b0; outline: 2px solid #f5b800; outline-offset: 1px; }
 }
+
+/* Metinės apžiūros aktas */
+.an-h { font-size: 11pt; margin: 6mm 0 2mm; }
+.an-grid td { vertical-align: top; }
+.an-grid tr.sec td { font-weight: 700; background: #f6f6f6; }
+.an-grid td:nth-child(2) { width: 36mm; }
+.an-grid .an-photos { width: 40mm; text-align: center; }
+.an-photos img { width: 36mm; max-height: 30mm; object-fit: cover; display: block; margin: 0 auto 1.5mm; border: 1px solid #ccc; }
+.an-concl-p { display: flex; gap: 6px; margin: 2mm 0; text-align: justify; }
+.an-concl-p .n { min-width: 7mm; }
+@media print { .an-grid tr { break-inside: avoid; page-break-inside: avoid; } }

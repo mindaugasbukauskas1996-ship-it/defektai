@@ -18,6 +18,8 @@ export const DEFAULT_SETTINGS = {
   act_prefix: 'DA',
   next_act_no: 1,
   nc_prefix: 'NA',
+  annual_prefix: 'MBB',
+  inspector_cert: '',
   next_nc_no: 1,
   form_code: 'Forma VP08FA',
   department: 'TECHNINIAI INŽ.',
@@ -128,7 +130,7 @@ export const profileName = p => (p && (p.full_name || p.email)) || '';
 export async function listTasks() {
   if (isDemo) return (await idbAll('tasks')).sort((a, b) => b.created_at.localeCompare(a.created_at));
   const { data, error } = await sb.from('tasks')
-    .select('id,created_at,updated_at,status,priority,service_type,address,city,apartment,stairwell,contact_name,contact_phone,problem,due_date,act_number,kind,contractor,assigned_to,report_no')
+    .select('id,created_at,updated_at,status,priority,service_type,address,city,apartment,stairwell,contact_name,contact_phone,problem,due_date,act_number,act_date,object_id,kind,contractor,assigned_to,report_no')
     .order('created_at', { ascending: false }).limit(1000);
   if (error) throw error;
   return data;
@@ -198,7 +200,7 @@ export async function addPhoto(taskId, blob, meta = {}) {
   const row = {
     id, task_id: taskId, path, annotated_path: null, annotations: [],
     caption: meta.caption || '', sort: meta.sort || 0, include_in_act: true,
-    width: meta.width || null, height: meta.height || null
+    width: meta.width || null, height: meta.height || null, ref: meta.ref || null
   };
   if (isDemo) {
     await idbPut('blobs', { path, blob });
@@ -252,6 +254,15 @@ export async function deletePhoto(photo) {
   await sb.storage.from('photos').remove(paths);
   const { error } = await sb.from('photos').delete().eq('id', photo.id);
   if (error) throw error;
+}
+
+/** Paskutinė to paties objekto metinė apžiūra (pagrindui kitiems metams). */
+export async function findPreviousAnnual(objectId) {
+  if (isDemo || !objectId) return null;
+  const { data, error } = await sb.from('tasks').select('*').eq('kind', 'annual').eq('object_id', objectId)
+    .order('act_date', { ascending: false, nullsFirst: false }).order('created_at', { ascending: false }).limit(1);
+  if (error) throw error;
+  return data[0] || null;
 }
 
 /** Peržiūros URL (pažymėta versija, jei yra). */
@@ -595,6 +606,19 @@ export async function deleteLesson(id) {
 // ---------------------------------------------------------------------
 // DI
 // ---------------------------------------------------------------------
+
+/** Metinės apžiūros akto tekstai (atskira Edge funkcija „ai-annual“). */
+export async function aiAnnual(payload) {
+  if (isDemo) throw new Error('Metinės apžiūros DI veikia tik prisijungus prie Supabase.');
+  const { data, error } = await sb.functions.invoke('ai-annual', { body: { payload } });
+  if (error) {
+    let msg = error.message;
+    try { const body = await error.context.json(); if (body && body.error) msg = body.error; } catch (_) { /* ignore */ }
+    throw new Error(msg);
+  }
+  if (data && data.error) throw new Error(data.error);
+  return data;
+}
 
 export async function ai(action, payload) {
   if (isDemo) {
