@@ -167,6 +167,7 @@ async function renderList() {
       <h1>Užduotys</h1>
       <span class="head-btns hide-mobile">
         <a class="btn" href="#/neatiktis">${icon('alert')} Nauja neatiktis</a>
+        <a class="btn" href="#/metine">${icon('file')} Nauja metinė apžiūra</a>
         <a class="btn primary" href="#/nauja">${icon('plus')} Nauja užduotis</a>
       </span>
     </div>
