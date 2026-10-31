@@ -354,3 +354,81 @@ create policy "reports admin write" on public.reports
 
 alter table public.tasks add column if not exists report_no text;
 create index if not exists tasks_report_idx on public.tasks (report_no);
+
+-- ---------- Paskyros aktyvavimas ----------
+-- Nauja paskyra (registracija / Add user) neturi prieigos prie duomenų, kol admin jos neaktyvuoja
+-- (Nustatymai → Paskyros → „aktyvi“). Pirma paskyra – aktyvus admin.
+alter table public.profiles add column if not exists active boolean not null default false;
+
+create or replace function public.is_active() returns boolean
+language sql stable security definer set search_path = public as $$
+  select exists (select 1 from public.profiles where id = auth.uid() and active)
+$$;
+revoke all on function public.is_active() from public, anon;
+grant execute on function public.is_active() to authenticated;
+
+create or replace function public.is_admin() returns boolean
+language sql stable security definer set search_path = public as $$
+  select exists (select 1 from public.profiles where id = auth.uid() and role = 'admin' and active)
+$$;
+
+create or replace function public.handle_new_user() returns trigger
+language plpgsql security definer set search_path = public as $$
+declare first_user boolean := not exists (select 1 from public.profiles);
+begin
+  insert into public.profiles (id, email, role, active)
+  values (new.id, new.email, case when first_user then 'admin' else 'user' end, first_user)
+  on conflict (id) do nothing;
+  return new;
+end $$;
+revoke all on function public.handle_new_user() from public, anon, authenticated;
+
+create or replace function public.guard_profile_role() returns trigger
+language plpgsql set search_path = public as $$
+begin
+  if (new.role is distinct from old.role or new.active is distinct from old.active) and not public.is_admin() then
+    raise exception 'Tik administratorius gali keisti rolę ir aktyvavimą';
+  end if;
+  return new;
+end $$;
+
+drop policy if exists "tasks select" on public.tasks;
+drop policy if exists "tasks insert" on public.tasks;
+drop policy if exists "tasks update" on public.tasks;
+drop policy if exists "tasks delete" on public.tasks;
+create policy "tasks select" on public.tasks for select to authenticated
+  using (public.is_active() and (assigned_to = auth.uid() or public.is_admin()));
+create policy "tasks insert" on public.tasks for insert to authenticated
+  with check (public.is_active() and created_by = auth.uid() and (assigned_to = auth.uid() or public.is_admin()));
+create policy "tasks update" on public.tasks for update to authenticated
+  using (public.is_active() and (assigned_to = auth.uid() or public.is_admin()))
+  with check (public.is_active() and (assigned_to = auth.uid() or public.is_admin()));
+create policy "tasks delete" on public.tasks for delete to authenticated
+  using (public.is_active() and (assigned_to = auth.uid() or public.is_admin()));
+
+drop policy if exists "objects read" on public.objects;
+create policy "objects read" on public.objects for select to authenticated using (public.is_active());
+drop policy if exists "codes read" on public.stair_codes;
+create policy "codes read" on public.stair_codes for select to authenticated using (public.is_active());
+
+drop policy if exists "reports read" on public.reports;
+create policy "reports read" on public.reports for select to authenticated
+  using (public.is_active() and (assigned_to = auth.uid() or public.is_admin()));
+
+drop policy if exists "own settings" on public.user_settings;
+create policy "own settings" on public.user_settings for all to authenticated
+  using (public.is_active() and user_id = auth.uid()) with check (public.is_active() and user_id = auth.uid());
+
+drop policy if exists "lessons select" on public.ai_lessons;
+drop policy if exists "lessons insert" on public.ai_lessons;
+drop policy if exists "lessons update" on public.ai_lessons;
+drop policy if exists "lessons delete" on public.ai_lessons;
+create policy "lessons select" on public.ai_lessons for select to authenticated
+  using (public.is_active() and (user_id = auth.uid() or public.is_admin()));
+create policy "lessons insert" on public.ai_lessons for insert to authenticated
+  with check (public.is_active() and user_id = auth.uid());
+create policy "lessons update" on public.ai_lessons for update to authenticated
+  using (public.is_active() and (user_id = auth.uid() or public.is_admin()))
+  with check (public.is_active() and (user_id = auth.uid() or public.is_admin()));
+create policy "lessons delete" on public.ai_lessons for delete to authenticated
+  using (public.is_active() and (user_id = auth.uid() or public.is_admin()));
