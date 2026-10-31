@@ -168,13 +168,13 @@ export async function exportDocx({ t, s, doc, figs, refPhotos = {} }) {
     const a = t.annual_act, g = a.general;
     const gw = [Math.round(W * 0.30), Math.round(W * 0.70)];
     const gr = (l, v) => row([cell(l, { w: gw[0], borders: ALL, fill: 'F3F4F6' }), cell(String(v ?? ''), { w: gw[1], borders: ALL })]);
-    const cw = [760, 2300, 2300, W - 760 - 2300 - 2300];
-    const body = [headRow(['Eil. Nr.', 'Apžiūrima dalis', 'Apžiūros nuotrauka', 'Pastabos / Rekomendacijos']
+    const rest = W - 600 - 1500 - 1900, cw = [600, 1500, 1900, Math.round(rest * 0.58), rest - Math.round(rest * 0.58)];
+    const body = [headRow(['Eil. Nr.', 'Apžiūrima dalis', 'Apžiūros nuotrauka', 'Pastebėti defektai', 'Rekomendacijos']
       .map((h, i) => cell(h, { w: cw[i], bold: true, fill: 'E9ECEF', align: AlignmentType.CENTER, v: VerticalAlign.CENTER })))];
     for (const sc of a.sections) {
       const items = sc.items.filter(x => x.status !== 'skip');
       if (!items.length) continue;
-      body.push(row([cell(`${sc.no}.`, { w: cw[0], bold: true, fill: 'F6F6F6' }), cell(sc.title, { w: cw[1] + cw[2] + cw[3], span: 3, bold: true, fill: 'F6F6F6' })]));
+      body.push(row([cell(`${sc.no}.`, { w: cw[0], bold: true, fill: 'F6F6F6' }), cell(sc.title, { w: cw[1] + cw[2] + cw[3] + cw[4], span: 4, bold: true, fill: 'F6F6F6' })]));
       for (const it of items) {
         const imgs = [];
         for (const p of (refPhotos[it.id] || [])) {
@@ -185,7 +185,7 @@ export async function exportDocx({ t, s, doc, figs, refPhotos = {} }) {
             imgs.push(new Paragraph({ spacing: { after: 60 }, alignment: AlignmentType.CENTER, children: [new ImageRun({ data: new Uint8Array(await blob.arrayBuffer()), transformation: { width: Math.round(bmp.width * k), height: Math.round(bmp.height * k) }, type: 'jpg' })] }));
           } catch (_) { /* nuotrauka praleidžiama */ }
         }
-        body.push(row([cell(it.no, { w: cw[0] }), cell(it.name, { w: cw[1] }), cell(imgs.length ? imgs : [P('', { after: 0 })], { w: cw[2] }), cell(it.text || '', { w: cw[3] })]));
+        body.push(row([cell(it.no, { w: cw[0] }), cell(it.name, { w: cw[1] }), cell(imgs.length ? imgs : [P('', { after: 0 })], { w: cw[2] }), cell(it.text || '', { w: cw[3] }), cell(it.rec || '', { w: cw[4] })]));
       }
     }
     const ch = [

@@ -418,3 +418,7 @@ textarea.notes { font-size: 16px; min-height: 260px; }
 .an-pick { max-height: 50vh; overflow: auto; margin: 10px 0; display: grid; gap: 6px; }
 .an-pick-row { display: flex; gap: 10px; align-items: flex-start; padding: 8px; border: 1px solid #e3e6ea; border-radius: 8px; cursor: pointer; font-size: 14px; }
 .an-pick-row input { margin-top: 4px; }
+
+.an-two { display: grid; grid-template-columns: 3fr 2fr; gap: 10px; }
+.an-two label { font-size: 12px; color: #667; }
+@media (max-width: 640px) { .an-two { grid-template-columns: 1fr; } }

@@ -43,9 +43,10 @@ async function getUser(req: Request) {
 
 const SYSTEM = `Tu esi patyręs daugiabučių gyvenamųjų namų techninės priežiūros inžinierius Lietuvoje. Padedi parengti METINĖS (KASMETINĖS) STATINIO APŽIŪROS AKTO tekstus pagal STR 1.07.03:2017 dvasią.
 
-Gausi apžiūros elementų sąrašą (sienos, stogas, cokolis ir t. t.). Kiekvienam elementui, kuriame inžinierius nurodė defektų („yra defektų“), parašyk akto tekstą tokio pavidalo (kaip pavyzdiniuose aktuose):
-"Pastaba: <ką matoma – defektai, jų mastas, vieta>.\\nImtis veiksmų: <konkretūs taisymo darbai>.\\nRekomenduojama: <platesnis ilgalaikis sprendimas, jei tinka>. (STR 1.07.03:2017 <punktai>)"
-- Eilutes „Imtis veiksmų“ ir „Rekomenduojama“ rašyk tik jei turi ką pasakyti. Nenurodyk to, ko nėra inžinieriaus pastabose, nuotraukose ar praėjusių metų akte.
+Gausi apžiūros elementų sąrašą (sienos, stogas, cokolis ir t. t.). Kiekvienam elementui, kuriame inžinierius nurodė defektų („yra defektų“), parašyk du SKIRTUS laukus:
+• defects – pastebėti defektai: ką matoma, jų mastas ir vieta (apie 2–4 trumpi sakiniai, be taisymo technologijų). Jokių nuorodų į paveikslėlius („žr. 3 pav.“) ir be žodžio „Pastaba:“. Jei yra STR punktai elemento lauke „str“, gali pridėti pabaigoje „(STR 1.07.03:2017 <punktai>)“.
+• rec – rekomendacijos: TRUMPAI, 1–2 sakiniai, tik KĄ daryti (pvz. „Užtaisyti įtrūkimus, nudažyti sienas. Stebėti, ar įtrūkimai plečiasi.“). NEAPRAŠYK technologijų, medžiagų, darbų eigos ir kaip taisyti. Negali būti ilgesnė nei ~200 simbolių.
+- Nenurodyk to, ko nėra inžinieriaus pastabose, nuotraukose ar praėjusių metų akte. Inžinieriaus pastaba gali būti ilga (perkelta iš defektų akto) – ją sutrumpink ir sutvarkyk.
 - Rašyk taisyklinga dalykine lietuvių kalba, trumpais techniniais sakiniais. Jokių kreipinių.
 - STR punktus nurodyk tik pateiktus elemento lauke „str“ (jei jis tuščias – nenurodyk).
 - Jei pateiktas praėjusių metų tekstas („pernai“), naudok jį kaip pagrindą: pakartok tai, kas nepasikeitė, pakeisk pagal šių metų pastabas, ir neprieštarauk naujiems faktams.
@@ -78,9 +79,10 @@ const TOOL = {
           type: 'object',
           properties: {
             id: { type: 'string', description: 'Elemento id iš užklausos.' },
-            text: { type: 'string', description: 'Akto tekstas: „Pastaba: ...\\nImtis veiksmų: ...\\nRekomenduojama: ... (STR ...)“.' }
+            defects: { type: 'string', description: 'Pastebėti defektai (be nuorodų į paveikslėlius, be technologijų).' },
+            rec: { type: 'string', description: 'Rekomendacijos: trumpai, 1–2 sakiniai, ką daryti.' }
           },
-          required: ['id', 'text']
+          required: ['id', 'defects', 'rec']
         }
       },
       conclusions: { type: 'array', items: { type: 'string' }, description: 'Bendros išvados / rekomendacijos (be numerių).' },

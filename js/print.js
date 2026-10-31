@@ -355,10 +355,11 @@ function annualSheet(t, s, refPhotos) {
   const sec = a.sections.map((sc, si) => {
     const items = sc.items.map((it, ii) => ({ it, ii })).filter(x => x.it.status !== 'skip');
     if (!items.length) return '';
-    return `<tr class="sec"><td class="no">${esc(sc.no)}.</td><td colspan="3">${esc(sc.title)}</td></tr>` + items.map(({ it, ii }) => `<tr>
+    return `<tr class="sec"><td class="no">${esc(sc.no)}.</td><td colspan="4">${esc(sc.title)}</td></tr>` + items.map(({ it, ii }) => `<tr>
       <td class="no">${esc(it.no)}</td><td>${esc(it.name)}</td>
       <td class="an-photos">${(refPhotos[it.id] || []).map(p => `<img src="${p.url}" alt="">`).join('')}</td>
-      <td data-b="an.sections.${si}.items.${ii}.text">${esc(it.text)}</td></tr>`).join('');
+      <td data-b="an.sections.${si}.items.${ii}.text">${esc(it.text)}</td>
+      <td data-b="an.sections.${si}.items.${ii}.rec">${esc(it.rec || '')}</td></tr>`).join('');
   }).join('');
   const signRow = (pos, name, sig) => `
     <div class="sign-row">
@@ -384,7 +385,7 @@ function annualSheet(t, s, refPhotos) {
     </table>
     <h3 class="an-h">APŽIŪROS DUOMENYS</h3>
     <table class="grid an-grid">
-      <thead><tr><th class="no">Eil. Nr.</th><th>Apžiūrima dalis</th><th>Apžiūros nuotrauka</th><th>Pastabos / Rekomendacijos</th></tr></thead>
+      <thead><tr><th class="no">Eil. Nr.</th><th>Apžiūrima dalis</th><th>Apžiūros nuotrauka</th><th>Pastebėti defektai</th><th>Rekomendacijos</th></tr></thead>
       <tbody>${sec}</tbody>
     </table>
     <h3 class="an-h">BENDROS IŠVADOS / REKOMENDACIJOS</h3>

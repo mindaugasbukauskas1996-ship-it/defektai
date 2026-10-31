@@ -106,3 +106,6 @@ h2.up { text-transform: uppercase; text-align: center; font-size: 13pt; margin: 
 .an-concl-p { display: flex; gap: 6px; margin: 2mm 0; text-align: justify; }
 .an-concl-p .n { min-width: 7mm; }
 @media print { .an-grid tr { break-inside: avoid; page-break-inside: avoid; } }
+.an-grid td:nth-child(2) { width: 28mm; }
+.an-grid .an-photos { width: 36mm; }
+.an-photos img { width: 32mm; }

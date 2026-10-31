@@ -7,7 +7,9 @@ import * as db from './data.js';
 import { icon } from './icons.js';
 import { $, $$, esc, toast, today, fmtDate, debounce, processImage, confirmDialog } from './util.js';
 
-const OK_TEXT = 'Apžiūros metu defektų nenustatyta.\nRekomendacija: vykdyti tolimesnius priežiūros darbus.';
+const OK_TEXT = 'Apžiūros metu defektų nenustatyta.';
+const OK_REC = 'Vykdyti tolimesnius priežiūros darbus.';
+const isOk = t => /^Apžiūros metu defektų nenustatyta/.test(t || '');
 
 /** Pagrindinis šablonas (pagal 2026-05 pavyzdį). Galima pridėti / išmesti elementus kiekvienoje apžiūroje. */
 export const ANNUAL_TEMPLATE = [
@@ -59,14 +61,14 @@ export function newAnnualAct(s, object, prev) {
     no: String(si + 1), title: sec.title,
     items: sec.items.map((it, ii) => {
       const p = prevItems[it.id];
-      return { id: it.id, no: `${si + 1}.${ii + 1}`, name: it.name, str: it.str, status: 'ok', brief: '', text: OK_TEXT,
-        prev: p && p.it.status !== 'skip' ? (p.it.text || '') : '' };
+      return { id: it.id, no: `${si + 1}.${ii + 1}`, name: it.name, str: it.str, status: 'ok', brief: '', text: OK_TEXT, rec: OK_REC,
+        prev: p && p.it.status !== 'skip' ? (p.it.text || '') : '', prevRec: p && p.it.status !== 'skip' ? (p.it.rec || '') : '' };
     })
   }));
   if (prev) {                                                         // praėjusių metų papildomi elementai
     prev.sections.forEach((psec, si) => psec.items.filter(it => String(it.id).startsWith('x_')).forEach(it => {
       const sec = sections[si] || sections[sections.length - 1];
-      sec.items.push({ id: it.id, no: `${sec.no}.${sec.items.length + 1}`, name: it.name, str: it.str || '', status: 'ok', brief: '', text: OK_TEXT, prev: it.text || '' });
+      sec.items.push({ id: it.id, no: `${sec.no}.${sec.items.length + 1}`, name: it.name, str: it.str || '', status: 'ok', brief: '', text: OK_TEXT, rec: OK_REC, prev: it.text || '', prevRec: it.rec || '' });
     }));
   }
   return {
@@ -148,7 +150,7 @@ function applyDefects(act, defects) {
     if (!item) {                                                       // neatpažinta sistema – atskiras elementas
       const sec = act.sections[act.sections.length - 1];
       item = { id: 'x_' + Math.random().toString(36).slice(2, 8), no: `${sec.no}.${sec.items.length + 1}`, name: d.system || 'Kitas defektas',
-        str: '', status: 'ok', brief: '', text: OK_TEXT, prev: '' };
+        str: '', status: 'ok', brief: '', text: OK_TEXT, rec: OK_REC, prev: '', prevRec: '' };
       sec.items.push(item);
     }
     item.status = 'defects';
@@ -275,7 +277,7 @@ export function drawAnnualInspection(body, ctx) {
           <label class="btn small">${icon('image')} Iš galerijos<input type="file" accept="image/*" multiple hidden data-up></label>
         </div>
         ${photosOf(it.id).length ? `<div class="an-thumbs">${photosOf(it.id).map(p => `<span class="an-th"><img alt="" data-src="${p.id}"><button type="button" data-an="delph" data-pid="${p.id}" title="Ištrinti">×</button></span>`).join('')}</div>` : ''}
-        ${it.prev ? `<details class="an-prev"><summary>Praėjusių metų tekstas</summary><div class="muted small pre">${esc(it.prev)}</div>
+        ${it.prev ? `<details class="an-prev"><summary>Praėjusių metų tekstas</summary><div class="muted small pre">${esc(it.prev)}${it.prevRec ? esc("\nRekomendacijos: " + it.prevRec) : ""}</div>
           <button class="btn small" type="button" data-an="useprev">Naudoti kaip pernai</button></details>` : ''}` : ''}
       ${it.keep ? '<div class="muted small">✓ Bus naudojamas praėjusių metų tekstas (DI jo nekeis).</div>' : ''}
     </div>`;
@@ -299,7 +301,7 @@ export function drawAnnualInspection(body, ctx) {
     const el = e.target;
     if (el.matches('input[type=radio]')) {
       const it = find(el); it.status = el.value; it.keep = false;
-      if (it.status === 'ok') it.text = OK_TEXT;
+      if (it.status === 'ok') { it.text = OK_TEXT; it.rec = OK_REC; }
       await save({ annual_act: a }); return draw();
     }
     if (el.matches('[data-up]')) {
@@ -325,7 +327,7 @@ export function drawAnnualInspection(body, ctx) {
       const name = (window.prompt('Naujo elemento pavadinimas (pvz. „Lauko durys“):') || '').trim();
       if (!name) return;
       const sec = a.sections.find(s => s.no === b.dataset.sec);
-      sec.items.push({ id: 'x_' + Date.now().toString(36), no: `${sec.no}.${sec.items.length + 1}`, name, str: '', status: 'ok', brief: '', text: OK_TEXT, prev: '' });
+      sec.items.push({ id: 'x_' + Date.now().toString(36), no: `${sec.no}.${sec.items.length + 1}`, name, str: '', status: 'ok', brief: '', text: OK_TEXT, rec: OK_REC, prev: '', prevRec: '' });
       await save({ annual_act: a }); return draw();
     }
     if (act === 'del') {
@@ -335,7 +337,7 @@ export function drawAnnualInspection(body, ctx) {
       await save({ annual_act: a }); return draw();
     }
     if (act === 'useprev') {
-      const it = find(b); it.text = it.prev; it.keep = true; it.status = it.prev.trim() === OK_TEXT ? 'ok' : 'defects';
+      const it = find(b); it.text = it.prev; it.rec = it.prevRec || ''; it.keep = true; it.status = isOk(it.prev) ? 'ok' : 'defects';
       await save({ annual_act: a }); return draw();
     }
     if (act === 'delph') {
@@ -373,7 +375,7 @@ export function drawAnnualActTab(body, ctx) {
   const persist = debounce(() => save({ annual_act: a, act_number: t.act_number, act_date: t.act_date }), 800);
   const gf = (k, label, span = '') => `<label class="${span}">${label}<input data-g="${k}" value="${esc(g[k] ?? '')}"></label>`;
   // kol DI neparašė – defektų elementuose rodome inžinieriaus pastabą (ir rankiniam užpildymui)
-  allItems(a).forEach(it => { if (it.status === 'defects' && !it.keep && it.text === OK_TEXT) it.text = it.brief ? `Pastaba: ${it.brief}` : ''; });
+  allItems(a).forEach(it => { if (it.status === 'defects' && !it.keep && isOk(it.text)) { it.text = it.brief || ''; it.rec = ''; } });
   const used = allItems(a).filter(x => x.status !== 'skip');
   const nDef = used.filter(x => x.status === 'defects').length;
 
@@ -398,8 +400,9 @@ export function drawAnnualActTab(body, ctx) {
       ${a.sections.map(sec => {
         const its = sec.items.filter(x => x.status !== 'skip');
         return its.length ? `<div class="an-sec-h"><b>${esc(sec.no)}. ${esc(sec.title)}</b></div>` + its.map(it => `
-          <label class="block-lbl">${esc(it.no)} ${esc(it.name)} <span class="tag ${it.status === 'defects' ? 'nc' : ''}">${it.status === 'defects' ? 'yra defektų' : 'defektų nėra'}</span>
-            <textarea data-i="${esc(it.id)}">${esc(it.text)}</textarea></label>`).join('') : '';
+          <div class="block-lbl">${esc(it.no)} ${esc(it.name)} <span class="tag ${it.status === 'defects' ? 'nc' : ''}">${it.status === 'defects' ? 'yra defektų' : 'defektų nėra'}</span>
+            <div class="an-two"><label>Pastebėti defektai<textarea data-i="${esc(it.id)}">${esc(it.text)}</textarea></label>
+              <label>Rekomendacijos<textarea data-r="${esc(it.id)}">${esc(it.rec || '')}</textarea></label></div></div>`).join('') : '';
       }).join('')}
       <div class="an-sec-h"><b>Bendros išvados / rekomendacijos</b></div>
       ${a.conclusions.map((c, i) => `<div class="an-concl"><span>${i + 1}.</span><textarea data-c="${i}">${esc(c)}</textarea><button class="btn icon-only small danger-ghost" data-an="delc" data-i="${i}" title="Pašalinti">${icon('trash')}</button></div>`).join('')}
@@ -423,6 +426,7 @@ export function drawAnnualActTab(body, ctx) {
     if (el.dataset.g) g[el.dataset.g] = el.value;
     else if (el.dataset.t) t[el.dataset.t] = el.value || null;
     else if (el.dataset.i) { const it = allItems(a).find(x => x.id === el.dataset.i); it.text = el.value; it.keep = false; }
+    else if (el.dataset.r) { const it = allItems(a).find(x => x.id === el.dataset.r); it.rec = el.value; it.keep = false; }
     else if (el.dataset.c !== undefined) a.conclusions[+el.dataset.c] = el.value;
     else return;
     if (el.tagName === 'TEXTAREA') fit(el);
@@ -461,15 +465,15 @@ async function generate(ctx) {
       general: { address: a.general.address, built_year: a.general.built_year, date: a.general.date },
       building,
       items: used.filter(x => x.status === 'defects' && !x.keep).map(x => ({
-        id: x.id, no: x.no, name: x.name, status: x.status, str: x.str, brief: x.brief, prev: x.prev,
+        id: x.id, no: x.no, name: x.name, status: x.status, str: x.str, brief: x.brief, prev: x.prev + (x.prevRec ? `\nRekomendacijos: ${x.prevRec}` : ''),
         photos: photos.filter(p => p._id === x.id).map(p => p.n)
       })),
       photos: photos.map(({ _id, ...p }) => p)
     });
-    const by = new Map((res.items || []).map(i => [i.id, i.text]));
+    const by = new Map((res.items || []).map(i => [i.id, i]));
     used.forEach(it => {
-      if (it.status === 'ok') it.text = OK_TEXT;
-      else if (!it.keep && by.has(it.id)) it.text = by.get(it.id);
+      if (it.status === 'ok') { it.text = OK_TEXT; it.rec = OK_REC; }
+      else if (!it.keep && by.has(it.id)) { const r = by.get(it.id); it.text = r.defects || r.text || ''; it.rec = r.rec || ''; }
     });
     if ((res.conclusions || []).length) a.conclusions = res.conclusions;
     a.assumptions = res.assumptions || [];
