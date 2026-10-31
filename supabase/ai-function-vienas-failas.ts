@@ -27,7 +27,7 @@ export const UNITS = [
 const MAX_PHOTOS = 12;
 
 const BUILDING_LABELS = {
-  construction: 'Konstruktyvas', built_year: 'Statybos metai', apartments: 'Butų skaičius', stairwells: 'Laiptinių skaičius',
+  construction: 'Konstruktyvas', built_year: 'Statybos metai', floors: 'Aukštų skaičius', apartments: 'Butų skaičius', stairwells: 'Laiptinių skaičius',
   usable_area: 'Naudingas plotas, m²', area: 'Plotas, m²', basement_area: 'Rūsio plotas, m²', renovation: 'Renovacijos būklė',
   roof_type: 'Stogo tipas', roof_cover: 'Stogo danga', roof_area: 'Stogo plotas, m²', roof_condition: 'Stogo būklė',
   heat_point: 'Šilumos punkto tipas'

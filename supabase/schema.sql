@@ -273,8 +273,10 @@ create table if not exists public.objects (
   roof_area    numeric,
   roof_type    text,
   heat_point   text,
+  floors       int,                           -- aukštų skaičius
   created_at   timestamptz not null default now()
 );
+alter table public.objects add column if not exists floors int;
 create index if not exists objects_key_idx on public.objects (street_key, house_key);
 
 create table if not exists public.stair_codes (
