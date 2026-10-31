@@ -376,3 +376,7 @@ textarea.notes { font-size: 16px; min-height: 260px; }
 .detail-pick label.on { border-color: #175cd3; background: #eff4ff; }
 .detail-pick input { display: none; }
 .detail-pick span { font-size: 12px; color: #667085; }
+
+/* Pranešimo pasirinkimas */
+.report-pick input { width: 100%; max-width: 420px; }
+#rep-hint.warn { color: #b42318; font-weight: 600; }
