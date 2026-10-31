@@ -162,8 +162,9 @@ export function normKey(s) {
 /** „Gintaro Įlankos g.   14, Neringa“ → { address, street, house, city }. */
 export function splitAddress(raw) {
   const clean = String(raw || '').replace(/\s+/g, ' ').trim();
-  const i = clean.lastIndexOf(',');
-  const city = i >= 0 ? clean.slice(i + 1).trim() : '';
+  // „Gatvė NR, Miestas“ arba „Gatvė NR, Kaimas, Seniūnija, Rajonas“ – miestas / gyvenvietė yra po pirmo kablelio
+  const i = clean.indexOf(',');
+  const city = i >= 0 ? clean.slice(i + 1).split(',')[0].trim() : '';
   const left = (i >= 0 ? clean.slice(0, i) : clean).trim();
   const m = /^(.*\S)\s+(\d[\w\/\-]*)$/.exec(left);
   return { address: clean, city, street: m ? m[1] : left, house: m ? m[2] : '' };
