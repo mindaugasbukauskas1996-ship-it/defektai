@@ -312,3 +312,41 @@ alter table public.tasks add column if not exists act_detail text not null defau
 do $$ begin
   alter table public.tasks add constraint tasks_act_detail_chk check (act_detail in ('narrow','medium','wide'));
 exception when duplicate_object then null; end $$;
+
+-- ---------- Pranešimai (importuojami; užduotys susiejamos per registracijos Nr.) ----------
+create table if not exists public.reports (
+  id            uuid primary key default gen_random_uuid(),
+  reg_no        text not null unique,          -- Registracijos nr., pvz. V26-0332167
+  registered_at timestamptz,
+  address       text,
+  city          text,
+  report_type   text,
+  department    text,
+  service_type  text,
+  description   text,
+  status        text,
+  priority_code text,
+  engineer      text,
+  manager       text,
+  order_type    text,
+  apartment     text,
+  work_label    text,
+  act_type      text,                          -- prašomas aktas
+  reporter      text,
+  contact       text,
+  property_type text,
+  assigned_to   uuid references auth.users(id) on delete set null,
+  imported_at   timestamptz not null default now()
+);
+create index if not exists reports_assigned_idx on public.reports (assigned_to);
+
+alter table public.reports enable row level security;
+drop policy if exists "reports read" on public.reports;
+drop policy if exists "reports admin write" on public.reports;
+create policy "reports read" on public.reports
+  for select to authenticated using (assigned_to = auth.uid() or public.is_admin());
+create policy "reports admin write" on public.reports
+  for all to authenticated using (public.is_admin()) with check (public.is_admin());
+
+alter table public.tasks add column if not exists report_no text;
+create index if not exists tasks_report_idx on public.tasks (report_no);
