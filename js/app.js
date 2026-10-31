@@ -43,8 +43,6 @@ function renderShell() {
   $('#nav-top').innerHTML = `
     <a href="#/" data-nav="list">${icon('list')}<span>Užduotys</span></a>
     <a href="#/nauja" data-nav="new">${icon('plus')}<span>Nauja</span></a>
-    <a href="#/metine" data-nav="annual">${icon('file')}<span>Metinė</span></a>
-    <a href="#/neatiktis" data-nav="nc">${icon('alert')}<span>Neatiktis</span></a>
     <a href="#/nustatymai" data-nav="settings">${icon('settings')}<span>Nustatymai</span></a>`;
   $('#nav-bottom').innerHTML = $('#nav-top').innerHTML;
   $('#demo-banner').innerHTML = db.isDemo
