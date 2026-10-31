@@ -386,3 +386,5 @@ textarea.notes { font-size: 16px; min-height: 260px; }
 .act-ed .obj-body textarea { min-height: 72px; }
 .act-ed .form-grid label textarea { min-height: 44px; }
 .act-ed .form-grid { align-items: start; }
+
+.docx-row { align-items: center; margin-top: 8px; }
