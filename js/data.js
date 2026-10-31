@@ -123,7 +123,7 @@ export const profileName = p => (p && (p.full_name || p.email)) || '';
 export async function listTasks() {
   if (isDemo) return (await idbAll('tasks')).sort((a, b) => b.created_at.localeCompare(a.created_at));
   const { data, error } = await sb.from('tasks')
-    .select('id,created_at,updated_at,status,priority,service_type,address,city,apartment,stairwell,contact_name,contact_phone,problem,due_date,act_number,kind,contractor,assigned_to')
+    .select('id,created_at,updated_at,status,priority,service_type,address,city,apartment,stairwell,contact_name,contact_phone,problem,due_date,act_number,kind,contractor,assigned_to,report_no')
     .order('created_at', { ascending: false }).limit(1000);
   if (error) throw error;
   return data;
@@ -391,6 +391,57 @@ export async function findObject(address, city) {
   const hits = (await listObjects()).filter(o => o.street_key === sk && o.house_key === hk);
   if (hits.length <= 1) return hits[0] || null;
   return hits.find(o => normKey(o.city) === normKey(a.city)) || null;
+}
+
+// ---------------------------------------------------------------------
+// Pranešimai (importuojami; pasirenkami pagal registracijos nr.)
+// ---------------------------------------------------------------------
+
+/** Paskyrai matomi pranešimai (admin mato visus). */
+export async function listReports() {
+  if (isDemo) return [];
+  const { data, error } = await sb.from('reports').select('*').order('registered_at', { ascending: false }).limit(1000);
+  if (error) throw error;
+  return data;
+}
+
+export async function countReports() {
+  if (isDemo) return 0;
+  const { count, error } = await sb.from('reports').select('id', { count: 'exact', head: true });
+  if (error) throw error;
+  return count || 0;
+}
+
+/** Registracijos nr., kuriems jau sukurta užduotis (matomos paskyrai). */
+export async function usedReportNos() {
+  if (isDemo) return new Set();
+  const { data, error } = await sb.from('tasks').select('report_no').not('report_no', 'is', null).limit(5000);
+  if (error) throw error;
+  return new Set(data.map(r => r.report_no));
+}
+
+/** Pranešimų importas (pagal registracijos nr.: naujus įrašo, esamus atnaujina). */
+export async function importReports(list, assignedTo) {
+  const rows = new Map();
+  for (const r of list) {
+    const d = new Date(String(r.date || '').replace(' ', 'T'));
+    rows.set(r.reg_no, {
+      reg_no: r.reg_no, registered_at: isNaN(d) ? null : d.toISOString(),
+      address: txt(String(r.address || '').replace(/\s+/g, ' ')), city: txt(r.city),
+      report_type: txt(r.report_type), department: txt(r.department), service_type: txt(r.service_type),
+      description: txt(r.description), status: txt(r.status), priority_code: txt(r.priority_code),
+      engineer: txt(r.engineer), manager: txt(r.manager), order_type: txt(r.order_type), apartment: txt(r.apartment),
+      work_label: txt(r.work_label), act_type: txt(r.act_type), reporter: txt(r.reporter),
+      contact: txt(r.contact), property_type: txt(r.property_type), assigned_to: assignedTo || null
+    });
+  }
+  const out = [...rows.values()];
+  if (!out.length) throw new Error('Faile nerasta pranešimų (tikėtasi eilučių, prasidedančių „V26-…“)');
+  for (const part of chunks(out, 100)) {
+    const { error } = await sb.from('reports').upsert(part, { onConflict: 'reg_no' });
+    if (error) throw error;
+  }
+  return out.length;
 }
 
 export async function countCodes() {

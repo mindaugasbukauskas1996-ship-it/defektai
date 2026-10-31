@@ -222,3 +222,43 @@ export function buildingSummary(o) {
     o.roof_condition ? `stogo būklė: ${o.roof_condition}` : '', o.heat_point ? `šilumos punktas: ${o.heat_point}` : ''
   ].filter(Boolean).join(' · ');
 }
+
+// ---------------------------------------------------------------------
+// Pranešimai (importas iš sistemos eksporto)
+// ---------------------------------------------------------------------
+
+/**
+ * Pranešimų CSV (be antraštės, skirtukas „;“). Aprašymai gali turėti eilučių lūžių ir „;“, todėl įrašai
+ * atskiriami pagal pradžią „V26-0000000;YYYY-MM-DD HH:MM;“, o aprašymas imamas tarp 8 pirmųjų ir 17 paskutinių laukų.
+ */
+export function parseReports(text) {
+  text = String(text || '').replace(/^\uFEFF/, '');
+  const recs = text.split(/\r?\n+(?=V\d\d-\d+(?:-\d+)?;\d{4}-\d\d-\d\d \d\d:\d\d;)/);
+  const out = [];
+  for (const rec of recs) {
+    const p = rec.replace(/[\r\n\s]+$/, '').split(';');
+    if (p.length < 26 || !/^V\d\d-/.test(p[0].trim())) continue;
+    const t = p.slice(-17);
+    out.push({
+      reg_no: p[0].trim(), date: p[1].trim(), address: p[2], report_type: p[3], department: p[4], service_type: p[5],
+      description: p.slice(8, p.length - 17).join(';').trim(),
+      status: t[0], priority_code: t[3], engineer: t[4], manager: t[5], order_type: t[6], apartment: t[7],
+      work_label: t[8], act_type: t[9], city: t[10], reporter: t[11], property_type: t[14], contact: t[16]
+    });
+  }
+  return out;
+}
+
+/** Pirmas telefono numeris iš teksto (+370... arba 86...). */
+export function extractPhone(s) {
+  const m = /(\+?370[\s-]?\d[\d\s-]{6,}\d|\b8[\s-]?6\d{2}[\s-]?\d{5}\b)/.exec(String(s || ''));
+  return m ? m[1].replace(/\s+/g, ' ').trim() : '';
+}
+
+/** Trumpas problemos aprašas iš pranešimo teksto (pirmas sakinys, iki ~140 simbolių). */
+export function shortProblem(desc, fallback = '') {
+  const clean = String(desc || '').replace(/\s+/g, ' ').trim();
+  if (!clean) return fallback;
+  const first = clean.split(/(?<=[.!?])\s+/)[0] || clean;
+  return first.length > 140 ? first.slice(0, 137).trimEnd() + '…' : first;
+}

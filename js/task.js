@@ -58,6 +58,7 @@ function draw() {
         <div class="th-sub">
           ${nc ? `<span class="tag nc">${icon('alert')} Neatiktis</span>` : ''}
           ${nc && t.contractor ? `<span class="tag">${esc(t.contractor)}</span>` : ''}
+          ${t.report_no ? `<span class="tag">Pr. ${esc(t.report_no)}</span>` : ''}
           ${t.stairwell ? `<span class="tag">${esc(t.stairwell)} laiptinė</span>` : ''}
           ${t.apartment ? `<span class="tag">bt. ${esc(t.apartment)}</span>` : ''}
           ${t.priority === 'skubus' ? `<span class="badge prio">Skubus</span>` : ''}

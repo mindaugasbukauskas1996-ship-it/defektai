@@ -7,7 +7,7 @@ import * as db from './data.js';
 import { icon } from './icons.js';
 import {
   $, $$, esc, toast, confirmDialog, today, fmtDate, STATUSES, statusLabel,
-  PRIORITIES, priorityLabel, buildingSummary, parseCsv, readTextFile
+  PRIORITIES, priorityLabel, buildingSummary, parseCsv, readTextFile, parseReports, extractPhone, shortProblem, splitAddress
 } from './util.js';
 import { renderTask } from './task.js';
 import { renderPrint } from './print.js';
@@ -171,7 +171,7 @@ async function renderList() {
       if (listFilter.status === 'neatiktys' && t.kind !== 'nonconformity') return false;
       if (!['aktyvios', 'visos', 'neatiktys'].includes(listFilter.status) && t.status !== listFilter.status) return false;
       if (!q) return true;
-      return [t.address, t.city, t.problem, t.contact_name, t.contact_phone, t.stairwell, t.act_number, t.service_type, t.contractor]
+      return [t.address, t.city, t.problem, t.contact_name, t.contact_phone, t.stairwell, t.act_number, t.service_type, t.contractor, t.report_no]
         .some(v => v && String(v).toLowerCase().includes(q));
     });
     arr.sort((a, b) =>
@@ -198,6 +198,7 @@ async function renderList() {
           <div class="tc-problem">${esc(t.problem || 'Problema neaprašyta')}</div>
           <div class="tc-meta">
             ${isAdmin && t.assigned_to && t.assigned_to !== me.id ? `<span class="assignee">${esc(pname(t.assigned_to))}</span>` : ''}
+            ${t.report_no ? `<span>Pr. ${esc(t.report_no)}</span>` : ''}
             ${t.contractor ? `<span>Rangovas: ${esc(t.contractor)}</span>` : ''}
             ${t.service_type ? `<span>${esc(t.service_type)}</span>` : ''}
             ${t.contact_name || t.contact_phone ? `<span>${esc([t.contact_name, t.contact_phone].filter(Boolean).join(' · '))}</span>` : ''}
@@ -228,6 +229,69 @@ async function renderList() {
 // ---------------------------------------------------------------------
 // Užduoties forma (nauja / redagavimas)
 // ---------------------------------------------------------------------
+
+const reportsDatalist = reports => `<datalist id="rep-list">${reports.map(r =>
+  `<option value="${esc(r.reg_no)}" label="${esc([r.address, shortProblem(r.description, r.work_label || '')].filter(Boolean).join(' – ').slice(0, 110))}"></option>`).join('')}</datalist>`;
+
+/** Pasirinkus pranešimą pagal registracijos nr., užpildo likusius užduoties laukus. */
+function bindReportPicker(form, reports, used, objects) {
+  const inp = $('#report-no');
+  if (!inp) return;
+  const hint = $('#rep-hint');
+  const byNo = new Map(reports.map(r => [r.reg_no.toLowerCase(), r]));
+  const el = n => form.elements[n];
+  const flash = e => { if (e) { e.classList.remove('flash'); void e.offsetWidth; e.classList.add('flash'); } };
+  const set = (name, v) => { const e = el(name); if (e && v) { e.value = v; flash(e); } };
+
+  const matchService = want => {
+    const sel = el('service_type');
+    const w = String(want || '').trim();
+    if (!sel || !w) return;
+    const toks = s => String(s).toLowerCase().split(/[^a-ząčęėįšųūž]+/).filter(x => x.length > 3);
+    const wt = toks(w);
+    let best = null, score = 0;
+    [...sel.options].filter(o => o.value).forEach(o => {
+      const sc = toks(o.value).filter(x => wt.includes(x)).length;
+      if (sc > score) { score = sc; best = o; }
+    });
+    if (best) sel.value = best.value;
+    else { sel.add(new Option(w, w)); sel.value = w; }
+    flash(sel);
+  };
+
+  const apply = r => {
+    const a = splitAddress(r.address || '');
+    el('address').value = [a.street, a.house].filter(Boolean).join(' ') || a.address;
+    el('city').value = a.city || r.city || el('city').value;
+    flash(el('address'));
+    el('address').dispatchEvent(new Event('change'));            // suranda objektą ir laiptinių kodus
+    set('apartment', r.apartment);
+    set('manager', r.manager);
+    setTimeout(() => {                                           // jei pranešime vadybininko nėra – iš objekto
+      const o = objects.find(x => x.id === el('object_id').value);
+      if (!el('manager').value && o && o.manager) set('manager', o.manager);
+    }, 700);
+    matchService(r.service_type);
+    const email = /@/.test(r.contact || '') ? r.contact.trim() : '';
+    set('description', [r.description, email ? `El. paštas: ${email}` : ''].filter(Boolean).join('\n\n'));
+    set('problem', shortProblem(r.description, r.work_label || r.act_type || ''));
+    set('contact_name', String(r.reporter || '').replace(/\s*\(.*\)\s*$/, '').trim());
+    set('contact_phone', extractPhone(r.contact) || extractPhone(r.description));
+    el('report_no').value = r.reg_no;
+    let am = form.querySelector('input[name=act_mode]');
+    if (!am) { am = document.createElement('input'); am.type = 'hidden'; am.name = 'act_mode'; form.appendChild(am); }
+    am.value = /su kiekiais/i.test(r.act_type || '') ? 'full' : 'defect';
+    const bits = [r.report_type, r.registered_at ? String(r.registered_at).slice(0, 10) : '', r.act_type ? `prašomas aktas: ${r.act_type}` : '',
+      r.engineer ? `inžinierius: ${r.engineer}` : '', used.has(r.reg_no) ? 'DĖMESIO: šiam pranešimui užduotis jau sukurta' : ''].filter(Boolean);
+    if (hint) { hint.textContent = bits.join(' · '); hint.classList.toggle('warn', used.has(r.reg_no)); }
+  };
+
+  inp.addEventListener('input', () => {
+    const r = byNo.get(inp.value.trim().toLowerCase());
+    if (r) apply(r);
+    else { el('report_no').value = inp.value.trim() ? '' : ''; if (hint) { hint.textContent = ''; hint.classList.remove('warn'); } }
+  });
+}
 
 const objDatalist = objects => `<datalist id="obj-list">${objects.map(o => `<option value="${esc(o.address)}">`).join('')}</datalist>`;
 
@@ -291,6 +355,8 @@ async function renderTaskForm(id, kind = 'defect') {
   if (id && !t) throw new Error('Užduotis nerasta');
   const me = await db.getProfile();
   const objects = await db.listObjects().catch(() => []);
+  const reports = id ? [] : await db.listReports().catch(() => []);
+  const usedNos = reports.length ? await db.usedReportNos().catch(() => new Set()) : new Set();
   const people = me.role === 'admin' ? await db.listProfiles() : [];
   const assignee = people.length > 1 ? `
       <label class="span2">Atsakingas darbuotojas<select name="assigned_to">
@@ -312,6 +378,14 @@ async function renderTaskForm(id, kind = 'defect') {
       <h1>${id ? 'Redaguoti užduotį' : 'Nauja užduotis'}</h1>
     </div>
 
+    ${reports.length ? `
+    <div class="card report-pick">
+      <div class="card-title">Pranešimas</div>
+      <p class="muted small">Įveskite arba pasirinkite pranešimo registracijos Nr. – užduoties laukai užsipildys automatiškai (adresas, butas, paslauga, aprašymas, kontaktai, vadybininkas, laiptinių kodai).</p>
+      <input id="report-no" list="rep-list" autocomplete="off" placeholder="Registracijos Nr., pvz. V26-0332167">
+      ${reportsDatalist(reports)}
+      <div class="muted small" id="rep-hint"></div>
+    </div>` : ''}
     <div class="card ai-fill">
       <div class="card-title">${icon('spark')} Greitas užpildymas su DI</div>
       <p class="muted small">Įklijuokite gyventojo laišką ar vadybininko pranešimą – DI užpildys adresą, telefoną, problemą ir kt.</p>
@@ -322,6 +396,7 @@ async function renderTaskForm(id, kind = 'defect') {
     <form id="task-form" class="card form-grid">
       <label class="span2">Adresas *<input name="address" required autocomplete="off" list="obj-list" value="${esc(t.address)}" placeholder="${objects.length ? 'Pradėkite rašyti ir pasirinkite objektą iš sąrašo' : 'Taikos pr. 55'}">${objDatalist(objects)}</label>
       <input type="hidden" name="object_id" value="${esc(t.object_id)}">
+      <input type="hidden" name="report_no" value="${esc(t.report_no)}">
       <div class="span4 obj-hint muted small" id="obj-hint"></div>
       <label>Miestas<input name="city" value="${esc(t.city)}"></label>
       <label>Laiptinė<input name="stairwell" list="stair-list" autocomplete="off" value="${esc(t.stairwell)}" placeholder="7"><datalist id="stair-list"></datalist></label>
@@ -345,6 +420,7 @@ async function renderTaskForm(id, kind = 'defect') {
 
   const form = $('#task-form');
   bindObjectPicker(form, objects, t, true);
+  bindReportPicker(form, reports, usedNos, objects);
 
   $('#btn-parse').addEventListener('click', async () => {
     const text = $('#raw-msg').value.trim();
@@ -446,11 +522,12 @@ const CODES_REPO_URL = 'https://raw.githubusercontent.com/mindaugasbukauskas1996
 
 async function renderImport() {
   const box = $('#import-card');
-  const [objs, nCodes] = await Promise.all([db.listObjects(true), db.countCodes()]);
+  const [objs, nCodes, nReports, people] = await Promise.all([db.listObjects(true), db.countCodes(), db.countReports(), db.listProfiles()]);
+  const me = await db.getProfile();
   box.innerHTML = `
     <div class="card import-card">
       <div class="card-title">Objektai ir laiptinių kodai</div>
-      <p class="muted small">Objektai pasirenkami iš sąrašo kuriant užduotį, o DI gauna pastato informaciją (konstruktyvas, stogas, plotai, šilumos punktas). Bazėje dabar: <b>${objs.length}</b> objektų, <b>${nCodes}</b> laiptinių kodų.</p>
+      <p class="muted small">Objektai pasirenkami iš sąrašo kuriant užduotį, o DI gauna pastato informaciją (konstruktyvas, stogas, plotai, šilumos punktas). Bazėje dabar: <b>${objs.length}</b> objektų, <b>${nCodes}</b> laiptinių kodų, <b>${nReports}</b> pranešimų.</p>
 
       <div class="imp-block">
         <div class="lbl">Objektų CSV</div>
@@ -463,6 +540,14 @@ async function renderImport() {
         <p class="muted small">Importas pakeičia visą kodų sąrašą. Šaltinis: repozitorija „laiptiniu-kodai“ arba CSV (Miestas; Gatvė; Namo nr.; Laiptinė; Kodas).</p>
         <div class="imp-row"><button class="btn" id="imp-codes-repo" type="button">Importuoti iš „laiptiniu-kodai“</button></div>
         <div class="imp-row"><input type="file" id="imp-codes-file" accept=".csv,text/csv"><button class="btn" id="imp-codes" type="button">Importuoti iš CSV</button></div>
+      </div>
+      <div class="imp-block">
+        <div class="lbl">Pranešimai (inžinieriaus)</div>
+        <p class="muted small">Sistemos eksporto CSV (pirmas stulpelis – registracijos Nr., pvz. V26-0332167). Pakartotinis importas atnaujina pagal registracijos Nr. Pranešimus mato tik pasirinkta paskyra (ir admin); kuriant užduotį jie pasirenkami pagal Nr.</p>
+        <div class="imp-row">
+          <select id="imp-rep-user">${people.map(p => `<option value="${esc(p.id)}" ${p.id === me.id ? 'selected' : ''}>${esc(db.profileName(p))}${p.id === me.id ? ' (aš)' : ''}</option>`).join('')}</select>
+          <input type="file" id="imp-rep-file" accept=".csv,text/csv"><button class="btn" id="imp-rep" type="button">Importuoti pranešimus</button>
+        </div>
       </div>
       <div id="imp-msg" class="muted small"></div>
     </div>`;
@@ -483,6 +568,11 @@ async function renderImport() {
     const f = $('#imp-codes-file').files[0];
     if (!f) return toast('Pasirinkite CSV failą', 'error');
     run($('#imp-codes'), 'Importuojama...', async () => `Importuota kodų: ${await db.importCodes(parseCsv(await readTextFile(f)))}`);
+  });
+  $('#imp-rep').addEventListener('click', () => {
+    const f = $('#imp-rep-file').files[0];
+    if (!f) return toast('Pasirinkite CSV failą', 'error');
+    run($('#imp-rep'), 'Importuojama...', async () => `Importuota pranešimų: ${await db.importReports(parseReports(await readTextFile(f)), $('#imp-rep-user').value)}`);
   });
   $('#imp-codes-repo').addEventListener('click', () => {
     run($('#imp-codes-repo'), 'Kraunama...', async () => {
