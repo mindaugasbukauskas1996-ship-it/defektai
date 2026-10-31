@@ -272,11 +272,14 @@ function bindReportPicker(form, reports, used, objects) {
       if (!el('manager').value && o && o.manager) set('manager', o.manager);
     }, 700);
     matchService(r.service_type);
-    const email = /@/.test(r.contact || '') ? r.contact.trim() : '';
+    // „Vardo“ stulpelyje kartais įrašytas el. paštas ar telefonas – tada tai kontaktas, o ne vardas
+    const cn = String(r.contact_name || '').trim();
+    const nameIsEmail = /@/.test(cn), nameIsPhone = /^[+\d\s-]{6,}$/.test(cn);
+    const email = /@/.test(r.contact || '') ? r.contact.trim() : (nameIsEmail ? cn : '');
     set('description', [r.description, email ? `El. paštas: ${email}` : ''].filter(Boolean).join('\n\n'));
     set('problem', shortProblem(r.description, r.work_label || r.act_type || ''));
-    set('contact_name', r.contact_name);
-    set('contact_phone', extractPhone(r.contact) || extractPhone(r.description));
+    if (!nameIsEmail && !nameIsPhone) set('contact_name', cn);
+    set('contact_phone', extractPhone(r.contact) || (nameIsPhone ? cn : '') || extractPhone(r.description));
     el('report_no').value = r.reg_no;
     let am = form.querySelector('input[name=act_mode]');
     if (!am) { am = document.createElement('input'); am.type = 'hidden'; am.name = 'act_mode'; form.appendChild(am); }
