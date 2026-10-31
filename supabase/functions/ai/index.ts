@@ -36,7 +36,7 @@ function projectApiKey(req: Request): string {
   return req.headers.get('apikey') || '';
 }
 
-/** Patikrina, ar užklausą siuntė prisijungęs vartotojas. */
+/** Patikrina, ar užklausą siuntė prisijungęs IR aktyvuotas vartotojas. */
 async function getUser(req: Request) {
   const auth = req.headers.get('authorization') || '';
   if (!auth.toLowerCase().startsWith('bearer ')) return null;
@@ -46,7 +46,14 @@ async function getUser(req: Request) {
   });
   if (!res.ok) return null;
   const user = await res.json();
-  return user && user.id ? user : null;
+  if (!user || !user.id) return null;
+  // paskyra turi būti aktyvuota (profiles.active); RLS leidžia skaityti savo profilį
+  const pr = await fetch(`${url}/rest/v1/profiles?select=active&id=eq.${user.id}`, {
+    headers: { Authorization: auth, apikey: projectApiKey(req) }
+  });
+  if (!pr.ok) return null;
+  const rows = await pr.json();
+  return rows && rows[0] && rows[0].active ? user : null;
 }
 
 Deno.serve(async (req: Request) => {
@@ -54,7 +61,7 @@ Deno.serve(async (req: Request) => {
   if (req.method !== 'POST') return json({ error: 'Tik POST' }, 405);
 
   const user = await getUser(req);
-  if (!user) return json({ error: 'Neprisijungta. Prisijunkite iš naujo.' }, 401);
+  if (!user) return json({ error: 'Neprisijungta arba paskyra neaktyvuota. Prisijunkite iš naujo.' }, 401);
 
   const apiKey = Deno.env.get('ANTHROPIC_API_KEY');
   if (!apiKey) return json({ error: 'Serveryje nenustatytas ANTHROPIC_API_KEY' }, 500);
