@@ -248,3 +248,65 @@ create policy "lessons update" on public.ai_lessons
   with check (user_id = auth.uid() or public.is_admin());
 create policy "lessons delete" on public.ai_lessons
   for delete to authenticated using (user_id = auth.uid() or public.is_admin());
+
+-- ---------- Objektai (pastatai) ir laiptinių kodai ----------
+create table if not exists public.objects (
+  id           uuid primary key default gen_random_uuid(),
+  address      text not null unique,          -- „Gatvė  NR, Miestas“ (vienas tarpas)
+  city         text,
+  street       text,
+  house        text,
+  street_key   text,                          -- normalizuotas paieškai
+  house_key    text,
+  manager      text,                          -- PA vadybininkas
+  project      text,                          -- projektas / įmonė
+  apartments   int,
+  construction text,                          -- konstruktyvas (blokinis / plytinis ...)
+  stairwells   int,
+  usable_area  numeric,
+  area         numeric,
+  basement_area numeric,
+  renovation   text,
+  built_year   int,
+  roof_condition text,
+  roof_cover   text,
+  roof_area    numeric,
+  roof_type    text,
+  heat_point   text,
+  created_at   timestamptz not null default now()
+);
+create index if not exists objects_key_idx on public.objects (street_key, house_key);
+
+create table if not exists public.stair_codes (
+  id         uuid primary key default gen_random_uuid(),
+  city       text,
+  street     text,
+  house      text,
+  stairwell  text,
+  code       text not null,
+  street_key text,
+  house_key  text
+);
+create index if not exists stair_codes_key_idx on public.stair_codes (street_key, house_key);
+
+alter table public.objects     enable row level security;
+alter table public.stair_codes enable row level security;
+
+drop policy if exists "objects read" on public.objects;
+drop policy if exists "objects admin write" on public.objects;
+create policy "objects read" on public.objects for select to authenticated using (true);
+create policy "objects admin write" on public.objects for all to authenticated
+  using (public.is_admin()) with check (public.is_admin());
+
+drop policy if exists "codes read" on public.stair_codes;
+drop policy if exists "codes admin write" on public.stair_codes;
+create policy "codes read" on public.stair_codes for select to authenticated using (true);
+create policy "codes admin write" on public.stair_codes for all to authenticated
+  using (public.is_admin()) with check (public.is_admin());
+
+-- užduotys: objektas ir aprašymo išsamumas (narrow | medium | wide)
+alter table public.tasks add column if not exists object_id uuid references public.objects(id) on delete set null;
+alter table public.tasks add column if not exists act_detail text not null default 'medium';
+do $$ begin
+  alter table public.tasks add constraint tasks_act_detail_chk check (act_detail in ('narrow','medium','wide'));
+exception when duplicate_object then null; end $$;
