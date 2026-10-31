@@ -1,13 +1,16 @@
 :root {
-  --bg: #f3f5f8;
+  --bg: #f5f5f7;
   --surface: #ffffff;
-  --text: #1b2430;
-  --muted: #667085;
-  --line: #dde3ea;
-  --primary: #1f3a5f;
-  --primary-2: #2b5288;
-  --primary-soft: #e7eef8;
-  --accent: #e8590c;
+  --text: #002f49;
+  --muted: #5f7584;
+  --line: #dfe5ea;
+  --primary: #002f49;
+  --primary-2: #00a355;
+  --primary-soft: #e6f6ee;
+  --green: #00bc62;
+  --lime: #93c11f;
+  --grad: linear-gradient(90deg, #93c11f, #00bc62);
+  --accent: #00bc62;
   --danger: #c62828;
   --ok: #2e7d32;
   --warn: #b26a00;
@@ -25,7 +28,7 @@
 html { -webkit-text-size-adjust: 100%; }
 body {
   margin: 0; background: var(--bg); color: var(--text);
-  font: 15px/1.45 system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif;
+  font: 15px/1.45 Montserrat, system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif;
 }
 body.no-scroll { overflow: hidden; }
 a { color: var(--primary-2); }
@@ -116,7 +119,7 @@ input[type=checkbox], input[type=radio] { width: auto; min-height: 0; }
 /* ---------- Pranešimai, modalai ---------- */
 .toast {
   position: fixed; left: 50%; bottom: calc(24px + var(--safe-b)); transform: translate(-50%, 20px);
-  background: #1b2430; color: #fff; padding: 10px 16px; border-radius: 10px; z-index: 200;
+  background: #002f49; color: #fff; padding: 10px 16px; border-radius: 10px; z-index: 200;
   opacity: 0; pointer-events: none; transition: all .2s; max-width: min(92vw, 560px); box-shadow: 0 8px 24px rgba(0,0,0,.2);
 }
 .toast.show { opacity: 1; transform: translate(-50%, 0); }
@@ -281,7 +284,7 @@ textarea.notes { font-size: 16px; min-height: 260px; }
 
 /* ---------- Žymėjimo redaktorius ---------- */
 .annot { position: fixed; inset: 0; z-index: 160; background: #10161f; display: flex; flex-direction: column; }
-.an-bar { display: flex; flex-wrap: wrap; gap: 8px 14px; align-items: center; padding: 8px 12px; background: #1b2430; color: #fff; }
+.an-bar { display: flex; flex-wrap: wrap; gap: 8px 14px; align-items: center; padding: 8px 12px; background: #002f49; color: #fff; }
 .an-tools { display: flex; flex-wrap: wrap; gap: 8px 14px; align-items: center; }
 .an-group { display: flex; gap: 4px; align-items: center; flex: none; }
 .an-group.end { margin-left: auto; }
@@ -422,3 +425,31 @@ textarea.notes { font-size: 16px; min-height: 260px; }
 .an-two { display: grid; grid-template-columns: 3fr 2fr; gap: 10px; }
 .an-two label { font-size: 12px; color: #667; }
 @media (max-width: 640px) { .an-two { grid-template-columns: 1fr; } }
+
+/* ---------- Mano Būstas stilius ---------- */
+h1, h2, h3, .card-title { font-weight: 700; }
+.topbar { background: #fff; color: var(--primary); border-bottom: 1px solid var(--line); box-shadow: 0 1px 8px rgba(0,47,73,.06); }
+.topbar::after { content: ""; position: absolute; left: 0; right: 0; bottom: -1px; height: 3px; background: var(--grad); }
+.brand { color: var(--primary); gap: 12px; }
+.brand .logo { font-weight: 700; font-size: 21px; letter-spacing: .2px; color: var(--primary); }
+.brand .logo b { color: var(--green); font-weight: 700; }
+.brand .app-name { font-size: 12px; font-weight: 600; color: var(--muted); padding-left: 12px; border-left: 1px solid var(--line); }
+.nav-top a { color: var(--primary); font-weight: 600; font-size: 14px; border-radius: 999px; }
+.nav-top a:hover { background: var(--primary-soft); color: var(--primary); }
+.nav-top a.active { background: var(--primary-soft); color: #008a49; }
+.btn { border-radius: 999px; padding-left: 18px; padding-right: 18px; border-color: #cfd8de; }
+.btn:hover { background: var(--primary-soft); border-color: var(--green); }
+.btn.icon-only { padding: 6px; }
+.btn.primary { background: var(--grad); border-color: transparent; color: #fff; background-size: 200% 100%; transition: background-position .3s; }
+.btn.primary:hover { background: var(--grad); background-size: 200% 100%; background-position: 100% 0; box-shadow: 0 4px 12px rgba(0,188,98,.3); }
+.btn.ghost:hover { background: var(--primary-soft); }
+.chip.on { background: var(--primary); }
+.tabs a.on { color: var(--primary); border-bottom-color: var(--green); }
+.nav-bottom a.active { color: #008a49; }
+input:focus, select:focus, textarea:focus { outline: 2px solid rgba(0,188,98,.25); border-color: var(--green); }
+.card { border-radius: 14px; }
+.card-title { color: var(--primary); }
+.ai-fill { background: linear-gradient(180deg, #f0faf5, #fff); }
+.spinner.big { color: var(--green); }
+label, .lbl { color: #3d5a6c; }
+@media (max-width: 640px) { .brand .app-name { display: none; } }
