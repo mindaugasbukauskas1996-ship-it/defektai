@@ -105,7 +105,7 @@ async function save(patch) {
 function buildingCard(o) {
   if (!o) return '';
   const row = (l, v) => v || v === 0 ? `<div class="kv"><span>${l}</span><b>${esc(v)}</b></div>` : '';
-  const has = [o.construction, o.built_year, o.apartments, o.stairwells, o.usable_area, o.area, o.basement_area, o.renovation,
+  const has = [o.construction, o.built_year, o.floors, o.apartments, o.stairwells, o.usable_area, o.area, o.basement_area, o.renovation,
     o.roof_type, o.roof_cover, o.roof_area, o.roof_condition, o.heat_point].some(v => v || v === 0);
   return `
     <div class="card bld-card">
@@ -113,7 +113,7 @@ function buildingCard(o) {
       ${has ? `
       <div class="grid2">
         <div>
-          ${row('Konstruktyvas', o.construction)}${row('Statybos metai', o.built_year)}${row('Butų skaičius', o.apartments)}
+          ${row('Konstruktyvas', o.construction)}${row('Statybos metai', o.built_year)}${row('Aukštų skaičius', o.floors)}${row('Butų skaičius', o.apartments)}
           ${row('Laiptinių skaičius', o.stairwells)}${row('Naudingas plotas, m²', o.usable_area)}${row('Plotas, m²', o.area)}
           ${row('Rūsio plotas, m²', o.basement_area)}${row('Renovacija', o.renovation)}
         </div>
@@ -129,7 +129,7 @@ function buildingCard(o) {
 /** Pastato laukai DI užklausai (tik užpildyti). */
 function buildingForAI(o) {
   if (!o) return undefined;
-  const keys = ['construction', 'built_year', 'apartments', 'stairwells', 'usable_area', 'area', 'basement_area',
+  const keys = ['construction', 'built_year', 'floors', 'apartments', 'stairwells', 'usable_area', 'area', 'basement_area',
     'renovation', 'roof_type', 'roof_cover', 'roof_area', 'roof_condition', 'heat_point'];
   const b = {};
   keys.forEach(k => { if (o[k] || o[k] === 0) b[k] = o[k]; });

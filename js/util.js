@@ -216,7 +216,7 @@ export function buildingSummary(o) {
   if (!o) return '';
   const roof = [o.roof_type, o.roof_cover].filter(Boolean).join(', ');
   return [
-    o.construction, o.built_year ? `${o.built_year} m.` : '', o.apartments ? `${o.apartments} butai` : '',
+    o.construction, o.built_year ? `${o.built_year} m.` : '', o.floors ? `${o.floors} aukšt.` : '', o.apartments ? `${o.apartments} butai` : '',
     o.stairwells ? `${o.stairwells} laipt.` : '', o.usable_area ? `naud. plotas ${o.usable_area} m²` : '',
     roof ? `stogas: ${roof}` : '', o.roof_area ? `stogo plotas ${o.roof_area} m²` : '',
     o.roof_condition ? `stogo būklė: ${o.roof_condition}` : '', o.heat_point ? `šilumos punktas: ${o.heat_point}` : ''

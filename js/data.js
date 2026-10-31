@@ -418,20 +418,35 @@ const txt = v => { const s = String(v ?? '').trim(); return s || null; };
 const int = v => { const n = parseNum(v); return n === null ? null : Math.round(n); };
 const chunks = (arr, n) => Array.from({ length: Math.ceil(arr.length / n) }, (_, i) => arr.slice(i * n, i * n + n));
 
-/** Objektų CSV (16 stulpelių, kaip įmonės sistemos eksportas): įrašo arba atnaujina pagal adresą. */
+/** Eilutės stulpelių išdėstymas pagal stulpelių skaičių → [adresas, vadybininkas, projektas, butai, konstruktyvas,
+ *  laiptinės, naudingas plotas, plotas, rūsio plotas, renovacija, metai, stogo būklė, danga, stogo plotas, stogo tipas,
+ *  šilumos punktas, aukštai]. 18 stulpelių eksportas turi papildomus „Aukštų sk.“ (4) ir vieną nenaudojamą (6). */
+const OBJECT_LAYOUTS = {
+  18: [0, 1, 2, 3, 5, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 4],
+  16: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, -1]
+};
+const cap = v => { const s = txt(v); return s ? s.charAt(0).toUpperCase() + s.slice(1).replace(/^(.)/, '$1') : null; };
+const nz = v => { const n = parseNum(v); return n ? n : null; };            // 0 = nenurodyta
+const nzInt = v => { const n = nz(v); return n === null ? null : Math.round(n); };
+
+/** Objektų CSV (kaip sistemos eksportas, 16 arba 18 stulpelių): įrašo arba atnaujina pagal adresą. */
 export async function importObjects(rows) {
   if (rows.length && /adresas/i.test(rows[0][0] || '')) rows = rows.slice(1);
   const map = new Map();
   for (const r of rows) {
-    const a = splitAddress(r[0]);
+    const L = OBJECT_LAYOUTS[r.length] || OBJECT_LAYOUTS[16];
+    const c = i => (i >= 0 ? r[L[i]] : '');
+    const f = i => (L[i] >= 0 ? r[L[i]] : '');
+    const a = splitAddress(f(0));
     if (!a.address) continue;
+    const roofType = String(f(14) || '').trim().replace(/^plokšcias$/i, 'plokščias');
     map.set(a.address.toLowerCase(), {
       address: a.address, city: txt(a.city), street: txt(a.street), house: txt(a.house),
       street_key: normKey(a.street), house_key: normKey(a.house),
-      manager: txt(r[1]), project: txt(r[2]), apartments: int(r[3]), construction: txt(r[4]),
-      stairwells: int(r[5]), usable_area: parseNum(r[6]), area: parseNum(r[7]), basement_area: parseNum(r[8]),
-      renovation: txt(r[9]), built_year: int(r[10]), roof_condition: txt(r[11]), roof_cover: txt(r[12]),
-      roof_area: parseNum(r[13]), roof_type: txt(r[14]), heat_point: txt(r[15])
+      manager: txt(f(1)), project: txt(f(2)), apartments: nzInt(f(3)), construction: cap(f(4)),
+      stairwells: nzInt(f(5)), usable_area: nz(f(6)), area: nz(f(7)), basement_area: parseNum(f(8)),
+      renovation: cap(f(9)), built_year: nzInt(f(10)), roof_condition: cap(f(11)), roof_cover: cap(f(12)),
+      roof_area: nz(f(13)), roof_type: cap(roofType), heat_point: cap(f(15)), floors: nzInt(f(16))
     });
   }
   const list = [...map.values()];
@@ -442,7 +457,6 @@ export async function importObjects(rows) {
   objectsCache = null;
   return list.length;
 }
-
 /** Laiptinių kodų CSV (Miestas;Gatvė;Namo nr.;Laiptinė;Kodas): pakeičia visą sąrašą. */
 export async function importCodes(rows) {
   if (rows.length && /miestas/i.test(rows[0][0] || '')) rows = rows.slice(1);
