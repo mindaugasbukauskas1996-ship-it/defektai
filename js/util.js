@@ -255,10 +255,13 @@ export function extractPhone(s) {
   return m ? m[1].replace(/\s+/g, ' ').trim() : '';
 }
 
-/** Trumpas problemos aprašas iš pranešimo teksto (pirmas sakinys, iki ~140 simbolių). */
+/** Trumpas problemos aprašas iš pranešimo teksto (pirmas sakinys be pasisveikinimo, iki ~140 simbolių). */
 export function shortProblem(desc, fallback = '') {
-  const clean = String(desc || '').replace(/\s+/g, ' ').trim();
+  let clean = String(desc || '').replace(/\s+/g, ' ').trim()
+    .replace(/^(laba diena|labas rytas|labas vakaras|labas|sveiki|sveikas|geros dienos)[\s,.!]*/i, '');
   if (!clean) return fallback;
-  const first = clean.split(/(?<=[.!?])\s+/)[0] || clean;
-  return first.length > 140 ? first.slice(0, 137).trimEnd() + '…' : first;
+  // sakinio pabaiga: ≥3 raidės + . ! ? ir didžioji raidė toliau (kad „g.“, „pr.“ neskaidytų)
+  const first = clean.split(/(?<=[A-Za-ząčęėįšųūžĄČĘĖĮŠŲŪŽ]{3,}[.!?])\s+(?=[A-ZĄČĘĖĮŠŲŪŽ])/)[0] || clean;
+  const out = first.charAt(0).toUpperCase() + first.slice(1);
+  return out.length > 140 ? out.slice(0, 137).trimEnd() + '…' : out;
 }
