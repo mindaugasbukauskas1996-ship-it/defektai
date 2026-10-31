@@ -736,7 +736,7 @@ function drawActEditor() {
     </div>
 
     <div class="card print-box">
-      <div class="card-title">${icon('print')} Spausdinti / išsaugoti PDF</div>
+      <div class="card-title">${icon('print')} Peržiūra, redagavimas, Word ir PDF</div>
       <div class="gen-actions">
         <a class="btn primary" href="#/spausdinti/${t.id}/defect">${icon('file')} Defektavimo aktas</a>
         ${w ? `<a class="btn" href="#/spausdinti/${t.id}/works">${icon('file')} Numatomų darbų aktas</a>
@@ -959,7 +959,7 @@ function drawNcEditor() {
     </div>
 
     <div class="card print-box">
-      <div class="card-title">${icon('print')} Spausdinti / išsaugoti PDF</div>
+      <div class="card-title">${icon('print')} Peržiūra, redagavimas, Word ir PDF</div>
       <div class="gen-actions">
         <a class="btn primary" href="#/spausdinti/${t.id}/nc">${icon('file')} Neatikties aktas</a>
       </div>
