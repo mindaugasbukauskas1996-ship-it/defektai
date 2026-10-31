@@ -102,7 +102,7 @@ const defectItemId = d => {
 
 /** Visi užfiksuoti defektai iš objekto defektų aktų (plokščias sąrašas). */
 async function collectDefects(object) {
-  const acts = await db.findDefectActs(object.id);
+  const acts = await db.findDefectActs(object);
   const out = [];
   acts.forEach(t => (t.defect_act.objects || []).forEach(o => {
     if (!(o.defects || '').trim()) return;

@@ -266,13 +266,18 @@ export async function findPreviousAnnual(objectId) {
 }
 
 /** Šio objekto ankstesni defektų aktai (tik su užfiksuotais defektais), naujausi pirmi. */
-export async function findDefectActs(objectId) {
-  if (isDemo || !objectId) return [];
-  const { data, error } = await sb.from('tasks').select('id,act_number,act_date,created_at,defect_act')
-    .or('kind.eq.defect,kind.is.null').eq('object_id', objectId).not('defect_act', 'is', null)
-    .order('created_at', { ascending: false }).limit(30);
+export async function findDefectActs(object) {
+  if (isDemo || !object) return [];
+  const word = String(object.street || '').split(/[\s.]+/)[0];       // pvz. „Kauno“
+  const { data, error } = await sb.from('tasks').select('id,act_number,act_date,created_at,address,object_id,defect_act')
+    .or('kind.eq.defect,kind.is.null').not('defect_act', 'is', null)
+    .or(`object_id.eq.${object.id}${word ? `,address.ilike.%${word.replace(/[,%()]/g, '')}%` : ''}`)
+    .order('created_at', { ascending: false }).limit(100);
   if (error) throw error;
-  return data.filter(t => ((t.defect_act || {}).objects || []).some(o => (o.defects || '').trim()));
+  const norm = s => ' ' + String(s || '').toLowerCase().replace(/[.,]/g, ' ').replace(/\s+/g, ' ').trim() + ' ';
+  const want = norm(`${object.street} ${object.house}`);
+  return data.filter(t => (t.object_id === object.id || norm(t.address).includes(want))
+    && ((t.defect_act || {}).objects || []).some(o => (o.defects || '').trim()));
 }
 
 /** Peržiūros URL (pažymėta versija, jei yra). */
