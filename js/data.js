@@ -655,6 +655,21 @@ export async function aiAnnual(payload) {
   return data;
 }
 
+/** Garso įrašas → tekstas (Edge funkcija „transcribe“, OpenAI). */
+export async function transcribe(blob) {
+  if (isDemo) throw new Error('Diktavimas garsu veikia tik prisijungus prie Supabase.');
+  const form = new FormData();
+  form.append('file', blob, 'audio');
+  const { data, error } = await sb.functions.invoke('transcribe', { body: form });
+  if (error) {
+    let msg = error.message;
+    try { const body = await error.context.json(); if (body && body.error) msg = body.error; } catch (_) { /* ignore */ }
+    throw new Error(msg);
+  }
+  if (data && data.error) throw new Error(data.error);
+  return (data && data.text) || '';
+}
+
 export async function ai(action, payload) {
   if (isDemo) {
     const s = await getSettings();

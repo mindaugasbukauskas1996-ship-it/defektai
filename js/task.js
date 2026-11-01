@@ -7,9 +7,10 @@ import { icon } from './icons.js';
 import {
   $, $$, esc, nl2br, toast, confirmDialog, debounce, today, fmtDate, fmtDateTime,
   STATUSES, statusLabel, priorityLabel, PURPOSES, processImage, telHref, mapsHref,
-  fmtQty, parseQty, buildingSummary, canSpeech, dictationHint
+  fmtQty, parseQty, buildingSummary
 } from './util.js';
 import { openAnnotator } from './annotator.js';
+import { bindDictation } from './dictate.js';
 import { drawAnnualInspection, drawAnnualActTab } from './annual.js';
 
 const UNITS = ['Vnt.', 'm', 'm²', 'm³', 'Komplektas', 'val.', 'kg', 'T', 'Ltr', 'cm', 'para',
@@ -414,42 +415,12 @@ function drawInspection(body) {
   $('#to-acts').addEventListener('click', () => { if (Object.keys(pending).length) doSave.flush({ ...pending }); });
   if (!t.inspection_date) save({ inspection_date: today() });
 
-  // Diktavimas (Chrome / Android / Edge)
-  const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
-  const btn = $('#dictate');
-  {
-    btn.hidden = false;
-    let rec = null;
-    btn.addEventListener('click', () => {
-      if (rec) { rec.stop(); return; }
-      if (!canSpeech()) return dictationHint(body.querySelector('[name=field_notes]'));
-      rec = new SR();
-      rec.lang = 'lt-LT';
-      rec.continuous = true;
-      rec.interimResults = false;
-      const ta = body.querySelector('[name=field_notes]');
-      rec.onresult = ev => {
-        for (let i = ev.resultIndex; i < ev.results.length; i++) {
-          if (ev.results[i].isFinal) {
-            const txt = ev.results[i][0].transcript.trim();
-            ta.value = (ta.value ? ta.value.replace(/\s*$/, ' ') : '') + txt.charAt(0).toUpperCase() + txt.slice(1) + '.';
-            ta.dispatchEvent(new Event('input', { bubbles: true }));
-          }
-        }
-      };
-      rec.onend = () => { rec = null; btn.classList.remove('rec'); btn.innerHTML = `${icon('mic')} Diktuoti`; };
-      let started = false;
-      rec.onstart = () => { started = true; };
-      rec.onerror = ev => {
-        if (ev.error === 'not-allowed' || ev.error === 'service-not-allowed') toast('Mikrofonas neleistas. Leiskite jį naršyklės / telefono nustatymuose.', 'error', 6000);
-        else if (ev.error !== 'no-speech' && ev.error !== 'aborted') toast('Diktavimo klaida: ' + ev.error, 'error');
-      };
-      try { rec.start(); } catch (_) { rec = null; return dictationHint(ta); }
-      btn.classList.add('rec');
-      btn.innerHTML = `${icon('mic')} Klausoma... (stabdyti)`;
-      setTimeout(() => { if (rec && !started) { rec.abort(); dictationHint(ta); } }, 4000);
-    });
-  }
+  // Diktavimas garsu: įrašas -> serveris atpažįsta lietuvišką tekstą
+  bindDictation($('#dictate'), txt => {
+    const ta = body.querySelector('[name=field_notes]');
+    ta.value = (ta.value ? ta.value.replace(/\s*$/, ' ') : '') + txt;
+    ta.dispatchEvent(new Event('input', { bubbles: true }));
+  });
 }
 
 // ---------------------------------------------------------------------

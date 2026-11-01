@@ -4,8 +4,9 @@
 // =====================================================================
 
 import * as db from './data.js';
+import { bindDictation } from './dictate.js';
 import { icon } from './icons.js';
-import { $, $$, esc, toast, today, fmtDate, debounce, processImage, confirmDialog, canSpeech, dictationHint } from './util.js';
+import { $, $$, esc, toast, today, fmtDate, debounce, processImage, confirmDialog } from './util.js';
 
 const OK_TEXT = 'Apžiūros metu defektų nenustatyta.';
 const OK_REC = 'Vykdyti tolimesnius priežiūros darbus.';
@@ -297,6 +298,12 @@ export function drawAnnualInspection(body, ctx) {
 
   const find = el => allItems(a).find(x => x.id === el.closest('.an-row').dataset.id);
 
+  // Diktavimas garsu (lietuviškai atpažįsta serveris)
+  $$('[data-an=dictate]', body).forEach(btn => {
+    const it = find(btn), ta = btn.closest('.an-row').querySelector('textarea[data-f=brief]');
+    bindDictation(btn, txt => { ta.value = (ta.value ? ta.value.replace(/\s*$/, ' ') : '') + txt; it.brief = ta.value; persist(); });
+  });
+
   body.onchange = async e => {
     const el = e.target;
     if (el.matches('input[type=radio]')) {
@@ -344,24 +351,6 @@ export function drawAnnualInspection(body, ctx) {
       if (!await confirmDialog('Ištrinti nuotrauką?', 'Ištrinti')) return;
       const p = S.photos.find(x => x.id === b.dataset.pid);
       await db.deletePhoto(p); S.photos = S.photos.filter(x => x !== p); return draw();
-    }
-    if (act === 'dictate') {
-      const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
-      const ta = b.closest('.an-row').querySelector('textarea[data-f=brief]'), it = find(b);
-      if (!canSpeech()) return dictationHint(ta);
-      const rec = new SR(); rec.lang = 'lt-LT'; rec.continuous = false; rec.interimResults = false;
-      let started = false;
-      rec.onstart = () => { started = true; };
-      b.classList.add('rec');
-      setTimeout(() => { if (!started) { rec.abort(); b.classList.remove('rec'); dictationHint(ta); } }, 4000);
-      rec.onresult = ev => {
-        const txt = ev.results[0][0].transcript.trim();
-        ta.value = (ta.value ? ta.value.replace(/\s*$/, ' ') : '') + txt.charAt(0).toUpperCase() + txt.slice(1) + '.';
-        it.brief = ta.value; persist();
-      };
-      rec.onend = () => b.classList.remove('rec');
-      rec.onerror = ev => toast('Diktavimo klaida: ' + ev.error, 'error');
-      rec.start();
     }
   };
 }
