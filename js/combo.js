@@ -5,7 +5,7 @@ import { esc } from './util.js';
 
 const norm = s => String(s || '').toLowerCase().replace(/\s+/g, ' ').trim();
 
-export function combo(input, getItems, { max = 40 } = {}) {
+export function combo(input, getItems, { max = 200 } = {}) {
   if (!input || input._combo) return;
   input._combo = true;
   input.autocomplete = 'off';
@@ -20,7 +20,7 @@ export function combo(input, getItems, { max = 40 } = {}) {
   menu.hidden = true;
   host.appendChild(menu);
 
-  let shown = [], idx = -1;
+  let shown = [], idx = -1, total = 0;
 
   const close = () => { menu.hidden = true; idx = -1; };
   const place = () => {
@@ -28,7 +28,10 @@ export function combo(input, getItems, { max = 40 } = {}) {
     menu.style.left = input.offsetLeft + 'px';
     menu.style.width = input.offsetWidth + 'px';
   };
-  const mark = () => [...menu.children].forEach((c, i) => c.classList.toggle('on', i === idx));
+  const mark = () => menu.querySelectorAll('.cb-item').forEach((c, i) => {
+    c.classList.toggle('on', i === idx);
+    if (i === idx) c.scrollIntoView({ block: 'nearest' });
+  });
   const pick = i => {
     const it = shown[i];
     if (!it) return;
@@ -40,19 +43,21 @@ export function combo(input, getItems, { max = 40 } = {}) {
   const open = () => {
     const toks = norm(input.value).split(' ').filter(Boolean);
     const all = getItems() || [];
-    shown = all.filter(it => {
+    const found = all.filter(it => {
       const hay = norm(it.value + ' ' + (it.label || ''));
       return toks.every(t => hay.includes(t));
-    }).slice(0, max);
+    });
+    total = found.length;
+    shown = found.slice(0, max);
     // vienintelis atitikmuo, sutampantis su įvesta reikšme – sąrašo nerodome
     if (!shown.length || (shown.length === 1 && norm(shown[0].value) === norm(input.value))) return close();
-    menu.innerHTML = shown.map((it, i) => `<div class="cb-item" data-i="${i}"><b>${esc(it.value)}</b>${it.label ? `<span>${esc(it.label)}</span>` : ''}</div>`).join('');
+    menu.innerHTML = (shown.length > 3 ? `<div class="cb-count">Rasta ${total} – slinkite žemyn</div>` : '') + shown.map((it, i) => `<div class="cb-item" data-i="${i}"><b>${esc(it.value)}</b>${it.label ? `<span>${esc(it.label)}</span>` : ''}</div>`).join('');
     place(); menu.hidden = false; idx = -1;
   };
 
   input.addEventListener('focus', open);
   input.addEventListener('input', open);
-  input.addEventListener('blur', () => setTimeout(close, 150));
+  input.addEventListener('blur', () => setTimeout(close, 300));
   input.addEventListener('keydown', e => {
     if (menu.hidden) return;
     if (e.key === 'ArrowDown') { idx = Math.min(idx + 1, shown.length - 1); mark(); e.preventDefault(); }
@@ -60,11 +65,10 @@ export function combo(input, getItems, { max = 40 } = {}) {
     else if (e.key === 'Enter' && idx >= 0) { pick(idx); e.preventDefault(); }
     else if (e.key === 'Escape') close();
   });
-  // pointerdown + preventDefault: laukas neprarastų fokuso anksčiau nei bus pasirinkta
-  menu.addEventListener('pointerdown', e => {
+  // kompiuteryje – mousedown neatima fokuso; pasirenkama paspaudimu (ne prisilietimu), kad telefone būtų galima slinkti
+  menu.addEventListener('mousedown', e => e.preventDefault());
+  menu.addEventListener('click', e => {
     const row = e.target.closest('.cb-item');
-    if (!row) return;
-    e.preventDefault();
-    pick(+row.dataset.i);
+    if (row) pick(+row.dataset.i);
   });
 }
