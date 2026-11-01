@@ -7,7 +7,7 @@ import { icon } from './icons.js';
 import {
   $, $$, esc, nl2br, toast, confirmDialog, debounce, today, fmtDate, fmtDateTime,
   STATUSES, statusLabel, priorityLabel, PURPOSES, processImage, telHref, mapsHref,
-  fmtQty, parseQty, buildingSummary
+  fmtQty, parseQty, buildingSummary, canSpeech, dictationHint
 } from './util.js';
 import { openAnnotator } from './annotator.js';
 import { drawAnnualInspection, drawAnnualActTab } from './annual.js';
@@ -417,11 +417,12 @@ function drawInspection(body) {
   // Diktavimas (Chrome / Android / Edge)
   const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
   const btn = $('#dictate');
-  if (SR) {
+  {
     btn.hidden = false;
     let rec = null;
     btn.addEventListener('click', () => {
       if (rec) { rec.stop(); return; }
+      if (!canSpeech()) return dictationHint(body.querySelector('[name=field_notes]'));
       rec = new SR();
       rec.lang = 'lt-LT';
       rec.continuous = true;
@@ -437,10 +438,16 @@ function drawInspection(body) {
         }
       };
       rec.onend = () => { rec = null; btn.classList.remove('rec'); btn.innerHTML = `${icon('mic')} Diktuoti`; };
-      rec.onerror = ev => toast('Diktavimo klaida: ' + ev.error, 'error');
-      rec.start();
+      let started = false;
+      rec.onstart = () => { started = true; };
+      rec.onerror = ev => {
+        if (ev.error === 'not-allowed' || ev.error === 'service-not-allowed') toast('Mikrofonas neleistas. Leiskite jį naršyklės / telefono nustatymuose.', 'error', 6000);
+        else if (ev.error !== 'no-speech' && ev.error !== 'aborted') toast('Diktavimo klaida: ' + ev.error, 'error');
+      };
+      try { rec.start(); } catch (_) { rec = null; return dictationHint(ta); }
       btn.classList.add('rec');
       btn.innerHTML = `${icon('mic')} Klausoma... (stabdyti)`;
+      setTimeout(() => { if (rec && !started) { rec.abort(); dictationHint(ta); } }, 4000);
     });
   }
 }

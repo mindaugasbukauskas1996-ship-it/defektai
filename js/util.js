@@ -270,3 +270,11 @@ export function shortProblem(desc, fallback = '') {
   const out = first.charAt(0).toUpperCase() + first.slice(1);
   return out.length > 140 ? out.slice(0, 137).trimEnd() + '…' : out;
 }
+// Diktavimas: iPhone programėlėje (pridėta prie pradžios ekrano) naršyklės balso atpažinimas neveikia,
+// todėl ten nukreipiame į klaviatūros mikrofoną.
+const IOS_APP = /iPad|iPhone|iPod/.test(navigator.userAgent) && !!(navigator.standalone || (window.matchMedia && matchMedia('(display-mode: standalone)').matches));
+export const canSpeech = () => !IOS_APP && !!(window.SpeechRecognition || window.webkitSpeechRecognition);
+export function dictationHint(ta) {
+  if (ta) ta.focus();
+  toast('Spauskite mikrofono ikoną telefono klaviatūroje (šalia tarpo) ir kalbėkite – tekstas atsiras laukelyje.', 'info', 7000);
+}
