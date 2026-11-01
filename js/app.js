@@ -7,7 +7,7 @@ import * as db from './data.js';
 import { icon } from './icons.js';
 import {
   $, $$, esc, toast, confirmDialog, today, fmtDate, STATUSES, statusLabel,
-  PRIORITIES, priorityLabel, buildingSummary, parseCsv, readTextFile, parseReports, extractPhone, shortProblem, splitAddress
+  PRIORITIES, priorityLabel, buildingSummary, parseCsv, readTextFile, parseReports, extractPhone, shortProblem, splitAddress, lithuanianDates
 } from './util.js';
 import { renderTask } from './task.js';
 import { renderPrint } from './print.js';
@@ -33,6 +33,7 @@ async function start() {
   db.onAuthChange(u => { const was = !!user; user = u; if (was !== !!u) route(); });
   window.addEventListener('hashchange', route);
   renderShell();
+  lithuanianDates();
   route();
   if ('serviceWorker' in navigator && location.protocol === 'https:') {
     navigator.serviceWorker.register('sw.js').catch(() => {});

@@ -270,3 +270,29 @@ export function shortProblem(desc, fallback = '') {
   const out = first.charAt(0).toUpperCase() + first.slice(1);
   return out.length > 140 ? out.slice(0, 137).trimEnd() + '…' : out;
 }
+
+// Datos laukai: telefonas rodo datą pagal sistemos kalbą (pvz. „1 Nov 2026“), todėl virš tikro lauko
+// (jis lieka nematomas ir atidaro kalendorių) rodome datą lietuviškai.
+const ltDate = v => {
+  if (!v) return 'Pasirinkite datą';
+  const d = new Date(v + 'T12:00:00');
+  return isNaN(d) ? v : d.toLocaleDateString('lt-LT', { year: 'numeric', month: 'long', day: 'numeric' });
+};
+function wrapDate(inp) {
+  if (inp.dataset.lt) return;
+  inp.dataset.lt = '1';
+  const wrap = document.createElement('span');
+  wrap.className = 'dt';
+  const lab = document.createElement('span');
+  lab.className = 'dt-label';
+  inp.parentNode.insertBefore(wrap, inp);
+  wrap.append(lab, inp);
+  const upd = () => { lab.textContent = ltDate(inp.value); };
+  inp.addEventListener('input', upd); inp.addEventListener('change', upd);
+  upd();
+}
+export function lithuanianDates(root = document.body) {
+  const scan = () => root.querySelectorAll('input[type=date]:not([data-lt])').forEach(wrapDate);
+  new MutationObserver(scan).observe(root, { childList: true, subtree: true });
+  scan();
+}
