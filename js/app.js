@@ -12,6 +12,7 @@ import {
 import { renderTask } from './task.js';
 import { renderPrint } from './print.js';
 import { renderAnnualList } from './annual.js';
+import { combo } from './combo.js';
 
 const view = () => document.getElementById('view');
 let user = null;
@@ -253,9 +254,6 @@ async function renderList() {
 // Užduoties forma (nauja / redagavimas)
 // ---------------------------------------------------------------------
 
-const reportsDatalist = reports => `<datalist id="rep-list">${reports.map(r =>
-  `<option value="${esc(r.reg_no)}" label="${esc([r.address, shortProblem(r.description, r.work_label || '')].filter(Boolean).join(' – ').slice(0, 110))}"></option>`).join('')}</datalist>`;
-
 /** Pasirinkus pranešimą pagal registracijos nr., užpildo likusius užduoties laukus. */
 function bindReportPicker(form, reports, used, objects) {
   const inp = $('#report-no');
@@ -317,14 +315,13 @@ function bindReportPicker(form, reports, used, objects) {
     if (hint) { hint.textContent = bits.join(' · '); hint.classList.toggle('warn', used.has(r.reg_no)); }
   };
 
+  combo(inp, () => reports.map(r => ({ value: r.reg_no, label: [r.address, shortProblem(r.description, r.work_label || '')].filter(Boolean).join(' – ').slice(0, 110) })));
   inp.addEventListener('input', () => {
     const r = byNo.get(inp.value.trim().toLowerCase());
     if (r) apply(r);
     else { el('report_no').value = inp.value.trim() ? '' : ''; if (hint) { hint.textContent = ''; hint.classList.remove('warn'); } }
   });
 }
-
-const objDatalist = objects => `<datalist id="obj-list">${objects.map(o => `<option value="${esc(o.address)}">`).join('')}</datalist>`;
 
 /** Objekto pasirinkimas iš sąrašo: užpildo adresą, miestą, vadybininką, laiptinių kodus. */
 function bindObjectPicker(form, objects, t, withCodes) {
@@ -333,7 +330,6 @@ function bindObjectPicker(form, objects, t, withCodes) {
   const byId = new Map(objects.map(o => [o.id, o]));
   const el = n => form.elements[n];
   const hint = $('#obj-hint');
-  const stairList = $('#stair-list');
   let codes = [];
 
   const flash = input => { if (input) { input.classList.remove('flash'); void input.offsetWidth; input.classList.add('flash'); } };
@@ -350,7 +346,6 @@ function bindObjectPicker(form, objects, t, withCodes) {
       if (el('manager') && o.manager) { el('manager').value = o.manager; flash(el('manager')); }
     }
     codes = withCodes ? await db.codesFor(o).catch(() => []) : [];
-    if (stairList) stairList.innerHTML = codes.map(c => `<option value="${esc(c.stairwell)}">${esc(c.code)}</option>`).join('');
     const parts = [];
     const sum = buildingSummary(o);
     parts.push(sum ? `Pastatas: ${sum}` : 'Pastato duomenų (stogas, konstruktyvas...) dar nėra.');
@@ -359,6 +354,8 @@ function bindObjectPicker(form, objects, t, withCodes) {
     if (withCodes && fill && codes.length === 1) fillStair(codes[0]);
   };
 
+  combo(el('address'), () => objects.map(o => ({ value: o.address })));
+  if (el('stairwell')) combo(el('stairwell'), () => codes.map(c => ({ value: c.stairwell, label: c.code })));
   el('address').addEventListener('input', () => {
     const o = byAddr.get(el('address').value.replace(/\s+/g, ' ').trim().toLowerCase());
     if (o) apply(o, true);
@@ -368,7 +365,7 @@ function bindObjectPicker(form, objects, t, withCodes) {
     form._objReady = (async () => {
       const o = await db.findObject(el('address').value, el('city').value);
       if (o) { if (el('object_id').value !== o.id) await apply(o, false); }
-      else { el('object_id').value = ''; if (hint) hint.textContent = ''; codes = []; if (stairList) stairList.innerHTML = ''; }
+      else { el('object_id').value = ''; if (hint) hint.textContent = ''; codes = []; }
     })();
   });
   if (el('stairwell')) {
@@ -416,8 +413,7 @@ async function renderTaskForm(id, kind = 'defect') {
     <div class="card report-pick">
       <div class="card-title">Pranešimas</div>
       <p class="muted small">Įveskite arba pasirinkite pranešimo registracijos Nr. – užduoties laukai užsipildys automatiškai (adresas, butas, paslauga, aprašymas, kontaktai, vadybininkas, laiptinių kodai).</p>
-      <input id="report-no" list="rep-list" autocomplete="off" placeholder="Registracijos Nr., pvz. V26-0332167">
-      ${reportsDatalist(reports)}
+      <input id="report-no" autocomplete="off" placeholder="Registracijos Nr., pvz. V26-0332167">
       <div class="muted small" id="rep-hint"></div>
     </div>` : ''}
     <div class="card ai-fill">
@@ -428,12 +424,12 @@ async function renderTaskForm(id, kind = 'defect') {
     </div>
 
     <form id="task-form" class="card form-grid">
-      <label class="span2">Adresas *<input name="address" required autocomplete="off" list="obj-list" value="${esc(t.address)}" placeholder="${objects.length ? 'Pradėkite rašyti ir pasirinkite objektą iš sąrašo' : 'Taikos pr. 55'}">${objDatalist(objects)}</label>
+      <label class="span2">Adresas *<input name="address" required autocomplete="off" value="${esc(t.address)}" placeholder="${objects.length ? 'Pradėkite rašyti ir pasirinkite objektą iš sąrašo' : 'Taikos pr. 55'}"></label>
       <input type="hidden" name="object_id" value="${esc(t.object_id)}">
       <input type="hidden" name="report_no" value="${esc(t.report_no)}">
       <div class="span4 obj-hint muted small" id="obj-hint"></div>
       <label>Miestas<input name="city" value="${esc(t.city)}"></label>
-      <label>Laiptinė<input name="stairwell" list="stair-list" autocomplete="off" value="${esc(t.stairwell)}" placeholder="7"><datalist id="stair-list"></datalist></label>
+      <label>Laiptinė<input name="stairwell" autocomplete="off" value="${esc(t.stairwell)}" placeholder="7"></label>
       <label>Butas<input name="apartment" value="${esc(t.apartment)}"></label>
       <label>Laiptinės kodas<input name="entry_code" value="${esc(t.entry_code)}" placeholder="pvz. 1234#"></label>
       <label>Kontaktinis asmuo<input name="contact_name" value="${esc(t.contact_name)}"></label>
@@ -509,13 +505,12 @@ function renderNcForm(id, t, s, assignee = '', objects = []) {
       <h1>${id ? 'Redaguoti neatiktį' : 'Nauja neatiktis'}</h1>
     </div>
     <form id="task-form" class="card form-grid">
-      <label class="span2">Objekto adresas *<input name="address" required autocomplete="off" list="obj-list" value="${esc(t.address)}" placeholder="${objects.length ? 'Pradėkite rašyti ir pasirinkite objektą iš sąrašo' : 'Taikos pr. 55'}">${objDatalist(objects)}</label>
+      <label class="span2">Objekto adresas *<input name="address" required autocomplete="off" value="${esc(t.address)}" placeholder="${objects.length ? 'Pradėkite rašyti ir pasirinkite objektą iš sąrašo' : 'Taikos pr. 55'}"></label>
       <input type="hidden" name="object_id" value="${esc(t.object_id)}">
       <label>Miestas<input name="city" value="${esc(t.city)}"></label>
       <label>Laiptinė<input name="stairwell" value="${esc(t.stairwell)}"></label>
       <label class="span2">Rangovas *<input name="contractor" required value="${esc(t.contractor)}" placeholder="UAB „Statyba“"></label>
-      <label class="span2">Kokius darbus atlieka<input name="service_type" list="nc-works" value="${esc(t.service_type)}" placeholder="Stogo dangos remontas">
-        <datalist id="nc-works">${s.service_types.map(x => `<option value="${esc(x)}">`).join('')}</datalist></label>
+      <label class="span2">Kokius darbus atlieka<input name="service_type" value="${esc(t.service_type)}" placeholder="Stogo dangos remontas"></label>
       <label>Pašalinti iki<input name="due_date" type="date" value="${esc(fmtDate(t.due_date))}"></label>
       ${id ? `<label>Būsena<select name="status">${STATUSES.map(o => `<option value="${o.id}" ${o.id === t.status ? 'selected' : ''}>${esc(o.label)}</option>`).join('')}</select></label>` : ''}
       ${assignee}
@@ -530,6 +525,7 @@ function renderNcForm(id, t, s, assignee = '', objects = []) {
 
   const form = $('#task-form');
   bindObjectPicker(form, objects, t, false);
+  combo(form.elements.service_type, () => s.service_types.map(x => ({ value: x })));
   form.addEventListener('submit', async e => {
     e.preventDefault();
     const data = Object.fromEntries(new FormData(form).entries());
