@@ -48,6 +48,8 @@ Aktų tipai: **defektavimo aktas** (forma VP08FA), **numatomų darbų aktas** (s
 - Greita lentelė (`apziura` skiltis): „Defektų nėra / Yra defektų / Praleisti“, diktavimas, nuotraukos prie elemento (`photos.ref`), praėjusių metų tekstas („Naudoti kaip pernai“). Aktas (`aktai` skiltis): DI generavimas, tekstų redagavimas, peržiūra (`doc = 'annual'`), Word.
 - DI: **atskira Edge funkcija `ai-annual`** (`supabase/functions/ai-annual/index.ts`, `verify_jwt=false`, tikrina aktyvumą). Klientas: `db.aiAnnual`. Funkcijos diegimas reikalauja vartotojo leidimo (klasifikatorius atmeta).
 
+### Diktavimas garsu
+- `js/dictate.js` (`bindDictation`): įrašo mikrofoną (MediaRecorder; veikia ir iPhone PWA, kur naršyklės SpeechRecognition neveikia), siunčia į Edge funkciją **`transcribe`** (`supabase/functions/transcribe/index.ts`, `verify_jwt=false`, tikrina aktyvumą) → OpenAI `gpt-4o-transcribe`, kalba `lt`. Kliento pusė: `db.transcribe(blob)`. Paslaptis `OPENAI_API_KEY` – tik Supabase Secrets (nerašyti pokalbyje). Įrašas ≤ 4 min / 8 MB.
 ### DI (Edge Function `ai`, `verify_jwt = false`, vartotoją tikrina pati)
 Veiksmai: `parse_task` (laiškas → laukai), `generate_act` (defektų + numatomų darbų aktai arba klausimai), `generate_nc` (neatikties aktas). Gauna: užduotį, nuotraukas (su žymėjimais), `detail` (išsamumas), `building` (pastato kontekstas iš `objects`), `lessons` (vartotojo išmoktos taisyklės). Atsakyme gali būti `lesson` – bendra taisyklė iš „Pataisyti su DI“ nurodymo; ji saugoma `ai_lessons`. Modelis: env `ANTHROPIC_MODEL`, numatytas `claude-sonnet-5-5`. `ANTHROPIC_API_KEY` – tik Supabase paslaptyse, **niekada** ne kode/pokalbyje.
 
