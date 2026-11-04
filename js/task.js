@@ -594,7 +594,7 @@ async function generate(body, { force = false, instruction = '' }) {
       const patch = {
         defect_act: normalizeDefect(res.defect_act),
         works_act: mode === 'full' ? normalizeWorks(res.works_act) : null,
-        ai_assumptions: res.assumptions || [],
+        ai_assumptions: [].concat(res.assumptions || []).map(String),
         act_generated_at: new Date().toISOString()
       };
       if (['nauja', 'planuota', 'apziureta'].includes(t.status)) patch.status = 'aktas';
@@ -656,7 +656,7 @@ function drawActEditor() {
   const t = S.task;
   const d = t.defect_act;
   const w = t.works_act;
-  const assumptions = t.ai_assumptions || [];
+  const assumptions = [].concat(t.ai_assumptions || []).map(String);
   const ta = (v, attrs, rows = 3) => `<textarea rows="${rows}" ${attrs}>${esc(v)}</textarea>`;
 
   return `
@@ -915,7 +915,7 @@ async function generateNc(body, { instruction = '' }) {
           description: i.description || '', requirement: i.requirement || '', action: i.action || '', photos: i.photos || []
         }))
       },
-      ai_assumptions: res.assumptions || [],
+      ai_assumptions: [].concat(res.assumptions || []).map(String),
       act_generated_at: new Date().toISOString()
     };
     if (!t.problem && patch.nc_act.items[0]) patch.problem = patch.nc_act.items[0].description.slice(0, 140);
@@ -935,7 +935,7 @@ async function generateNc(body, { instruction = '' }) {
 function drawNcEditor() {
   const t = S.task;
   const a = t.nc_act;
-  const assumptions = t.ai_assumptions || [];
+  const assumptions = [].concat(t.ai_assumptions || []).map(String);
   const ta = (v, attrs, rows = 3) => `<textarea rows="${rows}" ${attrs}>${esc(v)}</textarea>`;
   return `
     <div class="card act-ed">

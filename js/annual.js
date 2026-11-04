@@ -10,6 +10,8 @@ import { $, $$, esc, toast, today, fmtDate, debounce, processImage, confirmDialo
 
 const OK_TEXT = 'Apžiūros metu defektų nenustatyta.';
 const OK_REC = 'Vykdyti tolimesnius priežiūros darbus.';
+/** DI kartais grąžina tekstą vietoj sąrašo – visada dirbame su masyvu. */
+const asList = v => Array.isArray(v) ? v.map(String) : (v ? [String(v)] : []);
 const isOk = t => /^Apžiūros metu defektų nenustatyta/.test(t || '');
 
 /** Pagrindinis šablonas (pagal 2026-05 pavyzdį). Galima pridėti / išmesti elementus kiekvienoje apžiūroje. */
@@ -364,6 +366,7 @@ const fit = ta => { ta.style.height = 'auto'; ta.style.height = (ta.scrollHeight
 export function drawAnnualActTab(body, ctx) {
   const { S, save, draw, showBusy, downloadDocx } = ctx;
   const t = S.task, a = t.annual_act, g = a.general;
+  a.conclusions = asList(a.conclusions); a.assumptions = asList(a.assumptions);
   const persist = debounce(() => save({ annual_act: a, act_number: t.act_number, act_date: t.act_date }), 800);
   const gf = (k, label, span = '') => `<label class="${span}">${label}<input data-g="${k}" value="${esc(g[k] ?? '')}"></label>`;
   // kol DI neparašė – defektų elementuose rodome inžinieriaus pastabą (ir rankiniam užpildymui)
@@ -401,7 +404,7 @@ export function drawAnnualActTab(body, ctx) {
       <button class="btn small" data-an="addc">${icon('plus')} Pridėti išvadą</button>
     </div>
 
-    ${(a.assumptions || []).length ? `<div class="card assumptions"><div class="card-title">DI prielaidos (į aktą nepatenka – patikrinkite)</div><ul>${a.assumptions.map(x => `<li>${esc(x)}</li>`).join('')}</ul></div>` : ''}
+    ${asList(a.assumptions).length ? `<div class="card assumptions"><div class="card-title">DI prielaidos (į aktą nepatenka – patikrinkite)</div><ul>${asList(a.assumptions).map(x => `<li>${esc(x)}</li>`).join('')}</ul></div>` : ''}
 
     <div class="card print-box">
       <div class="card-title">${icon('print')} Peržiūra, redagavimas, Word ir PDF</div>
@@ -467,8 +470,8 @@ async function generate(ctx) {
       if (it.status === 'ok') { it.text = OK_TEXT; it.rec = OK_REC; }
       else if (!it.keep && by.has(it.id)) { const r = by.get(it.id); it.text = r.defects || r.text || ''; it.rec = r.rec || ''; }
     });
-    if ((res.conclusions || []).length) a.conclusions = res.conclusions;
-    a.assumptions = res.assumptions || [];
+    if (asList(res.conclusions).length) a.conclusions = asList(res.conclusions);
+    a.assumptions = asList(res.assumptions);
     const patch = { annual_act: a, act_generated_at: new Date().toISOString() };
     if (['nauja', 'planuota', 'apziureta'].includes(t.status)) patch.status = 'aktas';
     await save(patch);
