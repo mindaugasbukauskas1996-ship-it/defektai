@@ -814,7 +814,7 @@ async function downloadDocx(doc, btn) {
     const refPhotos = {};
     if (annual) for (const p of S.photos.filter(x => x.ref)) (refPhotos[p.ref] = refPhotos[p.ref] || []).push({ url: await db.photoUrl(p, true) });
     const { exportDocx } = await import('./docx.js');
-    const name = await exportDocx({ t: S.task, s: S.settings, doc, figs, refPhotos });
+    const name = await exportDocx({ t: S.task, s: await db.getAuthorSettings(S.task), doc, figs, refPhotos });
     toast(`Word failas paruoštas: ${name}`, 'ok', 5000);
   } catch (err) {
     console.error(err);

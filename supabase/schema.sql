@@ -469,3 +469,8 @@ begin
   return new;
 end $$;
 revoke all on function public.handle_new_user() from public, anon, authenticated;
+
+-- administratorius gali skaityti kitų paskyrų nustatymus (akto rengėjo vardas, pareigos, parašas jo užduočių aktuose)
+drop policy if exists "admin reads settings" on public.user_settings;
+create policy "admin reads settings" on public.user_settings
+  for select to authenticated using (public.is_admin());

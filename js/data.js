@@ -431,6 +431,32 @@ export async function getSettings(force = false) {
   return settingsCache;
 }
 
+// Asmens duomenys akte (vardas, pareigos, parašas...) imami iš to, kas atsakingas už užduotį, o ne iš peržiūrinčiojo
+const PERSON_FIELDS = ['engineer_name', 'engineer_position', 'engineer_phone', 'signature', 'inspector_cert'];
+
+/** Nustatymai aktui: akto rengėjas = užduoties atsakingas (arba kūrėjas); kiti laukai – jo, o jei tušti – peržiūrinčiojo. */
+export async function getAuthorSettings(task) {
+  const mine = await getSettings();
+  if (isDemo || !task) return mine;
+  const me = await getProfile();
+  const uid = task.assigned_to || task.created_by;
+  if (!uid || uid === me.id) return mine;
+  const r = await sb.from('user_settings').select('data').eq('user_id', uid).maybeSingle();
+  const theirs = (!r.error && r.data && r.data.data) || {};
+  const out = { ...mine };
+  for (const k of Object.keys(theirs)) {
+    const v = theirs[k];
+    if (PERSON_FIELDS.includes(k) || v === '' || v == null || (Array.isArray(v) && !v.length)) continue;
+    out[k] = v;
+  }
+  PERSON_FIELDS.forEach(k => { out[k] = theirs[k] || ''; });
+  if (!out.engineer_position) out.engineer_position = DEFAULT_SETTINGS.engineer_position;
+  if (!out.engineer_name) {                                           // jei jis dar neužpildė nustatymų – bent vardas iš paskyros
+    const people = await listProfiles(true).catch(() => []);
+    out.engineer_name = profileName(people.find(p => p.id === uid)) || '';
+  }
+  return out;
+}
 export async function saveSettings(data) {
   const clean = { ...data };
   if (isDemo) {

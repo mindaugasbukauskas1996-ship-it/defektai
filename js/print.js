@@ -9,8 +9,9 @@ import { $$, esc, nl2br, fmtDate, fmtQty, toast, parseQty, debounce } from './ut
 
 export async function renderPrint(el, id, doc) {
   el.innerHTML = `<div class="loading">Ruošiamas dokumentas...</div>`;
-  const [t, photos, s] = await Promise.all([db.getTask(id), db.listPhotos(id), db.getSettings()]);
+  const [t, photos] = await Promise.all([db.getTask(id), db.listPhotos(id)]);
   if (!t) throw new Error('Užduotis nerasta');
+  const s = await db.getAuthorSettings(t);                       // vardas, pareigos, parašas – to, kas atsakingas už užduotį
   if (t.kind === 'nonconformity') doc = 'nc';
   if (t.kind === 'annual') doc = 'annual';
   if (doc === 'annual' ? !t.annual_act : doc === 'nc' ? !t.nc_act : !t.defect_act) throw new Error('Aktas dar neparuoštas');
