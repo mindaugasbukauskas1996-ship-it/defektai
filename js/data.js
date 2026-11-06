@@ -431,6 +431,26 @@ export async function getSettings(force = false) {
   return settingsCache;
 }
 
+/** Admin: kito žmogaus nustatymai (skaitymas / įrašymas). */
+export async function getSettingsFor(userId) {
+  if (isDemo) return getSettings();
+  const r = await sb.from('user_settings').select('data').eq('user_id', userId).maybeSingle();
+  if (r.error) throw r.error;
+  return { ...DEFAULT_SETTINGS, ...((r.data && r.data.data) || {}) };
+}
+
+export async function saveSettingsFor(userId, data) {
+  const me = await getProfile();
+  if (userId === me.id) return saveSettings(data);
+  const clean = { ...data };
+  delete clean.demo_api_key;
+  const { error } = await sb.from('user_settings').upsert({ user_id: userId, data: clean });
+  if (error) throw error;
+  const name = (clean.engineer_name || '').trim();
+  const r = await sb.from('profiles').update({ full_name: name || null }).eq('id', userId);
+  if (r.error) throw r.error;
+  return { ...DEFAULT_SETTINGS, ...clean };
+}
 // Asmens duomenys akte (vardas, pareigos, parašas...) imami iš to, kas atsakingas už užduotį, o ne iš peržiūrinčiojo
 const PERSON_FIELDS = ['engineer_name', 'engineer_position', 'engineer_phone', 'signature', 'inspector_cert'];
 

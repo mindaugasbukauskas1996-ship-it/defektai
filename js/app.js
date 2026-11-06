@@ -77,7 +77,7 @@ async function route() {
     if (parts[0] === 'nauja') { setActiveNav('new'); return await renderTaskForm(null); }
     if (parts[0] === 'metine') { setActiveNav('annual'); return await renderAnnualList(view(), go); }
     if (parts[0] === 'neatiktis') { setActiveNav('nc'); return await renderTaskForm(null, 'nonconformity'); }
-    if (parts[0] === 'nustatymai') { setActiveNav('settings'); return await renderSettings(); }
+    if (parts[0] === 'nustatymai') { setActiveNav('settings'); return await renderSettings(parts[1]); }
     if (parts[0] === 'u' && parts[1]) {
       setActiveNav('list');
       if (parts[2] === 'redaguoti') return await renderTaskForm(parts[1]);
@@ -754,18 +754,22 @@ async function renderLessons(account) {
 // Nustatymai
 // ---------------------------------------------------------------------
 
-async function renderSettings() {
-  const s = await db.getSettings(true);
+async function renderSettings(targetId) {
   const account = await db.getProfile(true);
   const accounts = account.role === 'admin' ? await db.listProfiles(true) : [];
+  // admin gali atidaryti kito žmogaus nustatymus (#/nustatymai/<paskyros id>)
+  const target = account.role === 'admin' && targetId && targetId !== account.id ? accounts.find(p => p.id === targetId) : null;
+  const editing = !!target;
+  const s = editing ? await db.getSettingsFor(target.id) : await db.getSettings(true);
   const comm =(s.commission || []).concat([{ position: '', name: '' }]).slice(0, 4);
 
   view().innerHTML = `
-    <div class="page-head"><h1>Nustatymai</h1>
-      ${db.isDemo ? '' : `<button class="btn ghost" id="btn-logout">${icon('logout')} Atsijungti</button>`}
+    <div class="page-head"><h1>${editing ? 'Kito žmogaus nustatymai' : 'Nustatymai'}</h1>
+      ${editing ? `<a class="btn ghost" href="#/nustatymai">${icon('back')} Atgal į savo nustatymus</a>` : db.isDemo ? '' : `<button class="btn ghost" id="btn-logout">${icon('logout')} Atsijungti</button>`}
     </div>
     <form id="set-form">
-      ${account.email === 'demo' ? '' : `
+      ${editing ? `<div class="card editing-banner"><b>Redaguojate: ${esc(db.profileName(target))}</b> <span class="muted small">${esc(target.email || '')}</span>
+        <div class="muted small">Šie nustatymai (vardas, pareigos, parašas, numeracija) bus naudojami to žmogaus aktuose. Keiskite atsargiai.</div></div>` : account.email === 'demo' ? '' : `
       <div class="card form-grid">
         <div class="card-title span4">Paskyra</div>
         <div class="span4 acct">
@@ -784,6 +788,7 @@ async function renderSettings() {
           <div class="lbl">Paskyros (užduotis skirstote užduoties kortelėje)</div>
           <ul class="acct-list">${accounts.map(p => `<li><b>${esc(db.profileName(p))}</b> <span class="muted small">${esc(p.email || '')}${p.role === 'admin' ? ' · admin' : ''}</span>
             ${p.id === account.id ? '' : `<label class="chk" title="Ar paskyra gali naudotis programa"><input type="checkbox" data-acc="${esc(p.id)}" ${p.active ? 'checked' : ''}> aktyvi</label>`}
+            ${p.id === account.id ? '' : `<a class="btn small ghost" href="#/nustatymai/${esc(p.id)}" title="Keisti šio žmogaus vardą, pareigas, parašą">Jo nustatymai</a>`}
             ${p.id === account.id ? '' : `<button class="btn small ghost" type="button" data-reset="${esc(p.id)}" data-name="${esc(db.profileName(p))}" title="Nustatyti naują laikiną slaptažodį">Naujas slaptažodis</button>`}
             ${p.active ? '' : '<span class="tag nc">laukia aktyvavimo</span>'}</li>`).join('')}</ul>
           <div class="new-user">
@@ -850,10 +855,10 @@ async function renderSettings() {
         <button class="btn primary" type="submit">${icon('check')} Išsaugoti nustatymus</button>
       </div>
     </form>
-    <div id="lessons-card"></div>
-    ${account.role === 'admin' && !db.isDemo ? '<div id="import-card"></div>' : ''}`;
-  if (account.role === 'admin' && !db.isDemo) renderImport().catch(e => { $('#import-card').innerHTML = `<div class="card error">Importo skiltis neįkrauta: ${esc(e.message)}</div>`; });
-  renderLessons(account).catch(e => { $('#lessons-card').innerHTML = `<div class="card error">Nepavyko įkelti DI taisyklių: ${esc(e.message)}</div>`; });
+    ${editing ? '' : '<div id="lessons-card"></div>'}
+    ${account.role === 'admin' && !db.isDemo && !editing ? '<div id="import-card"></div>' : ''}`;
+  if (account.role === 'admin' && !db.isDemo && !editing) renderImport().catch(e => { $('#import-card').innerHTML = `<div class="card error">Importo skiltis neįkrauta: ${esc(e.message)}</div>`; });
+  if (!editing) renderLessons(account).catch(e => { $('#lessons-card').innerHTML = `<div class="card error">Nepavyko įkelti DI taisyklių: ${esc(e.message)}</div>`; });
 
   let signature = s.signature || '';
   $('#sig-file').addEventListener('change', async e => {
@@ -951,8 +956,8 @@ async function renderSettings() {
       service_types: String(f.service_types || '').split('\n').map(x => x.trim()).filter(Boolean)
     };
     try {
-      await db.saveSettings(data);
-      toast('Nustatymai išsaugoti', 'ok');
+      if (editing) await db.saveSettingsFor(target.id, data); else await db.saveSettings(data);
+      toast(editing ? `„${db.profileName(target)}“ nustatymai išsaugoti` : 'Nustatymai išsaugoti', 'ok');
     } catch (err) { toast(err.message, 'error'); }
   });
 }

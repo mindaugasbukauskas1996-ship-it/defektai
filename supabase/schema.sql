@@ -474,3 +474,9 @@ revoke all on function public.handle_new_user() from public, anon, authenticated
 drop policy if exists "admin reads settings" on public.user_settings;
 create policy "admin reads settings" on public.user_settings
   for select to authenticated using (public.is_admin());
+
+-- administratorius gali ne tik skaityti, bet ir keisti kitų paskyrų nustatymus
+drop policy if exists "admin reads settings" on public.user_settings;
+drop policy if exists "admin manages settings" on public.user_settings;
+create policy "admin manages settings" on public.user_settings
+  for all to authenticated using (public.is_admin()) with check (public.is_admin());

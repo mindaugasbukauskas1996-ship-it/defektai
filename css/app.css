@@ -536,3 +536,5 @@ input[type=date], select { min-width: 0; max-width: 100%; }
 .cred { display: grid; gap: 10px; margin: 10px 0; padding: 12px; background: var(--primary-soft); border-radius: 12px; }
 .cred-pw { font-size: 22px; letter-spacing: 1px; font-variant-ligatures: none; }
 .acct-list li { flex-wrap: wrap; }
+
+.editing-banner { border-color: var(--green); background: var(--primary-soft); }
