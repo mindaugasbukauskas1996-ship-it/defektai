@@ -1,9 +1,8 @@
 // =====================================================================
-// VIENO FAILO VERSIJA Supabase naršyklės redaktoriui (Edge Functions -> Via Editor).
-// Šis failas sugeneruotas iš supabase/functions/ai/prompt.js + index.ts.
-// Įklijuokite VISĄ turinį į funkcijos "ai" failą index.ts ir spauskite Deploy.
+// VIENO FAILO VERSIJA Supabase narÅyklÄ—s redaktoriui (Edge Functions -> Via Editor).
+// Å is failas sugeneruotas iÅ supabase/functions/ai/prompt.js + index.ts.
+// Ä®klijuokite VISÄ„ turinÄÆ ÄÆ funkcijos "ai" failÄ… index.ts ir spauskite Deploy.
 // =====================================================================
-
 // =====================================================================
 // Bendras DI (Claude API) modulis.
 // Naudojamas ir Supabase Edge funkcijoje (serveryje), ir naršyklėje
@@ -25,6 +24,24 @@ export const UNITS = [
 ];
 
 const MAX_PHOTOS = 12;
+
+// STR (statybos techniniai reglamentai): DI nuorodas imti TIK iš šio žinyno, kad nebūtų išgalvotų punktų.
+// Čia galima papildyti – kiekviena eilutė: kam taikoma → kokia nuoroda.
+export const STR_REFERENCE = `STR NUORODŲ ŽINYNAS (vienintelis leidžiamas šaltinis nuorodoms; kitų normų ir punktų numerių NEIŠGALVOK):
+A) STR 1.07.03:2017 – statinio apžiūra ir priežiūra. Punktai, kuriuos įmonė naudoja aktuose:
+ - stogas (danga, parapetai, įlajos, lietvamzdžiai): 13.1, 13.2 p.
+ - sienos, fasadas, siūlės, išorės atitvarai: 13.5–13.7, 97 p.
+ - pamatai, cokolis, nuogrinda, rūsio sienos: 14.2 p.
+ - balkonai, lodžijos: 24 p.
+ - langai, durys, natūrali ventiliacija, laiptinių patalpos (sienos, lubos, laiptai): 97 p.
+ - nuolatiniai stebėjimai (plyšių, deformacijų stebėjimas): 88.1 p.
+B) Esminiai statinio reikalavimai – nurodyk TIK žymą, be punkto numerio:
+ - STR 2.01.01(1):2005 – mechaninis atsparumas ir pastovumas (įtrūkimai, deformacijos, laikančiosios konstrukcijos);
+ - STR 2.01.01(2):2008 – gaisrinė sauga (elektros instaliacija, evakuaciniai keliai, durys);
+ - STR 2.01.01(3):2008 – higiena, sveikata, aplinkos apsauga (drėgmė, pelėsis, pratekėjimai, vandentiekis, nuotekos);
+ - STR 2.01.01(4):2008 – naudojimo sauga (turėklai, laiptai, pažeistos dangos, krentantys elementai);
+ - STR 2.01.01(6):2008 – energijos taupymas ir šilumos išsaugojimas (atitvarų šiluminė izoliacija, šildymas, šilumos punktas).
+Taisyklės: punkto numerį (p.) rašyk tik iš A) dalies, B) dalies normas – be punkto. Jei elementui nė viena norma netinka, nerašyk jokios. Nesiūlyk citatų – tik nuorodą.`;
 
 const BUILDING_LABELS = {
   construction: 'Konstruktyvas', built_year: 'Statybos metai', floors: 'Aukštų skaičius', apartments: 'Butų skaičius', stairwells: 'Laiptinių skaičius',
@@ -68,6 +85,14 @@ Rašymo taisyklės:
 - Nuotraukos sunumeruotos („1 pav.“, „2 pav.“ ...). Spalvoti kontūrai, rodyklės ir skaičiai apskritimuose nuotraukose – tai inžinieriaus pažymėtos vietos, kurias reikia tvarkyti. Nurodyk, kurios nuotraukos susijusios su kiekvienu defektu (laukas photos), o tekste gali rašyti „(žr. 2 pav., žyma 1)“.
 - Defektus grupuok pagal apžiūrėtą objektą / sistemą (pvz., „Stogas (plokščia bituminė danga)“, „Lietaus nuotekų sistema – įlaja“, „Laiptinės elektros skydinė“, „Laiptinės sienos ir lubos“).
 - Rekomenduojamuose darbuose nurodyk konkrečius veiksmus, eiliškumą ir, jei svarbu, skubumą (pvz., „Nedelsiant atjungti ir apžiūrėti...“).
+
+Pagrindas pagal STR (privaloma):
+- Defektavimo aktas turi būti paremtas STR. Kiekvieno objekto lauko defects PABAIGOJE parašyk teisinį pagrindą skliaustuose, pvz. „(STR 1.07.03:2017 13.5, 97 p.; STR 2.01.01(1):2005)“. Pasirink 1–3 tinkamiausias nuorodas iš žemiau pateikto STR žinyno pagal apžiūrėtą sistemą.
+- Nuorodas imk TIK iš žinyno. Jei reikalingos normos žinyne nėra arba nesi tikras dėl punkto – parašyk tik žinyne esančią žymą be punkto arba nieko, ir įrašyk į assumptions pastabą „Patikrinti STR pagrindą: <objektas>“.
+- Nuorodos neturi keisti defektų aprašymo turinio – tai tik pagrindas; neišgalvok faktų, kad „pritaikytum“ normą.
+- Jei pažeidimas mažina pastato saugą, atsparumą ar higieną, summary pabaigoje trumpai nurodyk, kurį esminį reikalavimą (STR 2.01.01(n)) tai liečia.
+
+${STR_REFERENCE}
 
 Numatomų darbų aktas (tik kai režimas „full“):
 - Kiekvienas atskiras darbas – atskira eilutė. Pavadinimas – kaip sąmatoje: daiktavardis + veiksmo daiktavardis (pvz., „Bituminės dangos demontavimas aplink įlają“, „Įlajos keitimas nauja per perdangą“, „Bituminės dangos prilydymas 2 sluoksniais“).
@@ -272,7 +297,8 @@ Rašymo taisyklės:
 - Remkis TIK inžinieriaus aprašymu (jis gali būti padiktuotas, su klaidomis) ir nuotraukomis. Neišgalvok neatitikčių, kurių nėra aprašyme ar nuotraukose.
 - Nuotraukos sunumeruotos („1 pav.“, „2 pav.“ ...). Spalvoti kontūrai, rodyklės ir skaičiai apskritimuose nuotraukose – inžinieriaus pažymėtos vietos. Kiekvienai neatitiktis nurodyk susijusias nuotraukas (laukas photos).
 - Kiekviena atskira neatiktis – atskira eilutė: ką rangovas padarė ar nepadarė (description – faktas, be vertinimų), kokį reikalavimą pažeidžia (requirement) ir ką rangovas privalo padaryti (action).
-- requirement: nurodyk reikalavimą, kurį pažeidžia (projektas, techninė specifikacija, gamintojo montavimo instrukcija, STR / RSN norma, darbų kokybės reikalavimai). Konkrečius normų punktus nurodyk TIK jei esi tikras; kitu atveju rašyk bendrai („Pagal projekto sprendinius ir statybos darbų kokybės reikalavimus“) ir tai įrašyk į assumptions.
+- requirement: nurodyk reikalavimą, kurį pažeidžia (projektas, techninė specifikacija, gamintojo montavimo instrukcija, darbų kokybės reikalavimai), ir PAGRINDĄ PAGAL STR: eilutės pabaigoje skliaustuose pateik 1–2 tinkamiausias nuorodas iš žemiau pateikto STR žinyno, pvz. „(STR 1.07.03:2017 13.1 p.; STR 2.01.01(3):2008)“. Neatitiktis turi būti paremta STR, todėl nuorodą pridėk prie kiekvienos eilutės, kai žinyne yra tinkama norma.
+- Nuorodas imk TIK iš žinyno (punktų numerius – tik iš A dalies). Jei tinkamos normos žinyne nėra arba nesi tikras – rašyk bendrai („Pagal projekto sprendinius ir statybos darbų kokybės reikalavimus“) ir įrašyk į assumptions „Patikrinti STR pagrindą: <neatiktis>“. Neišgalvok normų ar jų punktų.
 - action: konkretus taisymo veiksmas (pvz., „Išardyti ir pakartotinai sumontuoti pagal gamintojo instrukciją“, „Pašalinti ir atstatyti dangą“).
 - severity (neatitikties lygis): „Nežymi“ – estetinis ar menkas, nedaro įtakos saugai / patvarumui; „Esminė“ – mažina patvarumą, funkcionalumą ar kokybę, reikia taisyti; „Kritinė“ – kelia pavojų saugai ar sukels avariją, darbus reikia stabdyti. Pasirink aukščiausią tarp neatitikčių.
 - work: kokie rangovo darbai vertinami (pvz., „Stogo dangos remontas“). Jei neaišku – naudok užduoties duomenis.
@@ -281,6 +307,8 @@ Rašymo taisyklės:
 
 Pastato kontekstas:
 - Jei pateiktas „PASTATO KONTEKSTAS“, atsižvelk į jį vertindamas neatitiktis ir reikalavimus (konstruktyvas, stogo tipas ir danga, plotai, šilumos punktas). Faktai iš inžinieriaus aprašymo ir nuotraukų turi pirmenybę.
+
+${STR_REFERENCE}
 
 Inžinieriaus bendri pageidavimai:
 - Jei pateikti „INŽINIERIAUS BENDRI PAGEIDAVIMAI“, laikykis jų kaip nuolatinių rašymo ir turinio taisyklių, nebent jos prieštarauja šio akto faktams.
