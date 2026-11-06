@@ -480,3 +480,33 @@ drop policy if exists "admin reads settings" on public.user_settings;
 drop policy if exists "admin manages settings" on public.user_settings;
 create policy "admin manages settings" on public.user_settings
   for all to authenticated using (public.is_admin()) with check (public.is_admin());
+
+
+-- ---------- Automatinis uždarymas: „Aktas paruoštas“ > 2 paros → „Baigta“ ----------
+alter table public.tasks add column if not exists status_changed_at timestamptz not null default now();
+
+create or replace function public.touch_status_changed() returns trigger
+language plpgsql as $$
+begin
+  if new.status is distinct from old.status then new.status_changed_at = now(); end if;
+  return new;
+end $$;
+
+drop trigger if exists tasks_status_changed on public.tasks;
+create trigger tasks_status_changed before update on public.tasks
+  for each row execute function public.touch_status_changed();
+
+create or replace function public.close_ready_tasks() returns integer
+language plpgsql security definer set search_path = public as $$
+declare n integer;
+begin
+  update public.tasks set status = 'baigta'
+   where status = 'aktas' and status_changed_at < now() - interval '2 days';
+  get diagnostics n = row_count;
+  return n;
+end $$;
+revoke all on function public.close_ready_tasks() from public, anon, authenticated;
+
+create extension if not exists pg_cron;
+select cron.unschedule('close-ready-tasks') where exists (select 1 from cron.job where jobname = 'close-ready-tasks');
+select cron.schedule('close-ready-tasks', '17 * * * *', 'select public.close_ready_tasks()');
