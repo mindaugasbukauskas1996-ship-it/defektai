@@ -504,3 +504,13 @@ input[type=date], select { min-width: 0; max-width: 100%; }
 .doc-list li > span { overflow-wrap: anywhere; }
 .doc-add { cursor: pointer; }
 .doc-add.disabled { opacity: .5; pointer-events: none; }
+
+/* Skubios užduotys – raudonai */
+:root { --urgent: #d32f2f; }
+.badge.prio { background: var(--urgent); }
+.task-card.urgent { border-left-color: var(--urgent); border-left-width: 5px; background: #fff7f7; }
+.task-card.urgent .tc-addr { color: #b71c1c; }
+.chip-urgent { color: var(--urgent); border-color: #f1b5b5; }
+.chip-urgent span { color: var(--urgent); }
+.chip-urgent.on { background: var(--urgent); border-color: var(--urgent); color: #fff; }
+.chip-urgent.on span { color: #ffd6d6; }

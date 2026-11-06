@@ -153,11 +153,12 @@ async function renderList() {
   const isAdmin = me.role === 'admin';
   const people = isAdmin ? await db.listProfiles() : [];
   const pname = id => db.profileName(people.find(p => p.id === id));
-  const chips = [{ id: 'aktyvios', label: 'Aktyvios' }, ...STATUSES, { id: 'neatiktys', label: 'Neatiktys' }, { id: 'metines', label: 'Metinės' }, { id: 'visos', label: 'Visos' }];
+  const chips = [{ id: 'aktyvios', label: 'Aktyvios' }, { id: 'skubios', label: 'Skubios' }, ...STATUSES, { id: 'neatiktys', label: 'Neatiktys' }, { id: 'metines', label: 'Metinės' }, { id: 'visos', label: 'Visos' }];
 
   const counts = {};
   tasks.forEach(t => { counts[t.status] = (counts[t.status] || 0) + 1; });
   counts.aktyvios = tasks.filter(t => t.status !== 'baigta').length;
+  counts.skubios = tasks.filter(t => t.priority === 'skubus' && t.status !== 'baigta').length;
   counts.neatiktys = tasks.filter(t => t.kind === 'nonconformity').length;
   counts.metines = tasks.filter(t => t.kind === 'annual').length;
   counts.visos = tasks.length;
@@ -180,7 +181,7 @@ async function renderList() {
         ${people.filter(p => p.id !== me.id).map(p => `<option value="${esc(p.id)}" ${listFilter.who === p.id ? 'selected' : ''}>${esc(db.profileName(p))}</option>`).join('')}
       </select>` : ''}
       <div class="chips" id="chips">
-        ${chips.map(c => `<button class="chip ${listFilter.status === c.id ? 'on' : ''}" data-st="${c.id}">${esc(c.label)} <span>${counts[c.id] || 0}</span></button>`).join('')}
+        ${chips.map(c => `<button class="chip ${c.id === 'skubios' ? 'chip-urgent ' : ''}${listFilter.status === c.id ? 'on' : ''}" data-st="${c.id}">${esc(c.label)} <span>${counts[c.id] || 0}</span></button>`).join('')}
       </div>
     </div>
     <div id="task-list" class="task-list"></div>`;
@@ -190,9 +191,10 @@ async function renderList() {
     let arr = tasks.filter(t => {
       if (isAdmin && listFilter.who !== 'all' && t.assigned_to !== listFilter.who) return false;
       if (listFilter.status === 'aktyvios' && t.status === 'baigta') return false;
+      if (listFilter.status === 'skubios' && !(t.priority === 'skubus' && t.status !== 'baigta')) return false;
       if (listFilter.status === 'neatiktys' && t.kind !== 'nonconformity') return false;
       if (listFilter.status === 'metines' && t.kind !== 'annual') return false;
-      if (!['aktyvios', 'visos', 'neatiktys', 'metines'].includes(listFilter.status) && t.status !== listFilter.status) return false;
+      if (!['aktyvios', 'skubios', 'visos', 'neatiktys', 'metines'].includes(listFilter.status) && t.status !== listFilter.status) return false;
       if (!q) return true;
       return [t.address, t.city, t.problem, t.contact_name, t.contact_phone, t.stairwell, t.act_number, t.service_type, t.contractor, t.report_no]
         .some(v => v && String(v).toLowerCase().includes(q));
@@ -211,7 +213,7 @@ async function renderList() {
     }
     const overdue = d => d && d < today();
     el.innerHTML = arr.map(t => `
-      <a class="task-card st-${esc(t.status)}" href="#/u/${t.id}">
+      <a class="task-card st-${esc(t.status)}${t.priority === 'skubus' && t.status !== 'baigta' ? ' urgent' : ''}" href="#/u/${t.id}">
         <div class="tc-main">
           <div class="tc-addr">${esc(t.address || '(be adreso)')}${t.city ? `, ${esc(t.city)}` : ''}
             ${t.kind === 'nonconformity' ? `<span class="tag nc">${icon('alert')} Neatiktis</span>` : ''}
