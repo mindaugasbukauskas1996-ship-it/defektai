@@ -341,6 +341,44 @@ export async function photoBlob(photo) {
   return data;
 }
 
+// ---------------------------------------------------------------------
+// Projekto / dokumentų priedai (DI palygina projektą su faktine būkle)
+// ---------------------------------------------------------------------
+
+export const DOC_LIMITS = { files: 3, fileBytes: 20 * 1024 * 1024, totalBytes: 30 * 1024 * 1024 };
+
+export async function listDocs(taskId) {
+  if (isDemo) return [];
+  const { data, error } = await sb.from('task_docs').select('*').eq('task_id', taskId).order('created_at');
+  if (error) throw error;
+  return data;
+}
+
+export async function addDoc(taskId, file) {
+  if (isDemo) throw new Error('Dokumentų įkėlimas veikia tik prisijungus prie Supabase.');
+  const id = uuid();
+  const ext = (file.name.split('.').pop() || 'bin').toLowerCase().replace(/[^a-z0-9]/g, '').slice(0, 5) || 'bin';
+  const path = `${taskId}/docs/${id}.${ext}`;
+  const up = await sb.storage.from('photos').upload(path, file, { contentType: file.type || 'application/octet-stream', upsert: false });
+  if (up.error) throw up.error;
+  const row = { id, task_id: taskId, name: file.name, path, mime: file.type || '', size: file.size };
+  const { data, error } = await sb.from('task_docs').insert(row).select('*').single();
+  if (error) { await sb.storage.from('photos').remove([path]); throw error; }
+  return data;
+}
+
+export async function deleteDoc(doc) {
+  await sb.storage.from('photos').remove([doc.path]);
+  const { error } = await sb.from('task_docs').delete().eq('id', doc.id);
+  if (error) throw error;
+}
+
+/** Dokumento aprašas DI užklausai (laikina nuoroda). */
+export async function docForAI(doc) {
+  const { data, error } = await sb.storage.from('photos').createSignedUrl(doc.path, 900);
+  if (error) throw error;
+  return { name: doc.name, url: data.signedUrl, mime: doc.mime || '' };
+}
 /** Nuotraukos aprašas DI užklausai. */
 export async function photoForAI(photo) {
   const path = photo.annotated_path || photo.path;

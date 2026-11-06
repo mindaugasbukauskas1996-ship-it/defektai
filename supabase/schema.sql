@@ -438,3 +438,19 @@ create policy "lessons delete" on public.ai_lessons for delete to authenticated
 alter table public.tasks  add column if not exists annual_act jsonb;
 alter table public.photos add column if not exists ref text;
 create index if not exists tasks_object_kind_idx on public.tasks (object_id, kind);
+-- projekto / dokumentų priedai DI užklausoms (PDF, nuotraukos); failai – bucket `photos`, aplankas <užduoties id>/docs/
+create table if not exists public.task_docs (
+  id uuid primary key default gen_random_uuid(),
+  task_id uuid not null references public.tasks(id) on delete cascade,
+  name text not null,
+  path text not null,
+  mime text,
+  size bigint,
+  created_at timestamptz not null default now()
+);
+create index if not exists task_docs_task_idx on public.task_docs(task_id);
+alter table public.task_docs enable row level security;
+drop policy if exists "task_docs via task" on public.task_docs;
+create policy "task_docs via task" on public.task_docs for all to authenticated
+  using (exists (select 1 from public.tasks t where t.id = task_docs.task_id))
+  with check (exists (select 1 from public.tasks t where t.id = task_docs.task_id));

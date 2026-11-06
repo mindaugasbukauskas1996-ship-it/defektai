@@ -22,6 +22,7 @@ Vaidmenys: **Inžinierius** (darbuotojas), **Admin**, **Rangovas** (tik gauna ak
 - ✅ Pasirinkti išsamumą: **siaurai / vidutiniškai / plačiai**.
 - ✅ DI atsižvelgia į **pastato kontekstą** (blokinis/plytinis, stogas, plotai, šilumos punktas, aukštai).
 - ✅ **Neatikties aktas** rangovo darbams (nuotraukos + diktavimas → aktas su rangovu, reikalavimu, terminu, parašais).
+- ✅ Inžinierius – prieš generuodamas defektinį ar neatikties aktą **įkelti projektą / specifikaciją** (PDF, nuotraukos), kad DI palygintų, kaip numatyta projekte ir kaip padaryta faktiškai.
 - ✅ **Pataisyti su DI** nurodymu; DI **įsimena bendras taisykles** (savos kiekvienam; valdomos Nustatymuose).
 - ✅ **Peržiūra su redagavimu** tiesiai A4 vaizde; pakeitimai išsaugomi sistemoje.
 - ✅ Eksportas **PDF** (spausdinimas) ir **Word (.docx)** (iš redaktoriaus ir iš peržiūros).

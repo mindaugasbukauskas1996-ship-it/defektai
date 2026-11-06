@@ -66,6 +66,21 @@ function detailBlock(payload) {
 }
 const LESSON_DESC = 'Pildyk TIK kai pateiktas inžinieriaus nurodymas taisyti aktą. Jei nurodymas išreiškia BENDRĄ pageidavimą, kuris tiktų ir būsimiems aktams (stilius, visada įtraukiami darbai, terminai, formuluotės), parašyk jį vienu trumpu bendru sakiniu be konkretaus adreso ar kiekių. Jei nurodymas liečia tik šį aktą (konkretūs matmenys, vieta, faktas) – praleisk šį lauką.';
 
+// Projekto / dokumentų priedai (PDF arba nuotraukos pagal laikiną nuorodą).
+function docBlock(d) {
+  if (!d || !d.url) return null;
+  const isPdf = /pdf/i.test(d.mime || '') || /\.pdf($|\?)/i.test(d.name || '');
+  return isPdf ? { type: 'document', source: { type: 'url', url: d.url } } : { type: 'image', source: { type: 'url', url: d.url } };
+}
+
+const DOCS_RULES = `PROJEKTO DOKUMENTAI:
+- Jei pateikti „PROJEKTO DOKUMENTAI“ (projektas, techninė specifikacija), tai – kaip turėjo būti padaryta. Nuotraukos ir inžinieriaus aprašymas – kaip yra faktiškai. Palygink juos: ar faktinė būklė atitinka projekte numatytus sprendinius (medžiagos, sluoksniai, mazgai, matmenys, atstumai, sistemos sudėtis).
+- Cituok TIK tai, ką dokumente tikrai matai ir perskaitei; nurodyk dokumento pavadinimą ir, jei matyti, lapą / skyrių / mazgo žymą (pvz. „projektas „X.pdf“, 5 lapas, stogo mazgas A“). Neišgalvok projekto sprendinių. Jei dokumento nepavyko perskaityti arba atitinkamos vietos jame nerandi – įrašyk į assumptions („Projekte nerasta: <ko>“) ir remkis tik faktais.
+- Neatitikties akte: description – faktas; requirement – projekto sprendinys su nuoroda į dokumentą (+ STR pagrindas, kaip nurodyta); action – privalo atkurti pagal projektą.
+- Defektų akte: defects tekste, kai yra neatitikimas projektui, trumpai nurodyk „projekte numatyta: ...; faktiškai: ...“; rekomenduojamuose darbuose – atkurti pagal projektą.
+- Jei projektas faktinei situacijai neaktualus – nenaudok jo ir nieko apie jį nerašyk.`;
+
+
 // ---------------------------------------------------------------------
 // Akto generavimas
 // ---------------------------------------------------------------------
@@ -108,6 +123,8 @@ Pastato kontekstas ir išsamumas:
 Inžinieriaus bendri pageidavimai:
 - Jei pateikti „INŽINIERIAUS BENDRI PAGEIDAVIMAI“, laikykis jų kaip nuolatinių rašymo ir turinio taisyklių, nebent jos prieštarauja šio akto faktams.
 - Kai inžinierius prašo pataisyti aktą, laukelyje lesson įrašyk bendrą taisyklę tik jei nurodymas tinka ir kitiems aktams.
+
+${DOCS_RULES}
 
 Rezultatą VISADA pateik iškviesdamas įrankį „pateikti_rezultata“.`;
 
@@ -261,6 +278,13 @@ export function buildActRequest(payload, model = DEFAULT_MODEL) {
     : '\nNUOTRAUKŲ NĖRA.\n';
   content.push({ type: 'text', text });
 
+  (payload.docs || []).slice(0, 3).forEach(d => {
+    const b = docBlock(d);
+    if (!b) return;
+    content.push({ type: 'text', text: `PROJEKTO DOKUMENTAS: ${d.name || ''}` });
+    content.push(b);
+  });
+
   photos.forEach((p, i) => {
     const n = p.n || i + 1;
     const block = imageBlock(p);
@@ -308,6 +332,8 @@ ${STR_REFERENCE}
 Inžinieriaus bendri pageidavimai:
 - Jei pateikti „INŽINIERIAUS BENDRI PAGEIDAVIMAI“, laikykis jų kaip nuolatinių rašymo ir turinio taisyklių, nebent jos prieštarauja šio akto faktams.
 - Kai inžinierius prašo pataisyti aktą, laukelyje lesson įrašyk bendrą taisyklę tik jei nurodymas tinka ir kitiems aktams.
+
+${DOCS_RULES}
 
 Rezultatą VISADA pateik iškviesdamas įrankį „pateikti_neatiktis“.`;
 
@@ -374,6 +400,13 @@ export function buildNcRequest(payload, model = DEFAULT_MODEL) {
     ? `\nPRIDEDAMA NUOTRAUKŲ: ${photos.length}. Jos pateiktos žemiau eilės tvarka.\n`
     : '\nNUOTRAUKŲ NĖRA.\n';
   content.push({ type: 'text', text });
+
+  (payload.docs || []).slice(0, 3).forEach(d => {
+    const b = docBlock(d);
+    if (!b) return;
+    content.push({ type: 'text', text: `PROJEKTO DOKUMENTAS: ${d.name || ''}` });
+    content.push(b);
+  });
 
   photos.forEach((p, i) => {
     const n = p.n || i + 1;

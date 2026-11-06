@@ -20,11 +20,11 @@ let S = null; // dabartinės užduoties būsena
 
 export async function renderTask(el, id, tab) {
   el.innerHTML = `<div class="loading">Kraunama...</div>`;
-  const [task, photos, settings, me] = await Promise.all([db.getTask(id), db.listPhotos(id), db.getSettings(), db.getProfile()]);
+  const [task, photos, settings, me, docs] = await Promise.all([db.getTask(id), db.listPhotos(id), db.getSettings(), db.getProfile(), db.listDocs(id).catch(() => [])]);
   if (!task) throw new Error('Užduotis nerasta');
   const people = me.role === 'admin' ? await db.listProfiles() : [];
   const object = (await db.getObject(task.object_id).catch(() => null)) || (await db.findObject(task.address, task.city).catch(() => null));
-  S = { el, task, photos, settings, tab, saving: false, me, people, object };
+  S = { el, task, photos, docs, settings, tab, saving: false, me, people, object };
   draw();
 }
 
@@ -427,6 +427,51 @@ function drawInspection(body) {
 // Aktai
 // ---------------------------------------------------------------------
 
+// ---------- Projekto dokumentai (DI palygina projektą su faktine būkle) ----------
+
+const mb = n => (n / 1048576).toFixed(1).replace('.', ',') + ' MB';
+
+function drawDocsCard() {
+  const docs = S.docs || [];
+  return `
+    <div class="card docs-card">
+      <div class="card-title">${icon('file')} Projektas / dokumentai <span class="muted small">(neprivaloma)</span></div>
+      <p class="muted small">Įkelkite projektą ar techninę specifikaciją (PDF arba nuotraukos). DI palygins, kaip numatyta projekte ir kaip padaryta faktiškai.
+        Geriau įkelti tik reikalingus lapus (iki ${db.DOC_LIMITS.files} failų, kiekvienas iki ${db.DOC_LIMITS.fileBytes / 1048576} MB). Word failų DI neskaito – išsaugokite kaip PDF.</p>
+      ${docs.length ? `<ul class="doc-list">${docs.map(d => `<li data-id="${esc(d.id)}"><span>${icon('file')} ${esc(d.name)} <span class="muted small">${d.size ? mb(d.size) : ''}</span></span>
+        <button class="btn icon-only small danger-ghost" type="button" data-doc-del title="Pašalinti">${icon('trash')}</button></li>`).join('')}</ul>` : ''}
+      <label class="btn small doc-add ${docs.length >= db.DOC_LIMITS.files ? 'disabled' : ''}">${icon('plus')} Pridėti dokumentą
+        <input type="file" id="doc-file" accept="application/pdf,image/*" multiple hidden ${docs.length >= db.DOC_LIMITS.files ? 'disabled' : ''}></label>
+    </div>`;
+}
+
+function bindDocs(body, redraw) {
+  const inp = $('#doc-file', body);
+  if (inp) inp.addEventListener('change', async () => {
+    const files = Array.from(inp.files || []);
+    inp.value = '';
+    let total = (S.docs || []).reduce((s, d) => s + (d.size || 0), 0);
+    for (const f of files) {
+      if ((S.docs || []).length >= db.DOC_LIMITS.files) { toast(`Daugiausia ${db.DOC_LIMITS.files} dokumentai`, 'error'); break; }
+      if (!(f.type === 'application/pdf' || f.type.startsWith('image/'))) { toast(`„${f.name}“: leidžiami tik PDF ir nuotraukos`, 'error', 5000); continue; }
+      if (f.size > db.DOC_LIMITS.fileBytes) { toast(`„${f.name}“ per didelis (${mb(f.size)}). Įkelkite tik reikalingus lapus.`, 'error', 6000); continue; }
+      if (total + f.size > db.DOC_LIMITS.totalBytes) { toast('Bendras dokumentų dydis per didelis', 'error'); break; }
+      toast(`Įkeliama „${f.name}“...`, 'info', 2500);
+      try { S.docs.push(await db.addDoc(S.task.id, f)); total += f.size; }
+      catch (e) { toast('Nepavyko įkelti: ' + (e.message || e), 'error', 6000); }
+    }
+    redraw();
+  });
+  body.querySelectorAll('[data-doc-del]').forEach(b => b.addEventListener('click', async () => {
+    const d = S.docs.find(x => x.id === b.closest('li').dataset.id);
+    if (!d || !await confirmDialog(`Pašalinti „${d.name}“?`, 'Pašalinti')) return;
+    try { await db.deleteDoc(d); S.docs = S.docs.filter(x => x !== d); } catch (e) { toast(e.message || String(e), 'error'); }
+    redraw();
+  }));
+}
+
+const docsForAI = () => Promise.all((S.docs || []).map(d => db.docForAI(d)));
+
 function drawActs(body) {
   body = fresh(body);
   const t = S.task;
@@ -436,6 +481,7 @@ function drawActs(body) {
   const hasInput = (t.field_notes || '').trim() || (t.description || '').trim();
 
   body.innerHTML = `
+    ${drawDocsCard()}
     <div class="card">
       <div class="card-title">Ką parengti?</div>
       <div class="mode-pick">
@@ -455,7 +501,7 @@ function drawActs(body) {
       </div>
       <div class="gen-info muted small">
         DI gaus: užduoties duomenis, ${t.field_notes ? `jūsų aprašymą (${t.field_notes.length} simb.)` : '<b class="warn">aprašymo nėra</b>'},
-        ${nPhotos} nuotr.${S.photos.some(p => p.annotated_path && p.include_in_act) ? ' (su žymėjimais)' : ''}${answered.length ? `, ${answered.length} atsakymus į klausimus` : ''}.
+        ${nPhotos} nuotr.${S.photos.some(p => p.annotated_path && p.include_in_act) ? ' (su žymėjimais)' : ''}${(S.docs || []).length ? `, ${S.docs.length} projekto dokum.` : ''}${answered.length ? `, ${answered.length} atsakymus į klausimus` : ''}.
         ${!t.field_notes ? `<a href="#/u/${t.id}/apziura">Aprašyti situaciją</a>` : ''}
       </div>
       <div class="gen-actions">
@@ -472,6 +518,8 @@ function drawActs(body) {
         ${answered.map((q, i) => `<div class="qa"><b>${i + 1}. ${esc(q.question)}</b><div>${esc(q.answer || '— (neatsakyta)')}</div></div>`).join('')}
         <button class="btn ghost small" id="clear-qa">Išvalyti atsakymus</button>
       </details>` : ''}`;
+
+  bindDocs(body, () => drawActs(body));
 
   // Išsamumas
   $$('input[name=detail]', body).forEach(r => r.addEventListener('change', async e => {
@@ -579,6 +627,7 @@ async function generate(body, { force = false, instruction = '' }) {
       qa: (t.ai_questions || []).filter(q => q.done).map(q => ({ question: q.question, answer: q.answer })),
       current: instruction ? { defect_act: t.defect_act, works_act: t.works_act } : undefined,
       lessons: await db.activeLessons('defect').catch(() => []),
+      docs: await docsForAI(),
       photos
     };
     const res = await db.ai('generate_act', payload);
@@ -856,11 +905,12 @@ function drawNcActs(body) {
   const hasInput = (t.field_notes || '').trim() || (t.problem || '').trim();
 
   body.innerHTML = `
+    ${drawDocsCard()}
     <div class="card">
       <div class="card-title">Neatikties aktas</div>
       <div class="gen-info muted small">
         DI gaus: objekto ir rangovo duomenis, ${t.field_notes ? `jūsų aprašymą (${t.field_notes.length} simb.)` : '<b class="warn">aprašymo nėra</b>'},
-        ${nPhotos} nuotr.${S.photos.some(p => p.annotated_path && p.include_in_act) ? ' (su žymėjimais)' : ''}.
+        ${nPhotos} nuotr.${S.photos.some(p => p.annotated_path && p.include_in_act) ? ' (su žymėjimais)' : ''}${(S.docs || []).length ? `, ${S.docs.length} projekto dokum.` : ''}.
         ${!t.field_notes ? `<a href="#/u/${t.id}/apziura">Aprašyti neatitiktį</a>` : ''}
       </div>
       <div class="gen-actions">
@@ -870,6 +920,7 @@ function drawNcActs(body) {
     </div>
     ${a ? drawNcEditor() : ''}`;
 
+  bindDocs(body, () => drawNcActs(body));
   $('#gen-nc').addEventListener('click', () => generateNc(body, {}));
   const man = $('#manual-nc');
   if (man) man.addEventListener('click', async () => {
@@ -902,6 +953,7 @@ async function generateNc(body, { instruction = '' }) {
         work_name: t.service_type, problem: t.problem, description: t.description,
         field_notes: t.field_notes, inspection_date: t.inspection_date
       },
+      docs: await docsForAI(),
       photos
     });
     if (!(res.items || []).length) throw new Error('DI negrąžino neatikčių. Papildykite aprašymą ir bandykite dar kartą.');

@@ -48,6 +48,10 @@ Aktų tipai: **defektavimo aktas** (forma VP08FA), **numatomų darbų aktas** (s
 - Greita lentelė (`apziura` skiltis): „Defektų nėra / Yra defektų / Praleisti“, diktavimas, nuotraukos prie elemento (`photos.ref`), praėjusių metų tekstas („Naudoti kaip pernai“). Aktas (`aktai` skiltis): DI generavimas, tekstų redagavimas, peržiūra (`doc = 'annual'`), Word.
 - DI: **atskira Edge funkcija `ai-annual`** (`supabase/functions/ai-annual/index.ts`, `verify_jwt=false`, tikrina aktyvumą). Klientas: `db.aiAnnual`. Funkcijos diegimas reikalauja vartotojo leidimo (klasifikatorius atmeta).
 
+### Projekto dokumentai (palyginimas projektas ↔ faktas)
+- Lentelė `task_docs` (+ failai bucket `photos`, aplankas `<užduoties id>/docs/`), RLS kaip `photos`. Aktų skiltyje (defektų ir neatikties) kortelė „Projektas / dokumentai“ (`drawDocsCard`/`bindDocs` faile `js/task.js`; `db.listDocs/addDoc/deleteDoc/docForAI`, ribos `DOC_LIMITS`: 3 failai, ≤20 MB kiekvienas, ≤30 MB iš viso; PDF ir paveikslėliai, Word neskaitomas).
+- Generuojant `payload.docs` = laikinos nuorodos; `prompt.js` (`docBlock`, `DOCS_RULES`) prideda PDF kaip `document`, paveikslėlius kaip `image` ir nurodo lyginti projektą su faktine būkle (neatitikties `requirement` cituoja projektą, defektų tekste „projekte numatyta / faktiškai“).
+
 ### STR pagrindas (defektai, neatiktys)
 - `supabase/functions/ai/prompt.js` → `STR_REFERENCE` – kontroliuojamas STR nuorodų žinynas (A: STR 1.07.03:2017 punktai iš įmonės šablono; B: STR 2.01.01(n) tik žymos be punktų). DI nuorodas ima TIK iš jo: defektų tekste – skliaustuose gale; neatiktyse – `requirement` gale; nežinomą normą žymi `assumptions` pastaba „Patikrinti STR pagrindą“. Žinyną plėsti čia. Aktų formų struktūra nekeista.
 
