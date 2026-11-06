@@ -771,14 +771,30 @@ async function renderSettings() {
         <div class="span4 acct">
           <b>${esc(account.email)}</b> <span class="tag ${account.role === 'admin' ? 'nc' : ''}">${account.role === 'admin' ? 'Administratorius' : 'Darbuotojas'}</span>
           <div class="muted small">Šie nustatymai (vardas, parašas, akto numeracija) galioja tik šiai paskyrai.</div>
+          <details class="pw-box">
+            <summary>Pakeisti slaptažodį</summary>
+            <div class="pw-row">
+              <input type="password" id="pw-new" autocomplete="new-password" placeholder="Naujas slaptažodis (bent 8 simboliai)">
+              <button class="btn small" type="button" id="pw-save">Išsaugoti</button>
+            </div>
+          </details>
         </div>
         ${account.role === 'admin' ? `
         <div class="span4">
           <div class="lbl">Paskyros (užduotis skirstote užduoties kortelėje)</div>
           <ul class="acct-list">${accounts.map(p => `<li><b>${esc(db.profileName(p))}</b> <span class="muted small">${esc(p.email || '')}${p.role === 'admin' ? ' · admin' : ''}</span>
             ${p.id === account.id ? '' : `<label class="chk" title="Ar paskyra gali naudotis programa"><input type="checkbox" data-acc="${esc(p.id)}" ${p.active ? 'checked' : ''}> aktyvi</label>`}
+            ${p.id === account.id ? '' : `<button class="btn small ghost" type="button" data-reset="${esc(p.id)}" data-name="${esc(db.profileName(p))}" title="Nustatyti naują laikiną slaptažodį">Naujas slaptažodis</button>`}
             ${p.active ? '' : '<span class="tag nc">laukia aktyvavimo</span>'}</li>`).join('')}</ul>
-          <div class="muted small">Nauja paskyra kuriama Supabase: Authentication → Users → Add user (Auto Confirm User). Ji atsiras čia po pirmo prisijungimo ir veiks tik kai pažymėsite „aktyvi“. Nepažįstamų paskyrų neaktyvuokite.</div>
+          <div class="new-user">
+            <div class="lbl">Naujas vartotojas</div>
+            <div class="nu-row">
+              <input id="nu-name" placeholder="Vardas, pavardė">
+              <input id="nu-email" type="email" autocomplete="off" placeholder="El. paštas">
+              <button class="btn primary small" type="button" id="nu-create">Sukurti</button>
+            </div>
+            <div class="muted small">Paskyra sukuriama iškart aktyvi (darbuotojo teisėmis). Gausite laikiną slaptažodį – perduokite jį vartotojui, o jis pasikeis Nustatymuose.</div>
+          </div>
         </div>` : ''}
       </div>`}
       <div class="card form-grid">
@@ -863,6 +879,55 @@ async function renderSettings() {
       await db.setProfileActive(cb.dataset.acc, cb.checked);
       toast(cb.checked ? 'Paskyra aktyvuota' : 'Paskyra išjungta', 'ok');
     } catch (err) { toast(err.message, 'error'); cb.checked = !cb.checked; }
+  });
+
+  // naujas vartotojas / naujas laikinas slaptažodis (admin)
+  const showCredentials = (title, email, password) => {
+    const wrap = document.createElement('div');
+    wrap.className = 'modal-backdrop';
+    wrap.innerHTML = `<div class="modal small" role="dialog" aria-modal="true">
+      <h3>${esc(title)}</h3>
+      <p class="muted small">Slaptažodis rodomas tik dabar. Perduokite jį vartotojui (pvz. žinute) ir paprašykite pasikeisti: Nustatymai → Pakeisti slaptažodį.</p>
+      <div class="cred"><div><span class="muted small">El. paštas</span><br><b>${esc(email)}</b></div>
+        <div><span class="muted small">Laikinas slaptažodis</span><br><b class="cred-pw">${esc(password)}</b></div></div>
+      <div class="modal-actions"><button class="btn ghost" data-r="copy">Kopijuoti</button><button class="btn primary" data-r="ok">Uždaryti</button></div></div>`;
+    wrap.addEventListener('click', async e => {
+      const r = e.target.closest('[data-r]');
+      if (r && r.dataset.r === 'copy') {
+        try { await navigator.clipboard.writeText(`El. paštas: ${email}\nLaikinas slaptažodis: ${password}`); toast('Nukopijuota', 'ok'); } catch (_) { toast('Nepavyko nukopijuoti – perrašykite ranka', 'error'); }
+      } else if (r) wrap.remove();
+    });
+    document.getElementById('modal-root').appendChild(wrap);
+  };
+
+  const nuCreate = $('#nu-create');
+  if (nuCreate) nuCreate.addEventListener('click', async () => {
+    const email = $('#nu-email').value.trim(), full_name = $('#nu-name').value.trim();
+    if (!email) return toast('Įrašykite el. paštą', 'error');
+    nuCreate.disabled = true;
+    try {
+      const r = await db.adminUsers({ action: 'create', email, full_name });
+      showCredentials('Vartotojas sukurtas', r.email, r.password);
+      $('#nu-email').value = ''; $('#nu-name').value = '';
+      toast('Vartotojas sukurtas ir aktyvuotas', 'ok');
+      renderSettings();
+    } catch (err) { toast(err.message || String(err), 'error', 6000); }
+    finally { nuCreate.disabled = false; }
+  });
+  $$('[data-reset]').forEach(b => b.addEventListener('click', async () => {
+    if (!await confirmDialog(`Nustatyti naują laikiną slaptažodį vartotojui „${b.dataset.name}“? Senasis nebegalios.`, 'Nustatyti')) return;
+    try {
+      const r = await db.adminUsers({ action: 'reset', id: b.dataset.reset });
+      showCredentials('Naujas slaptažodis', b.dataset.name, r.password);
+    } catch (err) { toast(err.message || String(err), 'error', 6000); }
+  }));
+
+  const pwSave = $('#pw-save');
+  if (pwSave) pwSave.addEventListener('click', async () => {
+    const pw = $('#pw-new').value;
+    if (pw.length < 8) return toast('Slaptažodis per trumpas (bent 8 simboliai)', 'error');
+    try { await db.changeMyPassword(pw); $('#pw-new').value = ''; toast('Slaptažodis pakeistas', 'ok'); }
+    catch (err) { toast(err.message || String(err), 'error', 6000); }
   });
 
   const lo = $('#btn-logout');

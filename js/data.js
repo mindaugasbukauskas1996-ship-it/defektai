@@ -121,7 +121,25 @@ export async function setProfileActive(id, active) {
   const { error } = await sb.from('profiles').update({ active }).eq('id', id);
   if (error) throw error;
 }
-export const profileName = p => (p && (p.full_name || p.email)) || '';
+/** Admin: sukuria vartotoją (action 'create', email, full_name) arba nustato laikiną slaptažodį (action 'reset', id). */
+export async function adminUsers(payload) {
+  if (isDemo) throw new Error('Veikia tik prisijungus prie Supabase.');
+  const { data, error } = await sb.functions.invoke('admin-users', { body: payload });
+  if (error) {
+    let msg = error.message;
+    try { const body = await error.context.json(); if (body && body.error) msg = body.error; } catch (_) { /* ignore */ }
+    throw new Error(msg);
+  }
+  if (data && data.error) throw new Error(data.error);
+  return data;
+}
+
+/** Prisijungusio vartotojo slaptažodžio keitimas. */
+export async function changeMyPassword(password) {
+  if (isDemo) throw new Error('Veikia tik prisijungus prie Supabase.');
+  const { error } = await sb.auth.updateUser({ password });
+  if (error) throw error;
+}export const profileName = p => (p && (p.full_name || p.email)) || '';
 
 // ---------------------------------------------------------------------
 // Užduotys

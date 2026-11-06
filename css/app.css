@@ -524,3 +524,15 @@ input[type=date], select { min-width: 0; max-width: 100%; }
 .sel-box .ic { width: 16px; height: 16px; }
 .task-card.picked { outline: 2px solid var(--green); background: var(--primary-soft); }
 .task-card.picked .sel-box { background: var(--green); border-color: var(--green); }
+
+/* Naujas vartotojas (Nustatymai, admin) */
+.new-user { margin-top: 12px; padding: 12px; border: 1px dashed #b7c4cd; border-radius: 12px; background: #fafcfd; display: grid; gap: 8px; }
+.nu-row { display: flex; flex-wrap: wrap; gap: 8px; }
+.nu-row input { flex: 1 1 180px; width: auto; }
+.pw-box { margin-top: 8px; }
+.pw-box summary { cursor: pointer; font-weight: 600; font-size: 13px; color: var(--primary); }
+.pw-row { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; }
+.pw-row input { flex: 1 1 220px; width: auto; }
+.cred { display: grid; gap: 10px; margin: 10px 0; padding: 12px; background: var(--primary-soft); border-radius: 12px; }
+.cred-pw { font-size: 22px; letter-spacing: 1px; font-variant-ligatures: none; }
+.acct-list li { flex-wrap: wrap; }

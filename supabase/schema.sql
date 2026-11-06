@@ -454,3 +454,18 @@ drop policy if exists "task_docs via task" on public.task_docs;
 create policy "task_docs via task" on public.task_docs for all to authenticated
   using (exists (select 1 from public.tasks t where t.id = task_docs.task_id))
   with check (exists (select 1 from public.tasks t where t.id = task_docs.task_id));
+
+-- admin sukurtos paskyros (Edge funkcija admin-users) iškart aktyvios; app_metadata gali nustatyti tik admin API
+create or replace function public.handle_new_user() returns trigger
+language plpgsql security definer set search_path = public as $$
+declare
+  first_user boolean := not exists (select 1 from public.profiles);
+  by_admin boolean := coalesce(new.raw_app_meta_data->>'admin_created', '') = 'true';
+begin
+  insert into public.profiles (id, email, full_name, role, active)
+  values (new.id, new.email, nullif(new.raw_user_meta_data->>'full_name', ''),
+          case when first_user then 'admin' else 'user' end, first_user or by_admin)
+  on conflict (id) do nothing;
+  return new;
+end $$;
+revoke all on function public.handle_new_user() from public, anon, authenticated;
