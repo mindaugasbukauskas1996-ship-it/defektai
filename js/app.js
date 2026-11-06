@@ -145,6 +145,8 @@ function renderLogin() {
 // ---------------------------------------------------------------------
 
 const PRIO_ORDER = { skubus: 0, iprastas: 1, zemas: 2 };
+// masinis koregavimas: ar žymėjimo režimas įjungtas ir kurios užduotys pažymėtos
+const bulk = { on: false, ids: new Set() };
 const STATUS_ORDER = { nauja: 0, planuota: 1, apziureta: 2, aktas: 3, baigta: 4 };
 
 async function renderList() {
@@ -166,10 +168,11 @@ async function renderList() {
   view().innerHTML = `
     <div class="page-head">
       <h1>Užduotys</h1>
-      <span class="head-btns hide-mobile">
-        <a class="btn" href="#/neatiktis">${icon('alert')} Naujas neatikties aktas</a>
-        <a class="btn" href="#/metine">${icon('file')} Nauja metinė apžiūra</a>
-        <a class="btn primary" href="#/nauja">${icon('plus')} Nauja užduotis</a>
+      <span class="head-btns">
+        <button class="btn ${bulk.on ? 'primary' : ''}" id="bulk-toggle" type="button">${icon('check')} Masinis keitimas</button>
+        <a class="btn hide-mobile" href="#/neatiktis">${icon('alert')} Naujas neatikties aktas</a>
+        <a class="btn hide-mobile" href="#/metine">${icon('file')} Nauja metinė apžiūra</a>
+        <a class="btn primary hide-mobile" href="#/nauja">${icon('plus')} Nauja užduotis</a>
       </span>
     </div>
     <div class="list-tools">
@@ -184,6 +187,7 @@ async function renderList() {
         ${chips.map(c => `<button class="chip ${c.id === 'skubios' ? 'chip-urgent ' : ''}${listFilter.status === c.id ? 'on' : ''}" data-st="${c.id}">${esc(c.label)} <span>${counts[c.id] || 0}</span></button>`).join('')}
       </div>
     </div>
+    <div id="bulk-bar" class="bulk-bar" hidden></div>
     <div id="task-list" class="task-list"></div>`;
 
   const draw = () => {
@@ -209,11 +213,13 @@ async function renderList() {
     if (!arr.length) {
       el.innerHTML = `<div class="empty card">${tasks.length ? 'Pagal filtrą užduočių nėra.' :
         'Užduočių dar nėra. <a href="#/nauja">Sukurkite pirmąją užduotį</a>.'}</div>`;
+      drawBar();
       return;
     }
     const overdue = d => d && d < today();
     el.innerHTML = arr.map(t => `
-      <a class="task-card st-${esc(t.status)}${t.priority === 'skubus' && t.status !== 'baigta' ? ' urgent' : ''}" href="#/u/${t.id}">
+      <a class="task-card st-${esc(t.status)}${t.priority === 'skubus' && t.status !== 'baigta' ? ' urgent' : ''}${bulk.on && bulk.ids.has(t.id) ? ' picked' : ''}" href="#/u/${t.id}" data-id="${t.id}">
+        ${bulk.on ? `<span class="sel-box">${bulk.ids.has(t.id) ? icon('check') : ''}</span>` : ''}
         <div class="tc-main">
           <div class="tc-addr">${esc(t.address || '(be adreso)')}${t.city ? `, ${esc(t.city)}` : ''}
             ${t.kind === 'nonconformity' ? `<span class="tag nc">${icon('alert')} Neatiktis</span>` : ''}
@@ -237,8 +243,74 @@ async function renderList() {
           ${t.due_date ? `<span class="due ${overdue(t.due_date) && t.status !== 'baigta' ? 'late' : ''}">iki ${esc(fmtDate(t.due_date))}</span>` : ''}
         </div>
       </a>`).join('');
+    drawBar();
   };
+
+  // ---- masinis koregavimas ----
+  const shownIds = () => [...document.querySelectorAll('#task-list [data-id]')].map(a => a.dataset.id);
+  function drawBar() {
+    const bar = $('#bulk-bar');
+    if (!bulk.on) { bar.hidden = true; return; }
+    bar.hidden = false;
+    // paliekame pasirinktas reikšmes, jei juosta perpiešiama (pvz. keičiant filtrą)
+    const keep = ['status', 'prio', 'who'].map(k => { const s = $('#bulk-' + k); return s ? s.value : ''; });
+    bar.innerHTML = `
+      <div class="bulk-row"><b>Pažymėta: ${bulk.ids.size}</b>
+        <button class="btn small" type="button" data-b="all">Visos rodomos</button>
+        <button class="btn small ghost" type="button" data-b="none">Nuimti</button></div>
+      <div class="bulk-row">
+        <select id="bulk-status"><option value="">Būsena: nekeisti</option>${STATUSES.map(s => `<option value="${s.id}">${esc(s.label)}</option>`).join('')}</select>
+        <select id="bulk-prio"><option value="">Prioritetas: nekeisti</option>${PRIORITIES.map(s => `<option value="${s.id}">${esc(s.label)}</option>`).join('')}</select>
+        ${isAdmin && people.length ? `<select id="bulk-who"><option value="">Atsakingas: nekeisti</option>${people.map(p => `<option value="${esc(p.id)}">${esc(db.profileName(p))}</option>`).join('')}</select>` : ''}
+        <button class="btn primary small" type="button" data-b="apply" ${bulk.ids.size ? '' : 'disabled'}>Taikyti</button>
+      </div>`;
+    ['status', 'prio', 'who'].forEach((k, i) => { const s = $('#bulk-' + k); if (s) s.value = keep[i]; });
+  }
   draw();
+
+  const toggleBtn = $('#bulk-toggle');
+  toggleBtn.addEventListener('click', () => {
+    bulk.on = !bulk.on;
+    bulk.ids.clear();
+    toggleBtn.classList.toggle('primary', bulk.on);
+    toggleBtn.innerHTML = `${icon('check')} ${bulk.on ? 'Baigti keitimą' : 'Masinis keitimas'}`;
+    draw();
+  });
+  if (bulk.on) toggleBtn.innerHTML = `${icon('check')} Baigti keitimą`;
+
+  // žymėjimo režime paspaudimas pažymi kortelę, o ne atidaro užduotį
+  $('#task-list').addEventListener('click', e => {
+    if (!bulk.on) return;
+    const card = e.target.closest('[data-id]');
+    if (!card) return;
+    e.preventDefault();
+    const id = card.dataset.id;
+    if (bulk.ids.has(id)) bulk.ids.delete(id); else bulk.ids.add(id);
+    draw();
+  });
+
+  $('#bulk-bar').addEventListener('click', async e => {
+    const b = e.target.closest('[data-b]');
+    if (!b) return;
+    if (b.dataset.b === 'all') { shownIds().forEach(id => bulk.ids.add(id)); return draw(); }
+    if (b.dataset.b === 'none') { bulk.ids.clear(); return draw(); }
+    if (b.dataset.b !== 'apply') return;
+    const patch = {};
+    const st = $('#bulk-status').value, pr = $('#bulk-prio').value, wh = $('#bulk-who') ? $('#bulk-who').value : '';
+    if (st) patch.status = st;
+    if (pr) patch.priority = pr;
+    if (wh) patch.assigned_to = wh;
+    if (!Object.keys(patch).length) return toast('Pasirinkite, ką keisti (būseną, prioritetą ar atsakingą)', 'error');
+    const what = [st && `būsena „${statusLabel(st)}“`, pr && `prioritetas „${priorityLabel(pr)}“`, wh && `atsakingas „${db.profileName(people.find(p => p.id === wh))}“`].filter(Boolean).join(', ');
+    if (!await confirmDialog(`Pakeisti ${bulk.ids.size} užduotis? Nustatoma: ${what}.`, 'Taikyti')) return;
+    b.disabled = true;
+    const ids = [...bulk.ids];
+    const res = await Promise.allSettled(ids.map(id => db.updateTask(id, patch)));
+    const failed = res.filter(r => r.status === 'rejected').length;
+    bulk.on = false; bulk.ids.clear();
+    toast(failed ? `Pakeista ${ids.length - failed}, nepavyko ${failed}` : `Pakeista užduočių: ${ids.length}`, failed ? 'error' : 'ok', 5000);
+    renderList();
+  });
 
   $('#q').addEventListener('input', e => { listFilter.q = e.target.value; draw(); });
   const who = $('#who');

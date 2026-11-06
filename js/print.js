@@ -216,6 +216,7 @@ function defectSheet(t, s, nFigs) {
       ${field('Statinio adresas', addr)}
       ${field('Apžiūros tikslas', d.purpose, 'd.purpose')}
       ${field('Problema', d.problem, 'd.problem')}
+      ${t.report_no ? field('Pranešimo Nr.', t.report_no) : ''}
       ${t.service_type ? field('Darbų sritis', t.service_type) : ''}
       ${field('Pastatų administravimo vadybininkas', t.manager, 't.manager')}
       ${field('Darbų skubumas', d.urgency, 'd.urgency')}

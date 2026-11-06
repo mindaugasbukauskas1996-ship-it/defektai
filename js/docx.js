@@ -92,7 +92,7 @@ export async function exportDocx({ t, s, doc, figs, refPhotos = {} }) {
       P(`${fmtDate(t.act_date)}      Nr. ${t.act_number || ''}`, { size: 22, align: AlignmentType.CENTER, after: 0 }), small('(data)'),
       P(s.city || t.city || '', { align: AlignmentType.CENTER, border: true, after: 0 }), small('(sudarymo vieta)'),
       table(fw, [f('Statinio adresas', addr), f('Apžiūros tikslas', d.purpose), f('Problema', d.problem),
-        ...(t.service_type ? [f('Darbų sritis', t.service_type)] : []), f('Pastatų administravimo vadybininkas', t.manager), f('Darbų skubumas', d.urgency)]),
+        ...(t.report_no ? [f('Pranešimo Nr.', t.report_no)] : []), ...(t.service_type ? [f('Darbų sritis', t.service_type)] : []), f('Pastatų administravimo vadybininkas', t.manager), f('Darbų skubumas', d.urgency)]),
       P('', { after: 120 }),
       table(cw, body)
     ];
