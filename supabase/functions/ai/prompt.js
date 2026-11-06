@@ -22,21 +22,48 @@ const MAX_PHOTOS = 12;
 
 // STR (statybos techniniai reglamentai): DI nuorodas imti TIK iš šio žinyno, kad nebūtų išgalvotų punktų.
 // Čia galima papildyti – kiekviena eilutė: kam taikoma → kokia nuoroda.
-export const STR_REFERENCE = `STR NUORODŲ ŽINYNAS (vienintelis leidžiamas šaltinis nuorodoms; kitų normų ir punktų numerių NEIŠGALVOK):
-A) STR 1.07.03:2017 – statinio apžiūra ir priežiūra. Punktai, kuriuos įmonė naudoja aktuose:
- - stogas (danga, parapetai, įlajos, lietvamzdžiai): 13.1, 13.2 p.
- - sienos, fasadas, siūlės, išorės atitvarai: 13.5–13.7, 97 p.
- - pamatai, cokolis, nuogrinda, rūsio sienos: 14.2 p.
- - balkonai, lodžijos: 24 p.
- - langai, durys, natūrali ventiliacija, laiptinių patalpos (sienos, lubos, laiptai): 97 p.
- - nuolatiniai stebėjimai (plyšių, deformacijų stebėjimas): 88.1 p.
-B) Esminiai statinio reikalavimai – nurodyk TIK žymą, be punkto numerio:
+export const STR_REFERENCE = `STR NUORODŲ ŽINYNAS (vienintelis leidžiamas šaltinis nuorodoms; kitų normų ir punktų numerių NEIŠGALVOK).
+Žinynas sudarytas 2026-11 iš galiojančių STR suvestinių redakcijų tekstų. Kiekviena eilutė: norma ir punktas – ką punktas reikalauja (kur taikoma).
+A) STR 1.07.03:2017 (statinių techninė ir naudojimo priežiūra; taikoma esamiems statiniams):
+ - 12.2 p. – laiku pastebėti, įvertinti ir likviduoti statybinių konstrukcijų defektus (bet kuris defektas);
+ - 13.1 p. – išorės atitvarų (sienų, stogų, cokolių), pamatų drėgmę izoliuojantys įrenginiai turi būti tvarkingi (stogo, sienų, cokolio hidroizoliacija);
+ - 13.2 p. – vandens nuo statinio šalinimo įrenginiai turi būti tvarkingi: apskardinimai, latakai, lietvamzdžiai, įlajos, nuogrindos (stogas, lietaus nuotekos, nuogrinda);
+ - 13.5 p. – atitvarų sujungimo siūlėse ir kitose vietose neturi atsirasti pavojingų deformacijų požymių: plyšių, apsauginių sluoksnių pažeidimų, užakimų (siūlės, fasadas, plyšiai);
+ - 13.6 p. – laiku šalinti atitvarinių konstrukcijų apsauginio sluoksnio erozijos židinius (tinkas, fasado apsauginis sluoksnis);
+ - 13.7 p. – žiemą neturi peršalti konstrukcijos (drėgmė, šalčio tiltai, įšalimas);
+ - 14.2 p. – statinių nuogrindos, nuolajos ir kiti vandenį šalinantys įrenginiai turi būti tvarkingi (nuogrinda, pamatai, rūsys);
+ - 14.3 p. – drenažo ir vandens pašalinimo sistemos turi veikti tvarkingai (drenažas, rūsio drėgmė);
+ - 24 p. – metalinių konstrukcijų ir detalių apsauga nuo korozijos turi būti sistemingai atnaujinama (metaliniai turėklai, laiptai, stogo elementai, įtvirtinimai);
+ - 25 p. – medinės konstrukcijos neturi drėkti ir pūti (medinės konstrukcijos, pastogė);
+ - 87.2 p. – daugiabučių kasmetinės apžiūros atliekamos kartą per metus, nuo balandžio 1 d. iki gruodžio 1 d. (metinė apžiūra);
+ - 88.3 p. – kasmetines ir specializuotas apžiūras atlieka techninis prižiūrėtojas (metinė apžiūra);
+ - 97 p. – nustatytų bendrojo naudojimo objektų defektų šalinimo, remonto darbus valdytojas numato metiniame ir (ar) ilgalaikiame plane (pagrindas defektų šalinimo darbams planuoti; netinka kaip techninis reikalavimas konkrečiam elementui).
+B) STR 2.02.01:2004 (gyvenamieji pastatai; nustato reikalavimus statant, rekonstruojant ar remontuojant – remonto darbų ir atstatymo rekomendacijoms):
+ - 139.1 p. – krituliai, gruntinis ir paviršinis vanduo neturi kelti pavojaus sveikatai ir pastato konstrukcijų būklei (drėgmė, pratekėjimai);
+ - 139.5 p. – nuo kenksmingos drėgmės apsaugomi pamatai, perdangos, sienos, apatinio aukšto konstrukcijos (pamatai, rūsys);
+ - 139.7 p. – nuo kenksmingos drėgmės apsaugomi sienų ir fasadų danga, langai, durys, konstrukcinės siūlės, inžinerinių tinklų įvadų vietos (fasadas, siūlės, langai, durys);
+ - 139.8 p. – nuo kenksmingos drėgmės apsaugomos stogų dangos, pastogių patalpos, stogų ir perdangų konstrukcijos (stogas, pastogė);
+ - 139.11 p. – stogai ir terasos turi turėti sandarią dangą ar izoliaciją ir nutekėjimą lietaus vandeniui bei tirpstančiam sniegui į latakus ir nutekėjimo vamzdžius (stogas, terasa, latakai);
+ - 139.14 p. – balkonai, lodžijos ir terasos turi turėti nesugeriančią, šalčiui atsparią ir neslidžią grindų dangą (balkonų grindys);
+ - 225.1 p. – atsidarantys langai, kurių palangė žemiau 0,80 m nuo grindų, turi turėti aptvarą nuo iškritimo, jei žemė išorėje daugiau kaip 1,5 m žemiau grindų (langai, aptvarai);
+ - 225.3 p. – laiptai, siauresni nei 1,20 m, turi turėti vieną turėklą; 225.4 p. – platesni nei 1,20 m – dvejus turėklus (laiptinių turėklai);
+ - 225.5 p. – laiptų ir laiptų aikštelių aptvarų aukštis ne mažesnis kaip 0,9 m (laiptinių turėklai);
+ - 225.6 p. – balkonų ir lodžijų aptvarų aukštis ne mažesnis kaip 1,1 m nuo grindų dangos (balkonų turėklai);
+ - 225.7 p. – aptvarų vertikaliųjų elementų (strypų) dažnis ne retesnis kaip 120 mm (balkonų ir laiptų turėklai).
+C) STR 2.04.01:2018 (pastatų atitvaros: sienos, stogai, langai, išorinės įėjimo durys):
+ - 33.1 p. – stogo konstrukcija turi būti tokia, kad ties karnizais nesusidarytų ledo varvekliai, nekristų sniego nuošliaužos, stogą būtų saugu valyti ir remontuoti (stogas, karnizas);
+ - 33.4 p. – stogai turi turėti pakankamą nuolydį lietaus vandeniui nutekėti (plokščias stogas, balos);
+ - 33.5 p. – vanduo nuo stogo turi būti nuvestas taip, kad nepakenktų pastato konstrukcijoms, keliams, šaligatviams (lietaus nuotekos, latakai);
+ - 39.10 p. – stogo konstrukcijų metalo ir skardos elementai turi būti iš korozijai atsparių produktų: cinkuoto ar nerūdijančio plieno, vario (skardinimai, parapetai);
+ - 40.1 p. – garus izoliuojantis sluoksnis turi būti įrengtas taip, kad stogo konstrukcijose nesikauptų drėgmė (stogo drėgmė).
+D) Esminiai statinio reikalavimai (bendri principai; nurodyk TIK žymą, be punkto, ir trumpą temą):
  - STR 2.01.01(1):2005 – mechaninis atsparumas ir pastovumas (įtrūkimai, deformacijos, laikančiosios konstrukcijos);
- - STR 2.01.01(2):2008 – gaisrinė sauga (elektros instaliacija, evakuaciniai keliai, durys);
- - STR 2.01.01(3):2008 – higiena, sveikata, aplinkos apsauga (drėgmė, pelėsis, pratekėjimai, vandentiekis, nuotekos);
+ - STR 2.01.01(2):1999 – gaisrinė sauga (elektros instaliacija, evakuaciniai keliai, durys);
+ - STR 2.01.01(3):1999 – higiena, sveikata, aplinkos apsauga (drėgmė, pelėsis, pratekėjimai, vandentiekis, nuotekos);
  - STR 2.01.01(4):2008 – naudojimo sauga (turėklai, laiptai, pažeistos dangos, krentantys elementai);
+ - STR 2.01.01(5):2008 – apsauga nuo triukšmo;
  - STR 2.01.01(6):2008 – energijos taupymas ir šilumos išsaugojimas (atitvarų šiluminė izoliacija, šildymas, šilumos punktas).
-Taisyklės: punkto numerį (p.) rašyk tik iš A) dalies, B) dalies normas – be punkto. Jei elementui nė viena norma netinka, nerašyk jokios. Nesiūlyk citatų – tik nuorodą.`;
+Taisyklės: nuorodoje rašyk normą, punktą ir TRUMPĄ reikšmę iš šio žinyno, pvz. „STR 1.07.03:2017 13.2 p. – vandens šalinimo įrenginiai (latakai, įlajos) turi būti tvarkingi“. Reikšmę trumpink, bet nekeisk jos prasmės ir negalvok naujos. Punkto numerį rašyk tik iš A)–C) dalių, D) dalies normas – be punkto. Jei elementui nė viena norma netinka, nerašyk jokios. 2.02.01 (B) punktus siūlyk tik kai defektas liečia nurodytą elementą. Nesiūlyk citatų – tik nuorodą ir trumpą reikšmę.`;
 
 const BUILDING_LABELS = {
   construction: 'Konstruktyvas', built_year: 'Statybos metai', floors: 'Aukštų skaičius', apartments: 'Butų skaičius', stairwells: 'Laiptinių skaičius',
@@ -97,8 +124,8 @@ Rašymo taisyklės:
 - Rekomenduojamuose darbuose nurodyk konkrečius veiksmus, eiliškumą ir, jei svarbu, skubumą (pvz., „Nedelsiant atjungti ir apžiūrėti...“).
 
 Pagrindas pagal STR (privaloma):
-- Defektavimo aktas turi būti paremtas STR. Kiekvieno objekto lauko defects PABAIGOJE parašyk teisinį pagrindą skliaustuose, pvz. „(STR 1.07.03:2017 13.5, 97 p.; STR 2.01.01(1):2005)“. Pasirink 1–3 tinkamiausias nuorodas iš žemiau pateikto STR žinyno pagal apžiūrėtą sistemą.
-- Nuorodas imk TIK iš žinyno. Jei reikalingos normos žinyne nėra arba nesi tikras dėl punkto – parašyk tik žinyne esančią žymą be punkto arba nieko, ir įrašyk į assumptions pastabą „Patikrinti STR pagrindą: <objektas>“.
+- Defektavimo aktas turi būti paremtas STR. Kiekvieno objekto lauko defects PABAIGOJE parašyk teisinį pagrindą skliaustuose: norma, punktas ir trumpa reikšmė iš žinyno, pvz. „(STR 1.07.03:2017 13.5 p. – atitvarų siūlėse neturi atsirasti plyšių ir apsauginių sluoksnių pažeidimų; STR 2.01.01(1):2005)“. Pasirink 1–3 tinkamiausias nuorodas iš žemiau pateikto STR žinyno pagal apžiūrėtą sistemą.
+- Nuorodas ir jų reikšmes imk TIK iš žinyno. Jei reikalingos normos žinyne nėra arba nesi tikras dėl punkto – parašyk tik žinyne esančią žymą be punkto arba nieko, ir įrašyk į assumptions pastabą „Patikrinti STR pagrindą: <objektas>“.
 - Nuorodos neturi keisti defektų aprašymo turinio – tai tik pagrindas; neišgalvok faktų, kad „pritaikytum“ normą.
 - Jei pažeidimas mažina pastato saugą, atsparumą ar higieną, summary pabaigoje trumpai nurodyk, kurį esminį reikalavimą (STR 2.01.01(n)) tai liečia.
 
@@ -316,8 +343,8 @@ Rašymo taisyklės:
 - Remkis TIK inžinieriaus aprašymu (jis gali būti padiktuotas, su klaidomis) ir nuotraukomis. Neišgalvok neatitikčių, kurių nėra aprašyme ar nuotraukose.
 - Nuotraukos sunumeruotos („1 pav.“, „2 pav.“ ...). Spalvoti kontūrai, rodyklės ir skaičiai apskritimuose nuotraukose – inžinieriaus pažymėtos vietos. Kiekvienai neatitiktis nurodyk susijusias nuotraukas (laukas photos).
 - Kiekviena atskira neatiktis – atskira eilutė: ką rangovas padarė ar nepadarė (description – faktas, be vertinimų), kokį reikalavimą pažeidžia (requirement) ir ką rangovas privalo padaryti (action).
-- requirement: nurodyk reikalavimą, kurį pažeidžia (projektas, techninė specifikacija, gamintojo montavimo instrukcija, darbų kokybės reikalavimai), ir PAGRINDĄ PAGAL STR: eilutės pabaigoje skliaustuose pateik 1–2 tinkamiausias nuorodas iš žemiau pateikto STR žinyno, pvz. „(STR 1.07.03:2017 13.1 p.; STR 2.01.01(3):2008)“. Neatitiktis turi būti paremta STR, todėl nuorodą pridėk prie kiekvienos eilutės, kai žinyne yra tinkama norma.
-- Nuorodas imk TIK iš žinyno (punktų numerius – tik iš A dalies). Jei tinkamos normos žinyne nėra arba nesi tikras – rašyk bendrai („Pagal projekto sprendinius ir statybos darbų kokybės reikalavimus“) ir įrašyk į assumptions „Patikrinti STR pagrindą: <neatiktis>“. Neišgalvok normų ar jų punktų.
+- requirement: nurodyk reikalavimą, kurį pažeidžia (projektas, techninė specifikacija, gamintojo montavimo instrukcija, darbų kokybės reikalavimai), ir PAGRINDĄ PAGAL STR: eilutės pabaigoje skliaustuose pateik 1–2 tinkamiausias nuorodas iš žemiau pateikto STR žinyno, pvz. „(STR 1.07.03:2017 13.1 p. – išorės atitvarų drėgmę izoliuojantys įrenginiai turi būti tvarkingi; STR 2.01.01(3):1999)“ – su trumpa reikšme iš žinyno. Neatitiktis turi būti paremta STR, todėl nuorodą pridėk prie kiekvienos eilutės, kai žinyne yra tinkama norma.
+- Nuorodas imk TIK iš žinyno (punktų numerius – tik iš A–C dalių). Jei tinkamos normos žinyne nėra arba nesi tikras – rašyk bendrai („Pagal projekto sprendinius ir statybos darbų kokybės reikalavimus“) ir įrašyk į assumptions „Patikrinti STR pagrindą: <neatiktis>“. Neišgalvok normų ar jų punktų.
 - action: konkretus taisymo veiksmas (pvz., „Išardyti ir pakartotinai sumontuoti pagal gamintojo instrukciją“, „Pašalinti ir atstatyti dangą“).
 - severity (neatitikties lygis): „Nežymi“ – estetinis ar menkas, nedaro įtakos saugai / patvarumui; „Esminė“ – mažina patvarumą, funkcionalumą ar kokybę, reikia taisyti; „Kritinė“ – kelia pavojų saugai ar sukels avariją, darbus reikia stabdyti. Pasirink aukščiausią tarp neatitikčių.
 - work: kokie rangovo darbai vertinami (pvz., „Stogo dangos remontas“). Jei neaišku – naudok užduoties duomenis.
