@@ -48,6 +48,9 @@ Aktų tipai: **defektavimo aktas** (forma VP08FA), **numatomų darbų aktas** (s
 - Greita lentelė (`apziura` skiltis): „Defektų nėra / Yra defektų / Praleisti“, diktavimas, nuotraukos prie elemento (`photos.ref`), praėjusių metų tekstas („Naudoti kaip pernai“). Aktas (`aktai` skiltis): DI generavimas, tekstų redagavimas, peržiūra (`doc = 'annual'`), Word.
 - DI: **atskira Edge funkcija `ai-annual`** (`supabase/functions/ai-annual/index.ts`, `verify_jwt=false`, tikrina aktyvumą). Klientas: `db.aiAnnual`. Funkcijos diegimas reikalauja vartotojo leidimo (klasifikatorius atmeta).
 
+### STR pagrindas (defektai, neatiktys)
+- `supabase/functions/ai/prompt.js` → `STR_REFERENCE` – kontroliuojamas STR nuorodų žinynas (A: STR 1.07.03:2017 punktai iš įmonės šablono; B: STR 2.01.01(n) tik žymos be punktų). DI nuorodas ima TIK iš jo: defektų tekste – skliaustuose gale; neatiktyse – `requirement` gale; nežinomą normą žymi `assumptions` pastaba „Patikrinti STR pagrindą“. Žinyną plėsti čia. Aktų formų struktūra nekeista.
+
 ### Diktavimas garsu
 - `js/dictate.js` (`bindDictation`): įrašo mikrofoną (MediaRecorder; veikia ir iPhone PWA, kur naršyklės SpeechRecognition neveikia), siunčia į Edge funkciją **`transcribe`** (`supabase/functions/transcribe/index.ts`, `verify_jwt=false`, tikrina aktyvumą) → OpenAI `gpt-4o-transcribe`, kalba `lt`. Kliento pusė: `db.transcribe(blob)`. Paslaptis `OPENAI_API_KEY` – tik Supabase Secrets (nerašyti pokalbyje). Įrašas ≤ 4 min / 8 MB.
 ### DI (Edge Function `ai`, `verify_jwt = false`, vartotoją tikrina pati)
@@ -55,7 +58,7 @@ Veiksmai: `parse_task` (laiškas → laukai), `generate_act` (defektų + numatom
 
 ## Diegimo procedūra (kaip viską išleisti)
 1. **DB pakeitimai**: Supabase jungtis `apply_migration` (pavadinimas snake_case) + tą patį įrašyti į `supabase/schema.sql`. Po RLS pakeitimų patikrinti su imituotais vaidmenimis (`set local role authenticated` + `request.jwt.claims`).
-2. **DI funkcija**: pakeitus `prompt.js`/`index.ts` → sugeneruoti vieno failo versiją (antraštė + `prompt.js` + `index.ts` be `import ... from './prompt.js'`) ir `deploy_edge_function` (name `ai`, entrypoint `index.ts`, `verify_jwt:false`, vienas failas `index.ts`). **Šį veiksmą saugos klasifikatorius gali atmesti – tada paprašyti vartotojo aiškaus leidimo.**
+2. **DI funkcija**: pakeitus `prompt.js`/`index.ts` → `powershell -File supabase\build-single.ps1` sugeneruoja vieno failo versiją `ai-function-vienas-failas.ts` (antraštė + `prompt.js` + `index.ts` be `import ... from './prompt.js'`). **Į `deploy_edge_function` perduoti VISĄ failą (~32 KB, ~580 eilučių): nepilnas failas sugadina gyvą funkciją. Po diegimo patikrinti, kad neprisijungęs gauna 401** ir `deploy_edge_function` (name `ai`, entrypoint `index.ts`, `verify_jwt:false`, vienas failas `index.ts`). **Šį veiksmą saugos klasifikatorius gali atmesti – tada paprašyti vartotojo aiškaus leidimo.**
 3. **Sąsaja** (Git): `git add -A` → `git commit -m "trumpas aprašas"` → `git push` (šaka `main`). Pages atsinaujina per ~30 s. Prieš tai `git status`/`git diff`, kad matytųsi, kas keičiasi. Repo viešas – **niekada nekomituoti** CSV su duomenimis, paslapčių, `.env` (`.gitignore` tai dengia). Atsarginis būdas, jei Git neveiktų: įkelti per Claude in Chrome (`.../upload/main/<aplankas>` → `file_upload` → „Commit changes“; failai turi būti darbo aplanke).
 4. **Patikra gyvai**: palaukti ~30 s (Pages), tada naršyklės konsolėje `fetch('/defektai/js/x.js',{cache:'reload'})` visiems moduliams ir `location.reload()` – naršyklė iki 10 min. laiko senus modulius. JS įrankio išvestyje venk `=` ir `&` (blokuoja kaip „query string“).
 5. Dideli vienkartiniai duomenys (objektai, kodai, pranešimai) importuojami per **Nustatymai → Objektai ir laiptinių kodai** (admin), ne per SQL.

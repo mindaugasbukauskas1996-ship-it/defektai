@@ -1,7 +1,7 @@
 // =====================================================================
-// VIENO FAILO VERSIJA Supabase narÅyklÄ—s redaktoriui (Edge Functions -> Via Editor).
-// Å is failas sugeneruotas iÅ supabase/functions/ai/prompt.js + index.ts.
-// Ä®klijuokite VISÄ„ turinÄÆ ÄÆ funkcijos "ai" failÄ… index.ts ir spauskite Deploy.
+// VIENO FAILO VERSIJA Supabase naršyklės redaktoriui (Edge Functions -> Via Editor).
+// Šis failas sugeneruotas iš supabase/functions/ai/prompt.js + index.ts.
+// Įklijuokite VISĄ turinį į funkcijos "ai" failą index.ts ir spauskite Deploy.
 // =====================================================================
 // =====================================================================
 // Bendras DI (Claude API) modulis.

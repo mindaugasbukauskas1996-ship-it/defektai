@@ -1,4 +1,4 @@
-# Sugeneruoja supabase/ai-function-vienas-failas.ts iš functions/ai/prompt.js + index.ts (be import eilutės).
+﻿# Sugeneruoja supabase/ai-function-vienas-failas.ts iš functions/ai/prompt.js + index.ts (be import eilutės).
 # Paleisti iš projekto šaknies: powershell -File supabase\build-single.ps1
 $enc = New-Object Text.UTF8Encoding $false
 $root = Split-Path -Parent $PSScriptRoot
