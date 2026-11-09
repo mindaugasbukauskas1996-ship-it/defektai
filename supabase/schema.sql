@@ -413,7 +413,16 @@ create policy "codes read" on public.stair_codes for select to authenticated usi
 
 drop policy if exists "reports read" on public.reports;
 create policy "reports read" on public.reports for select to authenticated
-  using (public.is_active() and (assigned_to = auth.uid() or public.is_admin()));
+  using (public.is_active());   -- visi aktyvūs vartotojai mato visus pranešimus (2026-11)
+
+-- Registracijos nr., kuriems jau sukurta užduotis (visų vartotojų), dublių įspėjimui
+create or replace function public.used_report_nos() returns setof text
+language sql stable security definer set search_path = public as $$
+  select distinct report_no from public.tasks
+   where report_no is not null and public.is_active()
+$$;
+revoke all on function public.used_report_nos() from public, anon;
+grant execute on function public.used_report_nos() to authenticated;
 
 drop policy if exists "own settings" on public.user_settings;
 create policy "own settings" on public.user_settings for all to authenticated

@@ -568,9 +568,9 @@ export async function countReports() {
 /** Registracijos nr., kuriems jau sukurta užduotis (matomos paskyrai). */
 export async function usedReportNos() {
   if (isDemo) return new Set();
-  const { data, error } = await sb.from('tasks').select('report_no').not('report_no', 'is', null).limit(5000);
+  const { data, error } = await sb.rpc('used_report_nos');   // visų vartotojų užduotys (RLS to neleistų tiesiogiai)
   if (error) throw error;
-  return new Set(data.map(r => r.report_no));
+  return new Set(data || []);
 }
 
 /** Pranešimų importas (pagal registracijos nr.: naujus įrašo, esamus atnaujina). */
