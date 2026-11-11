@@ -826,3 +826,124 @@ const idbGet = (s, k) => tx(s, 'readonly', st => st.get(k));
 const idbAll = (s) => tx(s, 'readonly', st => st.getAll());
 const idbPut = (s, v) => tx(s, 'readwrite', st => st.put(v));
 const idbDel = (s, k) => tx(s, 'readwrite', st => st.delete(k));
+
+
+// ---------------------------------------------------------------------
+// Šilumos punktai (ŠP aprašų modulis) – tik su Supabase
+// ---------------------------------------------------------------------
+
+const HP_LIST_COLS = 'id,object_id,seq,address,city,registry_type,assigned_to,status,excluded,progress,missing,visited_at,submitted_at,updated_at';
+const hpErr = e => { if (e) throw e; };
+
+/** Admin: paskyros rolė ('user' – inžinierius, 'heat' – šilumininkas). */
+export async function setProfileRole(id, role) {
+  const { error } = await sb.from('profiles').update({ role }).eq('id', id);
+  hpErr(error);
+}
+
+/** Matomi ŠP (admin – visi, šilumininkas – jam priskirti), be klausimyno duomenų. */
+export async function listHeatPoints() {
+  if (isDemo) return [];
+  const out = [];
+  for (let from = 0; ; from += 1000) {
+    const { data, error } = await sb.from('heat_points').select(HP_LIST_COLS).order('address').range(from, from + 999);
+    hpErr(error);
+    out.push(...data);
+    if (data.length < 1000) break;
+  }
+  return out;
+}
+
+export async function getHeatPoint(id) {
+  const { data, error } = await sb.from('heat_points').select('*').eq('id', id).maybeSingle();
+  hpErr(error);
+  if (!data) throw new Error('Šilumos punktas nerastas arba jis jums nepriskirtas.');
+  return data;
+}
+
+export async function updateHeatPoint(id, patch) {
+  const { data, error } = await sb.from('heat_points').update(patch).eq('id', id).select('*').single();
+  hpErr(error);
+  return data;
+}
+
+/** Admin: priskiria (arba nuima, kai userId = null) kelis ŠP vienam šilumininkui. */
+export async function assignHeatPoints(ids, userId) {
+  for (const part of chunks(ids, 200)) {
+    const { error } = await sb.from('heat_points').update({ assigned_to: userId || null }).in('id', part);
+    hpErr(error);
+  }
+}
+
+export async function setHeatPointsExcluded(ids, excluded) {
+  for (const part of chunks(ids, 200)) {
+    const { error } = await sb.from('heat_points').update({ excluded }).in('id', part);
+    hpErr(error);
+  }
+}
+
+/** Admin: antras (trečias...) ŠP tame pačiame name. */
+export async function addHeatPointCopy(hp) {
+  const { data: rows, error: e1 } = await sb.from('heat_points').select('seq').eq('object_id', hp.object_id);
+  hpErr(e1);
+  const seq = Math.max(0, ...rows.map(r => r.seq)) + 1;
+  const { data, error } = await sb.from('heat_points').insert({
+    object_id: hp.object_id, seq, address: hp.address, city: hp.city, registry_type: hp.registry_type, assigned_to: hp.assigned_to
+  }).select('*').single();
+  hpErr(error);
+  return data;
+}
+
+export async function listHpItems(hpId) {
+  const { data, error } = await sb.from('hp_items').select('*').eq('heat_point_id', hpId).order('sort').order('created_at');
+  hpErr(error);
+  return data;
+}
+
+export async function addHpItems(rows) {
+  if (!rows.length) return [];
+  const { data, error } = await sb.from('hp_items').insert(rows).select('*');
+  hpErr(error);
+  return data;
+}
+
+export async function updateHpItem(id, patch) {
+  const { data, error } = await sb.from('hp_items').update(patch).eq('id', id).select('*').single();
+  hpErr(error);
+  return data;
+}
+
+export async function deleteHpItem(item, photos = []) {
+  const paths = photos.filter(p => p.item_id === item.id).map(p => p.path);
+  if (paths.length) await sb.storage.from('photos').remove(paths);
+  const { error } = await sb.from('hp_items').delete().eq('id', item.id);
+  hpErr(error);
+}
+
+export async function listHpPhotos(hpId) {
+  const { data, error } = await sb.from('hp_photos').select('*').eq('heat_point_id', hpId).order('created_at');
+  hpErr(error);
+  return data;
+}
+
+export async function addHpPhoto(hpId, blob, meta = {}) {
+  const id = uuid();
+  const path = `hp/${hpId}/${id}.jpg`;
+  const up = await sb.storage.from('photos').upload(path, blob, { contentType: 'image/jpeg', upsert: false });
+  hpErr(up.error);
+  const { data, error } = await sb.from('hp_photos').insert({
+    id, heat_point_id: hpId, item_id: meta.item_id || null, slot: meta.slot || 'general', path,
+    width: meta.width || null, height: meta.height || null
+  }).select('*').single();
+  if (error) { await sb.storage.from('photos').remove([path]); throw error; }
+  return data;
+}
+
+export async function deleteHpPhoto(photo) {
+  await sb.storage.from('photos').remove([photo.path]);
+  const { error } = await sb.from('hp_photos').delete().eq('id', photo.id);
+  hpErr(error);
+  forgetUrl(photo.path);
+}
+
+export const hpPhotoUrl = photo => pathUrl(photo.path);

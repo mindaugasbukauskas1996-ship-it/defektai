@@ -519,3 +519,180 @@ revoke all on function public.close_ready_tasks() from public, anon, authenticat
 create extension if not exists pg_cron;
 select cron.unschedule('close-ready-tasks') where exists (select 1 from cron.job where jobname = 'close-ready-tasks');
 select cron.schedule('close-ready-tasks', '17 * * * *', 'select public.close_ready_tasks()');
+
+-- =====================================================================
+-- Šilumos punktų (ŠP) aprašų modulis (2026-11) – žr. docs/SP-APRASAI.md
+-- Rolė „heat“ = šilumininkas: mato tik ŠP modulį ir tik jam priskirtus ŠP.
+-- =====================================================================
+alter table public.profiles drop constraint if exists profiles_role_check;
+alter table public.profiles add constraint profiles_role_check check (role in ('admin','user','heat'));
+
+create or replace function public.is_heat() returns boolean
+language sql stable security definer set search_path = public as $$
+  select exists (select 1 from public.profiles where id = auth.uid() and role = 'heat')
+$$;
+revoke all on function public.is_heat() from public, anon;
+grant execute on function public.is_heat() to authenticated;
+
+-- Šilumininkai nemato ir nekuria užduočių (defektų aktų) bei pranešimų
+drop policy if exists "tasks select" on public.tasks;
+drop policy if exists "tasks insert" on public.tasks;
+drop policy if exists "tasks update" on public.tasks;
+drop policy if exists "tasks delete" on public.tasks;
+create policy "tasks select" on public.tasks for select to authenticated
+  using (public.is_active() and not public.is_heat() and (assigned_to = auth.uid() or public.is_admin()));
+create policy "tasks insert" on public.tasks for insert to authenticated
+  with check (public.is_active() and not public.is_heat() and created_by = auth.uid() and (assigned_to = auth.uid() or public.is_admin()));
+create policy "tasks update" on public.tasks for update to authenticated
+  using (public.is_active() and not public.is_heat() and (assigned_to = auth.uid() or public.is_admin()))
+  with check (public.is_active() and not public.is_heat() and (assigned_to = auth.uid() or public.is_admin()));
+create policy "tasks delete" on public.tasks for delete to authenticated
+  using (public.is_active() and not public.is_heat() and (assigned_to = auth.uid() or public.is_admin()));
+
+drop policy if exists "reports read" on public.reports;
+create policy "reports read" on public.reports for select to authenticated
+  using (public.is_active() and not public.is_heat());
+
+create table if not exists public.heat_points (
+  id            uuid primary key default gen_random_uuid(),
+  object_id     uuid references public.objects(id) on delete set null,
+  seq           int  not null default 1,                 -- ŠP eilės nr. name (retai būna 2)
+  address       text not null default '',
+  city          text,
+  registry_type text,                                    -- tipas pagal objektų registrą
+  assigned_to   uuid references auth.users(id) on delete set null,
+  status        text not null default 'nauja',           -- nauja | pradeta | pateikta | grazinta | parengta
+  excluded      boolean not null default false,          -- neprižiūrimas / nereikia aprašo
+  survey        jsonb not null default '{}'::jsonb,      -- šilumininko klausimyno atsakymai (raktai – js/heat-model.js)
+  office        jsonb not null default '{}'::jsonb,      -- biuro pildomi laukai
+  progress      int  not null default 0,                 -- surinkta, %
+  missing       int  not null default 0,                 -- kiek punktų dar trūksta
+  note          text,                                    -- biuro pastaba šilumininkui
+  visited_at    timestamptz,
+  submitted_at  timestamptz,
+  created_at    timestamptz not null default now(),
+  updated_at    timestamptz not null default now(),
+  unique (object_id, seq)
+);
+create index if not exists heat_points_assigned_idx on public.heat_points (assigned_to);
+
+create table if not exists public.hp_items (
+  id            uuid primary key default gen_random_uuid(),
+  heat_point_id uuid not null references public.heat_points(id) on delete cascade,
+  grp           text not null,                           -- ivadas | sildymas | kv
+  kind          text not null,                           -- įrenginio tipas (js/heat-model.js KINDS)
+  label         text,
+  tag           text,                                    -- žymuo schemoje
+  manufacturer  text,
+  model         text,
+  specs         jsonb not null default '{}'::jsonb,      -- techniniai rodikliai
+  owner         text,
+  condition     text,
+  qty           int,
+  absent        boolean not null default false,          -- tokio įrenginio šiame ŠP nėra
+  note          text,
+  ai            jsonb,                                   -- DI nuskaityti duomenys (2 etapas)
+  sort          int not null default 0,                  -- < 1000 – pagal ŠP tipą; >= 1000 – pridėta ranka
+  created_at    timestamptz not null default now(),
+  updated_at    timestamptz not null default now()
+);
+create index if not exists hp_items_hp_idx on public.hp_items (heat_point_id, sort);
+
+-- failai – bucket `photos`, aplankas hp/<ŠP id>/
+create table if not exists public.hp_photos (
+  id            uuid primary key default gen_random_uuid(),
+  heat_point_id uuid not null references public.heat_points(id) on delete cascade,
+  item_id       uuid references public.hp_items(id) on delete cascade,
+  slot          text not null,                           -- plate | general | overview | schema | readings | house | docs
+  path          text not null,
+  width         int,
+  height        int,
+  note          text,
+  created_by    uuid references auth.users(id) on delete set null default auth.uid(),
+  created_at    timestamptz not null default now()
+);
+create index if not exists hp_photos_hp_idx on public.hp_photos (heat_point_id, created_at);
+
+-- Pastovūs ŠP modulio duomenys (atestatas, telefonai, atsakingi asmenys...) – tik adminui.
+-- Reikšmės įrašytos tiesiai duomenų bazėje; į šį viešą failą jų nerašyti.
+create table if not exists public.hp_settings (
+  id   int primary key default 1 check (id = 1),
+  data jsonb not null default '{}'::jsonb
+);
+
+drop trigger if exists heat_points_touch on public.heat_points;
+create trigger heat_points_touch before update on public.heat_points
+  for each row execute function public.touch_updated_at();
+drop trigger if exists hp_items_touch on public.hp_items;
+create trigger hp_items_touch before update on public.hp_items
+  for each row execute function public.touch_updated_at();
+
+-- Šilumininkas negali pats keisti priskyrimo, išbraukimo, objekto ir biuro laukų
+create or replace function public.guard_heat_point() returns trigger
+language plpgsql set search_path = public as $$
+begin
+  if not public.is_admin() and (
+       new.assigned_to is distinct from old.assigned_to
+    or new.excluded    is distinct from old.excluded
+    or new.object_id   is distinct from old.object_id
+    or new.seq         is distinct from old.seq
+    or new.office      is distinct from old.office
+    or new.status = 'parengta' and old.status is distinct from 'parengta') then
+    raise exception 'Šį lauką gali keisti tik administratorius';
+  end if;
+  return new;
+end $$;
+drop trigger if exists heat_points_guard on public.heat_points;
+create trigger heat_points_guard before update on public.heat_points
+  for each row execute function public.guard_heat_point();
+
+alter table public.heat_points enable row level security;
+alter table public.hp_items    enable row level security;
+alter table public.hp_photos   enable row level security;
+alter table public.hp_settings enable row level security;
+
+drop policy if exists "hp select" on public.heat_points;
+drop policy if exists "hp update" on public.heat_points;
+drop policy if exists "hp admin insert" on public.heat_points;
+drop policy if exists "hp admin delete" on public.heat_points;
+create policy "hp select" on public.heat_points for select to authenticated
+  using (public.is_active() and (public.is_admin() or assigned_to = auth.uid()));
+create policy "hp update" on public.heat_points for update to authenticated
+  using (public.is_active() and (public.is_admin() or assigned_to = auth.uid()))
+  with check (public.is_active() and (public.is_admin() or assigned_to = auth.uid()));
+create policy "hp admin insert" on public.heat_points for insert to authenticated with check (public.is_admin());
+create policy "hp admin delete" on public.heat_points for delete to authenticated using (public.is_admin());
+
+drop policy if exists "hp_items via hp" on public.hp_items;
+create policy "hp_items via hp" on public.hp_items for all to authenticated
+  using (exists (select 1 from public.heat_points h where h.id = hp_items.heat_point_id))
+  with check (exists (select 1 from public.heat_points h where h.id = hp_items.heat_point_id));
+
+drop policy if exists "hp_photos via hp" on public.hp_photos;
+create policy "hp_photos via hp" on public.hp_photos for all to authenticated
+  using (exists (select 1 from public.heat_points h where h.id = hp_photos.heat_point_id))
+  with check (exists (select 1 from public.heat_points h where h.id = hp_photos.heat_point_id));
+
+drop policy if exists "hp_settings admin" on public.hp_settings;
+create policy "hp_settings admin" on public.hp_settings for all to authenticated
+  using (public.is_admin()) with check (public.is_admin());
+
+drop policy if exists "hp photos read"   on storage.objects;
+drop policy if exists "hp photos write"  on storage.objects;
+drop policy if exists "hp photos delete" on storage.objects;
+create policy "hp photos read" on storage.objects for select to authenticated
+  using (bucket_id = 'photos' and (storage.foldername(name))[1] = 'hp' and exists
+    (select 1 from public.heat_points h where h.id::text = (storage.foldername(name))[2]));
+create policy "hp photos write" on storage.objects for insert to authenticated
+  with check (bucket_id = 'photos' and (storage.foldername(name))[1] = 'hp' and exists
+    (select 1 from public.heat_points h where h.id::text = (storage.foldername(name))[2]));
+create policy "hp photos delete" on storage.objects for delete to authenticated
+  using (bucket_id = 'photos' and (storage.foldername(name))[1] = 'hp' and exists
+    (select 1 from public.heat_points h where h.id::text = (storage.foldername(name))[2]));
+
+-- ŠP sąrašas iš objektų registro (pakartotinai paleidus prideda tik naujus)
+insert into public.heat_points (object_id, address, city, registry_type)
+select o.id, o.address, o.city, o.heat_point
+  from public.objects o
+ where o.heat_point in ('Automatizuotas priklausomas','Automatizuotas nepriklausomas','Elevatorinis')
+on conflict (object_id, seq) do nothing;

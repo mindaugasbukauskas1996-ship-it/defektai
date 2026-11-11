@@ -13,6 +13,7 @@ import { renderTask } from './task.js';
 import { renderPrint } from './print.js';
 import { renderAnnualList } from './annual.js';
 import { combo } from './combo.js';
+import { renderHeat, renderHeatAccount } from './heat.js';
 
 const view = () => document.getElementById('view');
 let user = null;
@@ -41,11 +42,15 @@ async function start() {
   }
 }
 
-function renderShell() {
+let navRole = null;
+// Meniu pagal rolę: šilumininkas mato tik šilumos punktus, admin – ir užduotis, ir šilumos punktus.
+function renderShell(role = 'user') {
+  navRole = role;
+  const sp = `<a href="#/sp" data-nav="sp">${icon('heat')}<span>${role === 'heat' ? 'Šilumos punktai' : 'ŠP'}</span></a>`;
   $('#nav-top').innerHTML = `
-    <a href="#/" data-nav="list">${icon('list')}<span>Užduotys</span></a>
-    <a href="#/nauja" data-nav="new">${icon('plus')}<span>Nauja</span></a>
-    <a href="#/nustatymai" data-nav="settings">${icon('settings')}<span>Nustatymai</span></a>`;
+    ${role === 'heat' ? sp : `<a href="#/" data-nav="list">${icon('list')}<span>Užduotys</span></a>
+    <a href="#/nauja" data-nav="new">${icon('plus')}<span>Nauja</span></a>${role === 'admin' && !db.isDemo ? sp : ''}`}
+    <a href="#/nustatymai" data-nav="settings">${icon('settings')}<span>${role === 'heat' ? 'Paskyra' : 'Nustatymai'}</span></a>`;
   $('#nav-bottom').innerHTML = $('#nav-top').innerHTML;
   $('#demo-banner').innerHTML = db.isDemo
     ? 'DEMO režimas – duomenys saugomi tik šioje naršyklėje. Prijunkite Supabase (žr. README).' : '';
@@ -70,9 +75,18 @@ async function route() {
   document.body.classList.toggle('logged', true);
 
   try {
+    let role = 'admin';
     if (!db.isDemo) {                               // neaktyvuota paskyra duomenų nemato
       const me = await db.getProfile();
       if (!me.active) return renderPending(me);
+      role = me.role;
+    }
+    if (role !== navRole) renderShell(role);
+    if (parts[0] === 'sp') { setActiveNav('sp'); return await renderHeat(view(), parts, go); }
+    if (role === 'heat') {                          // šilumininkas – tik šilumos punktų modulis
+      if (parts[0] === 'nustatymai') { setActiveNav('settings'); return await renderHeatAccount(view(), () => { user = null; route(); }); }
+      setActiveNav('sp');
+      return await renderHeat(view(), ['sp'], go);
     }
     if (parts[0] === 'nauja') { setActiveNav('new'); return await renderTaskForm(null); }
     if (parts[0] === 'metine') { setActiveNav('annual'); return await renderAnnualList(view(), go); }
@@ -153,7 +167,7 @@ async function renderList() {
   view().innerHTML = `<div class="loading">Kraunama...</div>`;
   const [tasks, me] = await Promise.all([db.listTasks(), db.getProfile()]);
   const isAdmin = me.role === 'admin';
-  const people = isAdmin ? await db.listProfiles() : [];
+  const people = isAdmin ? (await db.listProfiles()).filter(p => p.role !== 'heat') : [];
   const pname = id => db.profileName(people.find(p => p.id === id));
   const chips = [{ id: 'aktyvios', label: 'Aktyvios' }, { id: 'skubios', label: 'Skubios' }, ...STATUSES, { id: 'neatiktys', label: 'Neatiktys' }, { id: 'metines', label: 'Metinės' }, { id: 'visos', label: 'Visos' }];
 
@@ -462,7 +476,7 @@ async function renderTaskForm(id, kind = 'defect') {
   const objects = await db.listObjects().catch(() => []);
   const reports = id ? [] : await db.listReports().catch(() => []);
   const usedNos = reports.length ? await db.usedReportNos().catch(() => new Set()) : new Set();
-  const people = me.role === 'admin' ? await db.listProfiles() : [];
+  const people = me.role === 'admin' ? (await db.listProfiles()).filter(p => p.role !== 'heat') : [];
   const assignee = people.length > 1 ? `
       <label class="span2">Atsakingas darbuotojas<select name="assigned_to">
         ${people.map(p => `<option value="${esc(p.id)}" ${p.id === (t.assigned_to || me.id) ? 'selected' : ''}>${esc(db.profileName(p))}${p.id === me.id ? ' (aš)' : ''}</option>`).join('')}
@@ -788,6 +802,7 @@ async function renderSettings(targetId) {
           <div class="lbl">Paskyros (užduotis skirstote užduoties kortelėje)</div>
           <ul class="acct-list">${accounts.map(p => `<li><b>${esc(db.profileName(p))}</b> <span class="muted small">${esc(p.email || '')}${p.role === 'admin' ? ' · admin' : ''}</span>
             ${p.id === account.id ? '' : `<label class="chk" title="Ar paskyra gali naudotis programa"><input type="checkbox" data-acc="${esc(p.id)}" ${p.active ? 'checked' : ''}> aktyvi</label>`}
+            ${p.id === account.id || p.role === 'admin' ? '' : `<select class="role-sel" data-role="${esc(p.id)}" title="Inžinierius dirba su defektų aktais, šilumininkas – tik su šilumos punktais"><option value="user" ${p.role === 'user' ? 'selected' : ''}>Inžinierius</option><option value="heat" ${p.role === 'heat' ? 'selected' : ''}>Šilumininkas</option></select>`}
             ${p.id === account.id ? '' : `<a class="btn small ghost" href="#/nustatymai/${esc(p.id)}" title="Keisti šio žmogaus vardą, pareigas, parašą">Jo nustatymai</a>`}
             ${p.id === account.id ? '' : `<button class="btn small ghost" type="button" data-reset="${esc(p.id)}" data-name="${esc(db.profileName(p))}" title="Nustatyti naują laikiną slaptažodį">Naujas slaptažodis</button>`}
             ${p.active ? '' : '<span class="tag nc">laukia aktyvavimo</span>'}</li>`).join('')}</ul>
@@ -796,9 +811,10 @@ async function renderSettings(targetId) {
             <div class="nu-row">
               <input id="nu-name" placeholder="Vardas, pavardė">
               <input id="nu-email" type="email" autocomplete="off" placeholder="El. paštas">
+              <select id="nu-role" class="role-sel"><option value="user">Inžinierius</option><option value="heat">Šilumininkas</option></select>
               <button class="btn primary small" type="button" id="nu-create">Sukurti</button>
             </div>
-            <div class="muted small">Paskyra sukuriama iškart aktyvi (darbuotojo teisėmis). Gausite laikiną slaptažodį – perduokite jį vartotojui, o jis pasikeis Nustatymuose.</div>
+            <div class="muted small">Paskyra sukuriama iškart aktyvi. Inžinierius dirba su defektų aktais, šilumininkas mato tik jam priskirtus šilumos punktus. Gausite laikiną slaptažodį – perduokite jį vartotojui, o jis pasikeis Nustatymuose.</div>
           </div>
         </div>` : ''}
       </div>`}
@@ -912,6 +928,7 @@ async function renderSettings(targetId) {
     nuCreate.disabled = true;
     try {
       const r = await db.adminUsers({ action: 'create', email, full_name });
+      if ($('#nu-role').value === 'heat') await db.setProfileRole(r.id, 'heat');
       showCredentials('Vartotojas sukurtas', r.email, r.password);
       $('#nu-email').value = ''; $('#nu-name').value = '';
       toast('Vartotojas sukurtas ir aktyvuotas', 'ok');
@@ -919,6 +936,10 @@ async function renderSettings(targetId) {
     } catch (err) { toast(err.message || String(err), 'error', 6000); }
     finally { nuCreate.disabled = false; }
   });
+  $$('[data-role]').forEach(sel => sel.addEventListener('change', async () => {
+    try { await db.setProfileRole(sel.dataset.role, sel.value); toast(sel.value === 'heat' ? 'Rolė: šilumininkas' : 'Rolė: inžinierius', 'ok'); }
+    catch (err) { toast(err.message || String(err), 'error', 6000); renderSettings(); }
+  }));
   $$('[data-reset]').forEach(b => b.addEventListener('click', async () => {
     if (!await confirmDialog(`Nustatyti naują laikiną slaptažodį vartotojui „${b.dataset.name}“? Senasis nebegalios.`, 'Nustatyti')) return;
     try {
