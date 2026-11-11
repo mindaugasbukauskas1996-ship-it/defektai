@@ -10,7 +10,7 @@ export const STEPS = [
   { id: 'ivadas', label: 'Įvadas ir apskaita', grp: true },
   { id: 'sildymas', label: 'Šildymas', grp: true },
   { id: 'kv', label: 'Karštas vanduo', grp: true },
-  { id: 'rodmenys', label: 'Rodmenys' },
+  { id: 'rodmenys', label: 'Rodmenys (biuras)', office: true },   // šilumininkai nepildo; mato tik admin, į „trūksta“ neskaičiuojama
   { id: 'namas', label: 'Vamzdynai ir prietaisai' },
   { id: 'pabaiga', label: 'Pateikimas' }
 ];
@@ -238,6 +238,7 @@ export function computeProgress(hp, items, photos) {
   const s = hp.survey || {};
   const checks = [];
   for (const step of STEPS) {
+    if (step.office) continue;
     for (const q of QUESTIONS[step.id] || []) {
       if (!q.key || !q.req || (q.show && !q.show(s))) continue;
       checks.push({ step: step.id, label: q.label, ok: answered(s[q.key]) });

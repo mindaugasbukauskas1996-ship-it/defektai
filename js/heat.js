@@ -163,8 +163,8 @@ async function renderPoint(el, id, stepId, me, go) {
 
   const prog = () => computeProgress(S.hp, S.items, S.photos);
   const typed = () => !!(S.hp.survey.sildymas && S.hp.survey.kv);
-  const visSteps = () => STEPS.filter(st => !st.grp || !typed() || S.items.some(i => i.grp === st.id));
-  let step = STEPS.some(s => s.id === stepId) ? stepId : 'tipas';
+  const visSteps = () => STEPS.filter(st => (isAdmin || !st.office) && (!st.grp || !typed() || S.items.some(i => i.grp === st.id)));
+  let step = visSteps().some(s => s.id === stepId) ? stepId : 'tipas';
   if (!stepId && typed()) {                                   // tęsiam nuo pirmo nebaigto žingsnio
     const first = prog().checks.find(c => !c.ok);
     step = first ? first.step : 'pabaiga';
