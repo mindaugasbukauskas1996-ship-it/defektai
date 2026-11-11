@@ -45,8 +45,6 @@ export const QUESTIONS = {
   ],
   bendra: [
     { key: 'schema_yra', label: 'Ar ŠP ant sienos kabo schema?', type: 'one', req: true, options: YN },
-    { key: 'schema_atitinka', label: 'Ar schema atitinka tai, kas faktiškai sumontuota?', type: 'one', options: [...YN, ['nezinau', 'Nežinau']], show: s => s.schema_yra === 'taip' },
-    { key: 'schema_pastabos', label: 'Kuo schema skiriasi nuo fakto?', type: 'area', show: s => s.schema_atitinka === 'ne' },
     { key: 'vamzdynai_suzymeti', label: 'Ar vamzdynai ŠP sužymėti spalvomis?', type: 'one', options: YN },
     { key: 'armatura_sunumeruota', label: 'Ar armatūra (sklendės, ventiliai) sunumeruota?', type: 'one', options: YN }
   ],
