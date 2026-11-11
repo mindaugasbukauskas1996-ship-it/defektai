@@ -158,6 +158,9 @@ async function renderPoint(el, id, stepId, me, go) {
   const [hp, items, photos] = await Promise.all([db.getHeatPoint(id), db.listHpItems(id), db.listHpPhotos(id)]);
   const S = { hp, items, photos, obj: null, techs: [] };
   S.hp.survey = S.hp.survey || {};
+  // šildymo tipas iš registro – kad šilumininkui tereikėtų patvirtinti (išsaugoma su pirmu pakeitimu)
+  const REG = { 'Automatizuotas priklausomas': 'priklausoma', 'Automatizuotas nepriklausomas': 'nepriklausoma', 'Elevatorinis': 'elevatorinis' };
+  if (!S.hp.survey.sildymas && REG[S.hp.registry_type]) S.hp.survey.sildymas = REG[S.hp.registry_type];
   if (S.hp.object_id) S.obj = await db.getObject(S.hp.object_id).catch(() => null);
   if (isAdmin) S.techs = (await db.listProfiles()).filter(p => p.role === 'heat');
 
@@ -460,7 +463,7 @@ async function renderPoint(el, id, stepId, me, go) {
     catch (err) { toast(err.message || String(err), 'error', 6000); }
   });
 
-  if (typed() && !S.items.length) await syncItems();
+  if (typed()) await syncItems();                           // kai pasikeičia modelis (pvz. nebeklausiamas įrenginys), tušti nereikalingi įrašai pašalinami
   drawTop(); drawSteps(); drawBody();
 }
 

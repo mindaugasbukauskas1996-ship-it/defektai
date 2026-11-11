@@ -27,26 +27,25 @@ const autoSp = s => s.sildymas === 'priklausoma' || s.sildymas === 'nepriklausom
 export const QUESTIONS = {
   tipas: [
     { key: 'sp_vieta', label: 'Kur yra šilumos punktas?', type: 'text', req: true, ph: 'pvz. rūsys, 2 laiptinė' },
-    { key: 'sildymas', label: 'Koks šildymo prijungimas?', type: 'one', req: true, options: [
-      ['elevatorinis', 'Elevatorinis'],
-      ['priklausoma', 'Automatizuotas, be šilumokaičio (priklausoma schema)'],
-      ['nepriklausoma', 'Automatizuotas, su šilumokaičiu (nepriklausoma schema)'],
+    { key: 'sildymas', label: 'Koks šildymas šiame šilumos punkte?', type: 'one', req: true,
+      hint: 'Jei jau pažymėta – taip nurodyta registre. Pakeiskite, jei vietoje yra kitaip.', options: [
+      ['elevatorinis', 'Elevatorinis (be automatikos)'],
+      ['priklausoma', 'Automatinis, šildymui šilumokaičio NĖRA'],
+      ['nepriklausoma', 'Automatinis, šildymui YRA šilumokaitis'],
       ['nera', 'Šildymas ne per šį ŠP']] },
     { key: 'sild_siurblys', label: 'Ar šildymo kontūre yra cirkuliacinis siurblys?', type: 'one', req: true, options: YN, show: s => s.sildymas === 'elevatorinis' },
     { key: 'kv', label: 'Kaip ruošiamas karštas vanduo?', type: 'one', req: true, options: [
-      ['lygiagreti', 'Vienas šilumokaitis (lygiagreti schema)'],
-      ['dvi_pakopos', 'Dviejų pakopų schema'],
-      ['kita', 'Kitaip / nežinau'],
-      ['nera', 'Šiame ŠP karštas vanduo neruošiamas']] },
+      ['lygiagreti', 'Vienas karšto vandens šilumokaitis'],
+      ['dvi_pakopos', 'Dviejų pakopų'],
+      ['kita', 'Nežinau / kitaip'],
+      ['nera', 'Karštas vanduo čia neruošiamas']] },
     { key: 'kv_cirkuliacija', label: 'Ar karšto vandens sistema su cirkuliacija?', type: 'one', req: true, options: YN, show: kvOn },
     { key: 'nuotolinis', label: 'Ar yra nuotolinis valdymas / stebėjimas?', type: 'one', options: [...YN, ['nezinau', 'Nežinau']] },
     { key: 'keli_sp', label: 'Ar šiame name yra daugiau nei vienas šilumos punktas?', type: 'one', options: YN,
       hint: 'Jei taip – praneškite biurui, kad sistemoje pridėtų antrą ŠP.' }
   ],
   bendra: [
-    { key: 'schema_yra', label: 'Ar ŠP ant sienos kabo schema?', type: 'one', req: true, options: YN },
-    { key: 'vamzdynai_suzymeti', label: 'Ar vamzdynai ŠP sužymėti spalvomis?', type: 'one', options: YN },
-    { key: 'armatura_sunumeruota', label: 'Ar armatūra (sklendės, ventiliai) sunumeruota?', type: 'one', options: YN }
+    { key: 'schema_yra', label: 'Ar ŠP ant sienos kabo schema?', type: 'one', req: true, options: YN }
   ],
   rodmenys: [
     { key: 'lauko_temp', label: 'Lauko oro temperatūra matavimo metu', type: 'num', unit: '°C' },
@@ -78,7 +77,7 @@ export const QUESTIONS = {
     { key: 'stovu_vieta', label: 'Kur yra stovai?', type: 'many', options: ['Butuose', 'Laiptinėse', 'Šachtose'] },
     { key: 'nuorinimas', label: 'Kaip šalinamas oras?', type: 'many', options: ['Nuorinimo čiaupai viršutinio aukšto prietaisuose', 'Automatiniai nuorintojai'] },
     { head: 'Šildymo vamzdynai' },
-    { key: 'sv_medziaga', label: 'Vamzdžių medžiaga', type: 'many', req: true, options: ['Plienas', 'Plastikas', 'Daugiasluoksniai'] },
+    { key: 'sv_medziaga', label: 'Vamzdžių medžiaga', type: 'many', req: true, options: ['Plienas', 'Cinkuotas plienas', 'Plastikas', 'Daugiasluoksniai'] },
     { key: 'sv_skersmenys', label: 'Skersmenys (magistralės – stovai)', type: 'text', ph: 'pvz. DN80 – DN15' },
     { key: 'sv_jungimas', label: 'Jungimo būdas', type: 'many', options: ['Suvirinti', 'Presuoti', 'Srieginiai'] },
     { key: 'sv_izoliacija_tipas', label: 'Šilumos izoliacija (tipas, storis)', type: 'text', ph: 'pvz. akmens vatos kevalai 30 mm' },
@@ -86,18 +85,16 @@ export const QUESTIONS = {
     { key: 'sv_armatura', label: 'Uždaromoji armatūra', type: 'many', req: true, options: ['Rutuliniai ventiliai', 'Sklendės', 'Kūginiai ventiliai'] },
     { key: 'sv_stovu_sk', label: 'Stovų skaičius', type: 'num', unit: 'vnt.' },
     { key: 'sv_balansiniai', label: 'Balansiniai ventiliai stovuose', type: 'one', options: [...YN, ['nezinau', 'Nežinau']] },
-    { key: 'sv_balansiniai_tipas', label: 'Balansinių ventilių tipas ir kiekis', type: 'text', show: s => s.sv_balansiniai === 'taip' },
     { head: 'Karšto vandens vamzdynai', show: s => s.kv !== 'nera' },
-    { key: 'kv_medziaga', label: 'Vamzdžių medžiaga', type: 'many', req: true, options: ['Cinkuotas plienas', 'Nerūdijantis plienas', 'Plastikas', 'Daugiasluoksniai'], show: s => s.kv !== 'nera' },
+    { key: 'kv_medziaga', label: 'Vamzdžių medžiaga', type: 'many', req: true, options: ['Cinkuotas plienas', 'Nerūdijantis plienas', 'PPR', 'Plastikas', 'Daugiasluoksniai'], show: s => s.kv !== 'nera' },
     { key: 'kv_skersmenys', label: 'Skersmenys (magistralės – stovai)', type: 'text', ph: 'pvz. DN50 – DN15', show: s => s.kv !== 'nera' },
-    { key: 'kv_jungimas', label: 'Jungimo būdas', type: 'many', options: ['Suvirinti', 'Presuoti', 'Srieginiai'], show: s => s.kv !== 'nera' },
+    { key: 'kv_jungimas', label: 'Jungimo būdas', type: 'many', options: ['Suvirinti', 'Lituoti', 'Presuoti', 'Srieginiai'], show: s => s.kv !== 'nera' },
     { key: 'kv_izoliacija_tipas', label: 'Šilumos izoliacija (tipas, storis)', type: 'text', show: s => s.kv !== 'nera' },
     { key: 'kv_izoliacija_bukle', label: 'Izoliacijos būklė', type: 'one', options: [['gera', 'Gera'], ['daline', 'Dalinė'], ['nera', 'Nėra']], show: s => s.kv !== 'nera' },
     { key: 'kv_armatura', label: 'Uždaromoji armatūra', type: 'many', options: ['Rutuliniai ventiliai', 'Sklendės', 'Kūginiai ventiliai'], show: s => s.kv !== 'nera' },
     { key: 'kv_stovu_tiek', label: 'Tiekimo stovų skaičius', type: 'num', unit: 'vnt.', show: s => s.kv !== 'nera' },
     { key: 'kv_stovu_cirk', label: 'Cirkuliacijos stovų skaičius', type: 'num', unit: 'vnt.', show: s => s.kv !== 'nera' && s.kv_cirkuliacija !== 'ne' },
     { key: 'kv_balansiniai', label: 'Termobalansiniai ventiliai cirkuliacijos stovuose', type: 'one', options: [...YN, ['nezinau', 'Nežinau']], show: s => s.kv !== 'nera' },
-    { key: 'kv_balansiniai_tipas', label: 'Termobalansinių ventilių tipas ir kiekis', type: 'text', show: s => s.kv_balansiniai === 'taip' },
     { head: 'Šildymo prietaisai' },
     { key: 'prietaisai_butuose', label: 'Šildymo prietaisai butuose', type: 'many', req: true, options: ['Ketiniai radiatoriai', 'Plieniniai radiatoriai', 'Aliumininiai radiatoriai', 'Konvektoriai'] },
     { key: 'prietaisai_bendr', label: 'Šildymo prietaisai laiptinėse ir kitose bendrose patalpose', type: 'many', options: ['Ketiniai radiatoriai', 'Plieniniai radiatoriai', 'Konvektoriai', 'Registrai (vamzdiniai)', 'Nėra'] },
@@ -181,8 +178,7 @@ export function expectedItems(s) {
   add('ivadas', 'filtras');
   if (autoSp(s)) {
     add('ivadas', 'slegio_reguliatorius');
-    add('ivadas', 'valdiklis');
-    add('ivadas', 'lauko_jutiklis');
+    add('ivadas', 'valdiklis');                           // lauko jutiklis neklausiamas – nustatomas pagal valdiklį
     add('ivadas', 'el_skydelis');
   }
   add('ivadas', 'manometrai');
