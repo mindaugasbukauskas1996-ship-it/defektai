@@ -71,29 +71,29 @@ export const QUESTIONS = {
   ],
   namas: [
     { head: 'Šildymo sistema name' },
-    { key: 'sildymo_tipas', label: 'Šildymo sistemos tipas', type: 'one', req: true, options: [['vienvamzde', 'Vienvamzdė'], ['dvivamzde', 'Dvivamzdė'], ['kolektorine', 'Kolektorinė'], ['nezinau', 'Nežinau']] },
-    { key: 'paskirstymas', label: 'Šilumnešio paskirstymas', type: 'one', req: true, options: [['apatinis', 'Apatinis'], ['virsutinis', 'Viršutinis'], ['nezinau', 'Nežinau']] },
+    { key: 'sildymo_tipas', office: true, label: 'Šildymo sistemos tipas', type: 'one', options: [['vienvamzde', 'Vienvamzdė'], ['dvivamzde', 'Dvivamzdė'], ['kolektorine', 'Kolektorinė'], ['nezinau', 'Nežinau']] },
+    { key: 'paskirstymas', office: true, label: 'Šilumnešio paskirstymas', type: 'one', options: [['apatinis', 'Apatinis'], ['virsutinis', 'Viršutinis'], ['nezinau', 'Nežinau']] },
     { key: 'magistraliu_vieta', label: 'Kur išvedžiotos magistralės?', type: 'many', options: ['Rūsyje', 'Palėpėje', 'Techniniame koridoriuje'] },
     { key: 'stovu_vieta', label: 'Kur yra stovai?', type: 'many', options: ['Butuose', 'Laiptinėse', 'Šachtose'] },
-    { key: 'nuorinimas', label: 'Kaip šalinamas oras?', type: 'many', options: ['Nuorinimo čiaupai viršutinio aukšto prietaisuose', 'Automatiniai nuorintojai'] },
+    { key: 'nuorinimas', office: true, label: 'Kaip šalinamas oras?', type: 'many', options: ['Nuorinimo čiaupai viršutinio aukšto prietaisuose', 'Automatiniai nuorintojai'] },
     { head: 'Šildymo vamzdynai' },
     { key: 'sv_medziaga', label: 'Vamzdžių medžiaga', type: 'many', req: true, options: ['Plienas', 'Cinkuotas plienas', 'Plastikas', 'Daugiasluoksniai'] },
-    { key: 'sv_skersmenys', label: 'Skersmenys (magistralės – stovai)', type: 'text', ph: 'pvz. DN80 – DN15' },
+    { key: 'sv_skersmenys', office: true, label: 'Skersmenys (magistralės – stovai)', type: 'text', ph: 'pvz. DN80 – DN15' },
     { key: 'sv_jungimas', label: 'Jungimo būdas', type: 'many', options: ['Suvirinti', 'Presuoti', 'Srieginiai'] },
-    { key: 'sv_izoliacija_tipas', label: 'Šilumos izoliacija (tipas, storis)', type: 'text', ph: 'pvz. akmens vatos kevalai 30 mm' },
+    { key: 'sv_izoliacija_tipas', office: true, label: 'Šilumos izoliacija (tipas, storis)', type: 'text', ph: 'pvz. akmens vatos kevalai 30 mm' },
     { key: 'sv_izoliacija_bukle', label: 'Izoliacijos būklė', type: 'one', req: true, options: [['gera', 'Gera'], ['daline', 'Dalinė'], ['nera', 'Nėra']] },
     { key: 'sv_armatura', label: 'Uždaromoji armatūra', type: 'many', req: true, options: ['Rutuliniai ventiliai', 'Sklendės', 'Kūginiai ventiliai'] },
-    { key: 'sv_stovu_sk', label: 'Stovų skaičius', type: 'num', unit: 'vnt.' },
+    { key: 'sv_stovu_sk', office: true, label: 'Stovų skaičius', type: 'num', unit: 'vnt.' },
     { key: 'sv_balansiniai', label: 'Balansiniai ventiliai stovuose', type: 'one', options: [...YN, ['nezinau', 'Nežinau']] },
     { head: 'Karšto vandens vamzdynai', show: s => s.kv !== 'nera' },
     { key: 'kv_medziaga', label: 'Vamzdžių medžiaga', type: 'many', req: true, options: ['Cinkuotas plienas', 'Nerūdijantis plienas', 'PPR', 'Plastikas', 'Daugiasluoksniai'], show: s => s.kv !== 'nera' },
-    { key: 'kv_skersmenys', label: 'Skersmenys (magistralės – stovai)', type: 'text', ph: 'pvz. DN50 – DN15', show: s => s.kv !== 'nera' },
+    { key: 'kv_skersmenys', office: true, label: 'Skersmenys (magistralės – stovai)', type: 'text', ph: 'pvz. DN50 – DN15', show: s => s.kv !== 'nera' },
     { key: 'kv_jungimas', label: 'Jungimo būdas', type: 'many', options: ['Suvirinti', 'Lituoti', 'Presuoti', 'Srieginiai'], show: s => s.kv !== 'nera' },
-    { key: 'kv_izoliacija_tipas', label: 'Šilumos izoliacija (tipas, storis)', type: 'text', show: s => s.kv !== 'nera' },
+    { key: 'kv_izoliacija_tipas', office: true, label: 'Šilumos izoliacija (tipas, storis)', type: 'text', show: s => s.kv !== 'nera' },
     { key: 'kv_izoliacija_bukle', label: 'Izoliacijos būklė', type: 'one', options: [['gera', 'Gera'], ['daline', 'Dalinė'], ['nera', 'Nėra']], show: s => s.kv !== 'nera' },
     { key: 'kv_armatura', label: 'Uždaromoji armatūra', type: 'many', options: ['Rutuliniai ventiliai', 'Sklendės', 'Kūginiai ventiliai'], show: s => s.kv !== 'nera' },
-    { key: 'kv_stovu_tiek', label: 'Tiekimo stovų skaičius', type: 'num', unit: 'vnt.', show: s => s.kv !== 'nera' },
-    { key: 'kv_stovu_cirk', label: 'Cirkuliacijos stovų skaičius', type: 'num', unit: 'vnt.', show: s => s.kv !== 'nera' && s.kv_cirkuliacija !== 'ne' },
+    { key: 'kv_stovu_tiek', office: true, label: 'Tiekimo stovų skaičius', type: 'num', unit: 'vnt.', show: s => s.kv !== 'nera' },
+    { key: 'kv_stovu_cirk', office: true, label: 'Cirkuliacijos stovų skaičius', type: 'num', unit: 'vnt.', show: s => s.kv !== 'nera' && s.kv_cirkuliacija !== 'ne' },
     { key: 'kv_balansiniai', label: 'Termobalansiniai ventiliai cirkuliacijos stovuose', type: 'one', options: [...YN, ['nezinau', 'Nežinau']], show: s => s.kv !== 'nera' },
     { head: 'Šildymo prietaisai' },
     { key: 'prietaisai_butuose', label: 'Šildymo prietaisai butuose', type: 'many', req: true, options: ['Ketiniai radiatoriai', 'Plieniniai radiatoriai', 'Aliumininiai radiatoriai', 'Konvektoriai'] },
@@ -234,7 +234,7 @@ export function computeProgress(hp, items, photos) {
   for (const step of STEPS) {
     if (step.office) continue;
     for (const q of QUESTIONS[step.id] || []) {
-      if (!q.key || !q.req || (q.show && !q.show(s))) continue;
+      if (!q.key || !q.req || q.office || (q.show && !q.show(s))) continue;
       checks.push({ step: step.id, label: q.label, ok: answered(s[q.key]) });
     }
     for (const sl of SLOTS[step.id] || []) {

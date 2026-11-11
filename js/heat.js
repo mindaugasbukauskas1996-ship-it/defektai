@@ -250,10 +250,10 @@ async function renderPoint(el, id, stepId, me, go) {
 
   const qHtml = q => {
     const s = S.hp.survey;
-    if (q.show && !q.show(s)) return '';
+    if ((q.show && !q.show(s)) || (q.office && !isAdmin)) return '';
     if (q.head) return `<div class="hp-head">${esc(q.head)}</div>`;
     const v = s[q.key];
-    const lab = `<div class="hp-ql">${esc(q.label)}${q.req ? ' <span class="hp-req">*</span>' : ''}${q.unit ? ` <span class="muted small">(${esc(q.unit)})</span>` : ''}</div>${q.hint ? `<div class="muted small">${esc(q.hint)}</div>` : ''}`;
+    const lab = `<div class="hp-ql">${esc(q.label)}${q.req ? ' <span class="hp-req">*</span>' : ''}${q.unit ? ` <span class="muted small">(${esc(q.unit)})</span>` : ''}${q.office ? ' <span class="tag">pildo biuras</span>' : ''}</div>${q.hint ? `<div class="muted small">${esc(q.hint)}</div>` : ''}`;
     if (q.type === 'one' || q.type === 'many') {
       const on = x => q.type === 'many' ? (v || []).includes(x) : v === x;
       return `<div class="hp-q">${lab}<div class="hp-opts">${q.options.map(o => Array.isArray(o) ? o : [o, o]).map(([val, l]) =>
