@@ -164,7 +164,7 @@ export function makeCtx({ hp, items, photos, obj, set: baseSet, op }) {
   const s = hp.survey || {};
   const c = { hp, s, items: items || [], photos: photos || [], obj: obj || {}, set: set || {}, op: op || {}, office: hp.office || {} };
   // valdytojas: registre nurodytas projektas + rekvizitai iš nustatymų
-  const proj = String(c.obj.project || '').trim();
+  const proj = String((c.office || {}).valdytojas_imone || c.obj.project || '').trim();   // tiekėjo (Klaipėdos energijos) duomenys tikslesni už registro
   const key = proj.replace(/,?\s*(UAB|AB)\b\.?/gi, '').replace(/[„“"]/g, '').trim().toLowerCase();
   const line = key ? String(c.set.valdytojai || '').split('\n').map(x => x.trim()).find(x => x.replace(/[„“"]/g, '').toLowerCase().includes(key)) : '';
   c.valdytojas = line || proj;
