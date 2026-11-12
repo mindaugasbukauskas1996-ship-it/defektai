@@ -5,6 +5,7 @@
 
 const MODEL_DEFAULT = 'claude-sonnet-5-5';
 const MAX_PHOTOS = 4;
+const MAX_PHOTOS_MULTI = 8;                               // keli vienodo tipo prietaisai (manometrai, termometrai ir pan.)
 const MAX_FIELDS = 14;
 
 const CORS = {
@@ -46,17 +47,19 @@ async function getUser(req: Request) {
 const SYSTEM = `Tu esi daugiabučių namų šilumos punktų (ŠP) įrangos specialistas Lietuvoje. Gausi VIENO įrenginio nuotraukas (gamyklinė lentelė ir / arba bendras vaizdas) ir turi iš jų nuskaityti duomenis „Pastato šildymo ir karšto vandens sistemos aprašui“.
 
 Taisyklės:
-- Rašyk TIK tai, kas matoma nuotraukose: lentelėje, lipduke, ant korpuso išlietus ar išgraviruotus užrašus, prietaiso skalę ar ekraną. Nieko neimk iš atminties ar katalogų. Jei reikšmės nuotraukoje nėra arba jos neįmanoma įskaityti – palik tuščią eilutę "".
+- Rašyk TIK tai, kas matoma nuotraukose: lentelėje, lipduke, ant korpuso išlietus ar išgraviruotus užrašus, prietaiso skalę ar ekraną. Nieko neimk iš atminties ar katalogų. Jei reikšmės nuotraukoje nėra arba jos neįmanoma įskaityti – lauką palik visiškai tuščią (be kabučių, brūkšnių ar žodžio „nėra“).
 - Iš modelio žymens gali išvesti tik tai, kas jame tiesiogiai užrašyta (pvz. „DN 25“, „PN16“, „32-80“). Tokį lauką įtrauk į „uncertain“, jei nesi tikras, ką skaičius reiškia.
-- manufacturer – gamintojo pavadinimas taip, kaip užrašyta (pvz. Danfoss, Grundfos, Wilo, Alfa Laval, SWEP, Kamstrup, Axis Industries, Reflex, Siemens). model – tikslus tipo / modelio žymuo, be gamyklinio numerio.
+- manufacturer – gamintojo pavadinimas taip, kaip užrašyta (pvz. Danfoss, Grundfos, Wilo, Alfa Laval, SWEP, Kamstrup, Axis Industries, Reflex, Siemens). model – tikslus tipo / modelio žymuo, be gamyklinio numerio. Sertifikavimo ir patvirtinimo žymos (TÜV, CE, MID, EN numeriai) nėra nei gamintojas, nei modelis – jas rašyk į „extra“.
 - Rodiklių laukuose rašyk tik reikšmę be mato vieneto (vienetas nurodytas prie lauko), dešimtainį skyriklį – kablelį (pvz. "1,6"). Jei lentelėje kitas vienetas (pvz. l/h vietoj m³/h, kPa ar MPa vietoj bar) – perskaičiuok į prašomą ir lauką įtrauk į „uncertain“. Jei laukas turi galimų reikšmių sąrašą – rinkis vieną iš jo arba palik tuščią.
 - Jei nuotraukose yra kelios lentelės (pvz. vožtuvo ir pavaros) – naudok abi: pagrindinis įrenginys į manufacturer / model, kita – į atitinkamą lauką (pvz. „Pavaros modelis“).
 - Jei nuotraukoje matosi aiškiai kitas įrenginys, nei nurodyta užduotyje – duomenų nepildyk ir parašyk tai lauke „comment“.
 - uncertain – laukų raktai (taip pat "manufacturer", "model"), kurių reikšmę įskaitei tik iš dalies arba spėjai.
-- readable: "gera" – pagrindiniai duomenys įskaityti; "dalinai" – dalis svarbių duomenų neįskaitoma (blizgesys, neryšku, lentelė nupjauta, per toli); "neiskaitoma" – lentelės nėra arba nieko naudingo įskaityti nepavyko.
-- comment – trumpai lietuviškai paprastais žodžiais šilumininkui, ką perfotografuoti ir kaip (pvz. „Lentelė blizga – fotografuokite be blykstės, iš arčiau.“). Jei viskas gerai – "".
-- extra – kiti lentelėje matomi naudingi duomenys, kuriems nėra atskiro lauko (gamyklinis Nr., pagaminimo metai, PN, Tmax, įtampa ir pan.), viena eilute. Jei nėra – "".
-- Įrenginiams be gamyklinės lentelės (manometrai, termometrai, armatūra, filtrai) skaityk tai, kas matoma ant paties prietaiso: skalės ribas, ant korpuso išlietą DN / PN, gamintojo ženklą.
+- readable: "gera" – gamintojas ir modelis (arba pagrindiniai rodikliai) įskaityti; "dalinai" – lentelė yra, bet dalis jos neįskaitoma (blizgesys, neryšku, nupjauta, per toli); "neiskaitoma" – lentelės nuotraukoje nėra arba nieko įskaityti nepavyko.
+- comment – tik kai readable nėra "gera" arba nuotraukoje ne tas įrenginys: vienas trumpas sakinys paprastais žodžiais šilumininkui, ką perfotografuoti (pvz. „Lentelė blizga – fotografuokite be blykstės, iš arčiau.“). Neprašyk papildomų nuotraukų duomenims, kurių gamyklinėje lentelėje paprastai nebūna (plokštelių skaičius, nustatytas režimas, DN), ir neprašyk nuimti izoliacijos ar ką nors ardyti. Kitais atvejais lauką palik tuščią.
+- extra – kiti lentelėje matomi naudingi duomenys, kuriems nėra atskiro lauko (gamyklinis Nr., pagaminimo metai, PN, Tmax, įtampa ir pan.), viena eilute. Jei nėra – palik tuščią.
+- Įrenginiams BE gamyklinės lentelės (užduotyje parašyta „gamyklinės lentelės nėra“: manometrai, termometrai, armatūra, filtrai ir pan.) skaityk tai, kas matoma ant paties prietaiso: skalės ribas, ant korpuso išlietą DN / PN, gamintojo ženklą. Jei įrenginys nuotraukoje matomas – readable = "gera" ir comment tuščias, net jei DN ar gamintojo nesimato.
+- Jei užduotyje parašyta „keli prietaisai“ – kiekvienoje nuotraukoje gali būti kitas to paties tipo prietaisas. Neaprašinėk tik vieno: laukuose išvardyk visas skirtingas reikšmes per kabliataškį su kiekiu (pvz. skalė „0–16 (2 vnt.); 0–10 (1 vnt.)“, patikra „2022; 2024“), manufacturer – visi matomi gamintojai per kablelį. Neprašyk fotografuoti kiekvieno atskirai.
+- Skalę rašyk kaip ribas, pvz. „0–16“.
 
 Rezultatą VISADA pateik iškviesdamas įrankį „pateikti_irengini“.`;
 
@@ -81,7 +84,7 @@ function buildTool(fields: Field[]) {
   for (const f of fields) {
     specProps[f.key] = {
       type: 'string',
-      description: `${f.label}${f.unit ? ` (${f.unit})` : ''}${f.options && f.options.length ? `. Galimos reikšmės: ${f.options.join(' | ')}` : ''}. Jei nematyti – "".`
+      description: `${f.label}${f.unit ? ` (${f.unit})` : ''}${f.options && f.options.length ? `. Galimos reikšmės: ${f.options.join(' | ')}` : ''}. Jei nematyti – palik tuščią.`
     };
   }
   return {
@@ -92,13 +95,13 @@ function buildTool(fields: Field[]) {
       type: 'object',
       additionalProperties: false,
       properties: {
-        manufacturer: { type: 'string', description: 'Gamintojas. Jei nematyti – "".' },
-        model: { type: 'string', description: 'Tipas / modelis. Jei nematyti – "".' },
+        manufacturer: { type: 'string', description: 'Gamintojas. Jei nematyti – palik tuščią.' },
+        model: { type: 'string', description: 'Tipas / modelis. Jei nematyti – palik tuščią.' },
         specs: { type: 'object', additionalProperties: false, properties: specProps, required: fields.map(f => f.key) },
         uncertain: { type: 'array', items: { type: 'string' }, description: 'Laukų raktai, kurių reikšmė neužtikrinta.' },
         readable: { type: 'string', enum: ['gera', 'dalinai', 'neiskaitoma'] },
-        comment: { type: 'string', description: 'Ką perfotografuoti (šilumininkui). Jei nereikia – "".' },
-        extra: { type: 'string', description: 'Kiti lentelėje matomi duomenys viena eilute. Jei nėra – "".' }
+        comment: { type: 'string', description: 'Ką perfotografuoti (šilumininkui). Jei nereikia – palik tuščią.' },
+        extra: { type: 'string', description: 'Kiti lentelėje matomi duomenys viena eilute. Jei nėra – palik tuščią.' }
       },
       required: ['manufacturer', 'model', 'specs', 'uncertain', 'readable', 'comment', 'extra']
     }
@@ -116,12 +119,14 @@ function buildRequest(payload: any, model: string) {
   const tool = buildTool(fields);
   let text = `ĮRENGINYS: ${String(it.name || '').slice(0, 200)}\nGrupė: ${String(it.group || '').slice(0, 100)}\n`;
   if (payload.sp_type) text += `Šilumos punktas: ${String(payload.sp_type).slice(0, 200)}\n`;
+  text += it.plate ? 'Šis įrenginys turi gamyklinę lentelę.\n' : 'Šio tipo įrenginiams gamyklinės lentelės nėra.\n';
+  if (it.multi) text += 'Keli prietaisai: nuotraukose gali būti keli skirtingi šio tipo prietaisai.\n';
   if (it.hint) text += `Pastaba apie nuotraukas: ${String(it.hint).slice(0, 300)}\n`;
   text += '\nLAUKAI, kuriuos reikia užpildyti (specs):\n' + (fields.length
     ? fields.map(f => `- ${f.key}: ${f.label}${f.unit ? ` (${f.unit})` : ''}`).join('\n') : '(papildomų laukų nėra)') + '\n';
   const content: any[] = [{ type: 'text', text }];
   let n = 0;
-  for (const p of (payload.photos || []).slice(0, MAX_PHOTOS)) {
+  for (const p of (payload.photos || []).slice(0, it.multi ? MAX_PHOTOS_MULTI : MAX_PHOTOS)) {
     const blk = imageBlock(p);
     if (!blk) continue;
     n++;
@@ -151,7 +156,12 @@ function extract(resp: any, toolName: string) {
   throw new Error('DI negrąžino struktūrizuoto atsakymo. Bandykite dar kartą.');
 }
 
-const str = (v: unknown, max = 300) => (typeof v === 'string' ? v : v == null ? '' : String(v)).trim().slice(0, max);
+// tuščia reikšmė kartais grįžta kaip dvi kabutės, brūkšnys ar „nėra“ – tokias laikome tuščiomis
+const EMPTY_RE = /^(["'„“”\s.?–—-]*|nėra|nematyti|nesimato|n\/a|none|null)$/i;
+const str = (v: unknown, max = 300) => {
+  const s = (typeof v === 'string' ? v : v == null ? '' : String(v)).trim();
+  return EMPTY_RE.test(s) ? '' : s.slice(0, max);
+};
 
 Deno.serve(async (req: Request) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: CORS });

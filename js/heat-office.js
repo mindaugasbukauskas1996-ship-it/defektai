@@ -25,13 +25,13 @@ export const aiReadable = S => S.items.filter(it => !it.absent && S.photos.some(
 export async function readItem(S, it) {
   const k = KINDS[it.kind] || KINDS.kita;
   const ph = S.photos.filter(p => p.item_id === it.id)
-    .sort((a, b) => (a.slot === 'plate' ? 0 : 1) - (b.slot === 'plate' ? 0 : 1)).slice(0, 4);
+    .sort((a, b) => (a.slot === 'plate' ? 0 : 1) - (b.slot === 'plate' ? 0 : 1)).slice(0, k.qty ? 8 : 4);
   if (!ph.length) throw new Error('Įrenginys neturi nuotraukų.');
   const s = S.hp.survey || {};
   const res = await db.hpAi({
     sp_type: `šildymas – ${s.sildymas || '?'}, karštas vanduo – ${s.kv || '?'}`,
     item: {
-      name: itemLabel(it), group: GROUP_LABEL[it.grp] || '', hint: k.hint || '',
+      name: itemLabel(it), group: GROUP_LABEL[it.grp] || '', hint: k.hint || '', plate: !!k.plate, multi: !!k.qty,
       fields: k.fields.map(([key, label, unit, options]) => ({ key, label, unit: unit || '', options }))
     },
     photos: await Promise.all(ph.map(db.hpPhotoForAI))
@@ -64,7 +64,8 @@ export function aiBadge(it) {
   if (!a) return '';
   const k = KINDS[it.kind] || KINDS.kita;
   const names = (a.uncertain || []).map(key => key === 'manufacturer' ? 'gamintojas' : key === 'model' ? 'modelis' : ((k.fields.find(f => f[0] === key) || [])[1] || '').toLowerCase()).filter(Boolean);
-  return `<div class="hp-ai ${esc(a.readable || '')}">${icon(a.readable === 'gera' ? 'check' : 'alert')}<div><b>Sistema: ${esc(AI_LABEL[a.readable] || 'nuskaityta')}</b>${a.readable === 'neiskaitoma' ? ' – perfotografuokite arba įveskite duomenis ranka' : ''}
+  const st = !k.plate && a.readable === 'neiskaitoma' ? 'dalinai' : (a.readable || '');   // prietaisams be lentelės perfotografuoti neprašome
+  return `<div class="hp-ai ${esc(st)}">${icon(st === 'gera' ? 'check' : 'alert')}<div><b>Sistema: ${esc(AI_LABEL[st] || 'nuskaityta')}</b>${st === 'neiskaitoma' ? ' – perfotografuokite arba įveskite duomenis ranka' : ''}
     ${a.comment ? `<div>${esc(a.comment)}</div>` : ''}${names.length ? `<div class="muted small">Patikrinti: ${esc(names.join(', '))}</div>` : ''}${a.extra ? `<div class="muted small">Lentelėje dar: ${esc(a.extra)}</div>` : ''}</div></div>`;
 }
 
