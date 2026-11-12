@@ -281,15 +281,38 @@ async function renderPoint(el, id, stepId, me, go) {
     return `<div class="hp-q${q.type === 'num' ? ' num' : ''}">${lab}<input data-qi="${q.key}" ${q.type === 'num' ? 'inputmode="decimal"' : ''} value="${esc(v ?? '')}" placeholder="${esc(q.ph || '')}" autocomplete="off"></div>`;
   };
 
+  // Nuotraukų įkėlimas vyksta fone: nuotrauka iškart parodoma kaip „keliama“, o puslapis lieka veikiantis.
+  const pending = [];                                         // { key, slot, item_id }
+  let upChain = Promise.resolve();
+  const skey = (slot, item_id) => `${slot}|${item_id || ''}`;
+  const thumbsHtml = (slot, item_id) => {
+    const ph = S.photos.filter(p => (p.item_id || null) === (item_id || null) && p.slot === slot);
+    const wait = pending.filter(p => p.slot === slot && (p.item_id || null) === (item_id || null));
+    return `${ph.map(p => `<div class="hp-thumb"><img data-ph="${p.id}" alt="nuotrauka"><button type="button" class="hp-del" data-delph="${p.id}" title="Ištrinti nuotrauką">${icon('x')}</button></div>`).join('')}
+        ${wait.map(() => '<div class="hp-thumb pend" title="Keliama…"><span class="spin"></span></div>').join('')}
+        <label class="btn small primary">${icon('camera')} Fotografuoti<input type="file" accept="image/*" capture="environment" hidden data-up="${slot}" data-item="${item_id || ''}"></label>
+        <label class="btn small">${icon('image')} Iš galerijos<input type="file" accept="image/*" multiple hidden data-up="${slot}" data-item="${item_id || ''}"></label>`;
+  };
+  const loadThumbs = root => root.querySelectorAll('img[data-ph]').forEach(async img => {
+    const p = S.photos.find(x => x.id === img.dataset.ph);
+    try { img.src = await db.hpPhotoUrl(p); } catch (_) { /* nuotrauka nepasiekiama */ }
+  });
+  /** Perpiešia tik vieną nuotraukų vietą – nieko nekeičia kitur (nedingsta įvesti duomenys). */
+  const redrawSlot = (slot, item_id) => {
+    const box = [...body.querySelectorAll('.hp-slot')].find(b => b.dataset.sk === skey(slot, item_id));
+    if (!box) return;
+    const th = box.querySelector('.hp-thumbs');
+    th.innerHTML = thumbsHtml(slot, item_id);
+    box.classList.toggle('need', box.dataset.req === '1' && !S.photos.some(p => (p.item_id || null) === (item_id || null) && p.slot === slot));
+    loadThumbs(th);
+  };
+
   const slotHtml = ({ slot, item_id = null, title, hint, req }) => {
     const ph = S.photos.filter(p => (p.item_id || null) === item_id && p.slot === slot);
-    return `<div class="hp-slot${req && !ph.length ? ' need' : ''}">
+    return `<div class="hp-slot${req && !ph.length ? ' need' : ''}" data-sk="${skey(slot, item_id)}" data-req="${req ? 1 : 0}">
       <div class="hp-ql">${esc(title)}${req ? ' <span class="hp-req">*</span>' : ''}</div>
       ${hint ? `<div class="muted small">${esc(hint)}</div>` : ''}
-      <div class="hp-thumbs">${ph.map(p => `<div class="hp-thumb"><img data-ph="${p.id}" alt="nuotrauka"><button type="button" class="hp-del" data-delph="${p.id}" title="Ištrinti nuotrauką">${icon('x')}</button></div>`).join('')}
-        <label class="btn small primary">${icon('camera')} Fotografuoti<input type="file" accept="image/*" capture="environment" hidden data-up="${slot}" data-item="${item_id || ''}"></label>
-        <label class="btn small">${icon('image')} Iš galerijos<input type="file" accept="image/*" multiple hidden data-up="${slot}" data-item="${item_id || ''}"></label>
-      </div></div>`;
+      <div class="hp-thumbs">${thumbsHtml(slot, item_id)}</div></div>`;
   };
 
   const fld = (attr, key, label, val, unit, opts, cls = '') => `<label class="${cls}">${esc(label)}${unit ? ` <span class="muted small">(${esc(unit)})</span>` : ''}${opts
@@ -359,10 +382,7 @@ async function renderPoint(el, id, stepId, me, go) {
         <div class="${step === 'rodmenys' ? 'hp-grid' : ''}">${qs}</div>${slots}</div>`;
     }
     body.innerHTML = html;
-    body.querySelectorAll('img[data-ph]').forEach(async img => {
-      const p = S.photos.find(x => x.id === img.dataset.ph);
-      try { img.src = await db.hpPhotoUrl(p); } catch (_) { /* nuotrauka nepasiekiama */ }
-    });
+    loadThumbs(body);
   }
 
   const setStep = (sid, scroll = true) => {
@@ -450,29 +470,38 @@ async function renderPoint(el, id, stepId, me, go) {
     const t = e.target;
     if (t.dataset.up !== undefined && t.files && t.files.length) {
       const slot = t.dataset.up, item_id = t.dataset.item || null, files = [...t.files];
-      const box = t.closest('.hp-slot');
-      if (box) box.classList.add('busy');
-      let ok = 0;
-      for (const f of files) {
-        try {
-          const im = await processImage(f, 2000, 0.82);
-          S.photos.push(await db.addHpPhoto(id, im.blob, { slot, item_id, width: im.width, height: im.height }));
-          ok++;
-        } catch (err) { toast('Nuotraukos įkelti nepavyko: ' + (err.message || err), 'error', 6000); }
-      }
-      if (ok) toast(ok > 1 ? `Įkelta nuotraukų: ${ok}` : 'Nuotrauka įkelta', 'ok');
-      drawBody(); touch();
-      // gamyklinė lentelė: iškart nuskaitoma, kad šilumininkas sužinotų, ar reikia perfotografuoti, kol dar yra šilumos punkte
-      const it = ok && slot === 'plate' && item_id ? S.items.find(x => x.id === item_id) : null;
-      if (it && !reading.has(it.id)) {
-        reading.add(it.id);
-        try {
-          await readItem(S, it);
-          if (it.ai && it.ai.readable !== 'gera') toast(it.ai.comment || 'Lentelė neįskaitoma – perfotografuokite', 'error', 9000);
-        } catch (err) { /* patikra neprivaloma – biuras nuskaitys vėliau */ }
-        reading.delete(it.id);
-        if (body.isConnected && step !== 'aprasas') drawBody();
-      }
+      // vietos laikikliai iškart, o apdorojimas ir įkėlimas – fone, po vieną
+      const jobs = files.map(f => ({ f, slot, item_id }));
+      jobs.forEach(j => pending.push(j));
+      redrawSlot(slot, item_id);
+      jobs.forEach(j => {
+        upChain = upChain.then(async () => {
+          let ok = false;
+          try {
+            await new Promise(r => setTimeout(r, 30));          // leidžiame naršyklei perpiešti ekraną
+            const im = await processImage(j.f, 2000, 0.82);
+            S.photos.push(await db.addHpPhoto(id, im.blob, { slot: j.slot, item_id: j.item_id, width: im.width, height: im.height }));
+            ok = true;
+          } catch (err) { toast('Nuotraukos įkelti nepavyko: ' + (err.message || err), 'error', 6000); }
+          pending.splice(pending.indexOf(j), 1);
+          redrawSlot(j.slot, j.item_id);
+          if (!ok) return;
+          touch();
+          // gamyklinė lentelė: iškart nuskaitoma, kad šilumininkas sužinotų, ar reikia perfotografuoti, kol dar yra šilumos punkte
+          const it = j.slot === 'plate' && j.item_id ? S.items.find(x => x.id === j.item_id) : null;
+          if (it && !reading.has(it.id) && !pending.some(p => p.item_id === j.item_id && p.slot === 'plate')) {
+            reading.add(it.id);
+            readItem(S, it).then(() => {
+              if (it.ai && it.ai.readable !== 'gera') toast(it.ai.comment || 'Lentelė neįskaitoma – perfotografuokite', 'error', 9000);
+            }).catch(() => { /* patikra neprivaloma – biuras nuskaitys vėliau */ }).finally(() => {
+              reading.delete(it.id);
+              const a = document.activeElement;
+              const typing = a && /^(INPUT|TEXTAREA|SELECT)$/.test(a.tagName);
+              if (body.isConnected && step !== 'aprasas' && !typing) drawBody();
+            });
+          }
+        });
+      });
       return;
     }
     const card = t.closest('[data-item]');

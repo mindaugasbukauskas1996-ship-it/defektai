@@ -625,3 +625,6 @@ input[type=date], select { min-width: 0; max-width: 100%; }
 .of-group .form-grid { margin: 10px 0 6px; align-items: end; }
 .of-gaps { margin: 6px 0 0; padding-left: 20px; font-size: 13px; color: #475467; columns: 2; }
 @media (max-width: 700px) { .of-gaps { columns: 1; } .of-table { font-size: 12px; } }
+.hp-thumb.pend { display: flex; align-items: center; justify-content: center; border: 1px dashed #c4cad4; }
+.spin { width: 24px; height: 24px; border: 3px solid #d0d5dd; border-top-color: var(--primary); border-radius: 50%; animation: hpspin .8s linear infinite; }
+@keyframes hpspin { to { transform: rotate(360deg); } }

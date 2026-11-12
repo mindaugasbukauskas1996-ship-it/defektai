@@ -111,6 +111,21 @@ export const PURPOSES = ['Neeilinė', 'Kasmetinė', 'Kita papildoma'];
 
 // Nuotraukos sumažinimas prieš įkeliant (taupo vietą ir DI kainą)
 export async function processImage(file, maxSide = 1800, quality = 0.84) {
+  // Greitas kelias: dekodavimas ir sumažinimas atliekami ne pagrindinėje gijoje, todėl puslapis nesustoja
+  try {
+    if (typeof OffscreenCanvas !== 'undefined') {
+      const full = await createImageBitmap(file, { imageOrientation: 'from-image' });
+      const k = Math.min(1, maxSide / Math.max(full.width, full.height));
+      const w = Math.round(full.width * k), h = Math.round(full.height * k);
+      const small = k < 1 ? await createImageBitmap(full, { resizeWidth: w, resizeHeight: h, resizeQuality: 'medium' }) : full;
+      if (small !== full) full.close();
+      const oc = new OffscreenCanvas(w, h);
+      oc.getContext('2d').drawImage(small, 0, 0);
+      small.close();
+      const blob = await oc.convertToBlob({ type: 'image/jpeg', quality });
+      return { blob, width: w, height: h };
+    }
+  } catch (_) { /* kitas kelias žemiau */ }
   let bmp;
   try {
     bmp = await createImageBitmap(file, { imageOrientation: 'from-image' });
