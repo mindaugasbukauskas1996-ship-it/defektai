@@ -10,7 +10,6 @@ export const STEPS = [
   { id: 'ivadas', label: 'Įvadas ir apskaita', grp: true },
   { id: 'sildymas', label: 'Šildymas', grp: true },
   { id: 'kv', label: 'Karštas vanduo', grp: true },
-  { id: 'rodmenys', label: 'Rodmenys (biuras)', office: true },   // šilumininkai nepildo; mato tik admin, į „trūksta“ neskaičiuojama
   { id: 'namas', label: 'Vamzdynai ir prietaisai' },
   { id: 'pabaiga', label: 'Pateikimas' },
   { id: 'aprasas', label: 'Aprašas (biuras)', office: true }       // DI skaitymas, biuro laukai, aprašo atsisiuntimas – tik admin
@@ -48,14 +47,6 @@ export const QUESTIONS = {
   bendra: [
     { key: 'schema_yra', label: 'Ar ŠP ant sienos kabo schema?', type: 'one', req: true, options: YN }
   ],
-  rodmenys: [
-    { key: 'lauko_temp', label: 'Lauko oro temperatūra matavimo metu', type: 'num', unit: '°C' },
-    { head: 'Įvadas (šilumos tinklai)' },
-    { key: 'r_slegis_tiek', label: 'Slėgis tiekimo linijoje', type: 'num', unit: 'bar', req: true, show: (s, o = {}) => !o.p42_p_tiek_z },   // jei slėgis žinomas (4.2 skyrius) – nebevedamas
-    { key: 'r_slegis_graz', label: 'Slėgis grąžinimo linijoje', type: 'num', unit: 'bar', req: true, show: (s, o = {}) => !o.p42_p_graz_z },
-    { key: 'r_temp_tiek', label: 'Tiekiamo šilumnešio temperatūra', type: 'num', unit: '°C', req: true },
-    { key: 'r_temp_graz', label: 'Grąžinamo į tinklus šilumnešio temperatūra', type: 'num', unit: '°C', req: true }
-  ],
   namas: [
     { head: 'Šildymo sistema name' },
     { key: 'sildymo_tipas', office: true, label: 'Šildymo sistemos tipas', type: 'one', options: [['vienvamzde', 'Vienvamzdė'], ['dvivamzde', 'Dvivamzdė'], ['kolektorine', 'Kolektorinė'], ['nezinau', 'Nežinau']] },
@@ -91,9 +82,6 @@ export const SLOTS = {
   bendra: [
     { slot: 'overview', title: 'Bendros ŠP nuotraukos', min: 2, hint: 'Nufotografuokite visą šilumos punktą iš kelių kampų (geriausia 4), kad matytųsi visi įrenginiai ir vamzdynai.' },
     { slot: 'schema', title: 'Schemos nuotrauka', min: 1, show: s => s.schema_yra === 'taip', hint: 'Fotografuokite tiesiai iš priekio, visa schema kadre, be blizgesio. Jei schema didelė – padarykite ir kelias nuotraukas iš arčiau.' }
-  ],
-  rodmenys: [
-    { slot: 'readings', title: 'Valdiklio ekrano ir prietaisų rodmenų nuotraukos', min: 0, hint: 'Valdiklio nustatymai (šildymo kreivė, temperatūros), manometrai, termometrai.' }
   ],
   namas: [],
   pabaiga: [

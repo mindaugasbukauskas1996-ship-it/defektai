@@ -60,8 +60,6 @@ const R7 = [  // 7 skyrius: [raktas, parametras, vnt., rodyti?, reikšmė iš su
   ['kv_temp', 'Karšto vandens temperatūra po šilumokaičio', '°C', kvOn, 'dash', true],
   ['kv_vart', 'Karšto vandens temperatūra vartojimo vietose', '°C', kvOn, null, true],
   ['kv_apsaug', 'Apsauginio vožtuvo suveikimo slėgis', 'bar', kvOn, c => '8', false],
-  { head: 'Šilumos punktas' },
-  ['graz_temp', 'Grąžinamo į tinklus šilumnešio temperatūra', '°C', null, c => c.s.r_temp_graz, true]
 ];
 
 const R42 = [
