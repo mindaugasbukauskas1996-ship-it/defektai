@@ -246,6 +246,7 @@ export function computeProgress(hp, items, photos) {
   }
   for (const it of items) {
     if (it.absent) continue;
+    if (it.kind === 'valdiklis' && (hp.office || {}).valdiklis_modelis) continue;     // žinomas valdiklis – nei duomenų, nei nuotraukų nereikia
     const k = KINDS[it.kind] || KINDS.kita;
     const ph = photos.filter(p => p.item_id === it.id);
     const ok = k.plate ? ph.some(p => p.slot === 'plate') : ph.length > 0;

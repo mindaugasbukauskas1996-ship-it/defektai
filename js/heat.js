@@ -333,11 +333,11 @@ async function renderPoint(el, id, stepId, me, go) {
         ${fixed ? '' : `<label class="chk"><input type="checkbox" data-absent ${it.absent ? 'checked' : ''}> Šio įrenginio nėra</label>`}
         ${it.sort >= 1000 ? `<button type="button" class="btn small ghost" data-delitem title="Pašalinti įrenginį">${icon('trash')}</button>` : ''}</div>
       ${it.absent ? '' : `
-      ${fixed ? `<div class="hp-fixed"><b>${esc([it.manufacturer, it.model].filter(Boolean).join(' '))}</b> – jau žinoma, nieko rinktis nereikia. Tik nufotografuokite valdiklį.</div>`
+      ${fixed ? `<div class="hp-fixed"><b>${esc([it.manufacturer, it.model].filter(Boolean).join(' '))}</b> – jau žinoma. Nieko rinktis, vesti ar fotografuoti nereikia.</div>`
         : `${k.hint ? `<div class="muted small">${esc(k.hint)}</div>` : ''}
       ${reading.has(it.id) ? '<div class="muted small">Tikrinama, ar lentelė įskaitoma…</div>' : aiBadge(it, isAdmin)}`}
-      ${k.plate ? slotHtml({ slot: 'plate', item_id: it.id, title: 'Gamyklinė lentelė', req: true, hint: 'Visa lentelė kadre, ryški, be blizgesio – kad būtų įskaitomi visi skaičiai.' }) : ''}
-      ${slotHtml({ slot: 'general', item_id: it.id, title: k.plate ? 'Bendra įrenginio nuotrauka' : 'Nuotrauka', req: !k.plate })}
+      ${fixed ? '' : `${k.plate ? slotHtml({ slot: 'plate', item_id: it.id, title: 'Gamyklinė lentelė', req: true, hint: 'Visa lentelė kadre, ryški, be blizgesio – kad būtų įskaitomi visi skaičiai.' }) : ''}
+      ${slotHtml({ slot: 'general', item_id: it.id, title: k.plate ? 'Bendra įrenginio nuotrauka' : 'Nuotrauka', req: !k.plate })}`}
       <details class="hp-manual${fixed ? ' hp-hide' : ''}" ${itemFilled(it) && !fixed ? 'open' : ''}><summary>Įvesti duomenis ranka</summary>
         <div class="form-grid">
           ${it.kind === 'kita' ? fld('data-f', 'label', 'Įrenginio pavadinimas', it.label, '', null, 'span2') : ''}
