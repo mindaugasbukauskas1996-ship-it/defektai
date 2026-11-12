@@ -52,17 +52,13 @@ const lowRise = c => fl(c) > 0 && fl(c) <= 5, highRise = c => fl(c) >= 9;     //
 const R7 = [  // 7 skyrius: [raktas, parametras, vnt., rodyti?, reikšmė iš surinktų duomenų, ar yra „leistinos ribos“]
   { head: 'Šildymo sistema', show: heatOn },
   ['sild_slegis', 'Darbinis slėgis (grąžinimo linijoje)', 'bar', heatOn, c => highRise(c) ? '5,5' : lowRise(c) ? '4' : '', true],
-  ['statinis', 'Statinis (užpildymo) slėgis', 'bar', heatOn, null, true],
-  ['max_slegis', 'Didžiausias leistinas slėgis', 'bar', heatOn, 'dash', true],
   ['sild_apsaug', 'Apsauginio vožtuvo suveikimo slėgis', 'bar', indep, c => '6', false],
   ['indas', 'Išsiplėtimo indo priešslėgis', 'bar', indep, c => highRise(c) ? '2,5' : lowRise(c) ? '1,5' : '', true],
   ['rele', 'Slėgio relės (apsaugos nuo sausos eigos) nustatymas', 'bar', indep, c => '1,5', false],
   ['max_temp', 'Didžiausia tiekiamo šilumnešio temperatūra', '°C', heatOn, c => '85', true],
-  ['hidr', 'Hidraulinio bandymo slėgis', 'bar', heatOn, null, false],
   { head: 'Karšto vandens sistema', show: kvOn },
   ['kv_temp', 'Karšto vandens temperatūra po šilumokaičio', '°C', kvOn, 'dash', true],
   ['kv_vart', 'Karšto vandens temperatūra vartojimo vietose', '°C', kvOn, null, true],
-  ['kv_cirk', 'Cirkuliacinio vandens temperatūra', '°C', s => kvOn(s) && s.kv_cirkuliacija === 'taip', 'dash', true],
   ['kv_apsaug', 'Apsauginio vožtuvo suveikimo slėgis', 'bar', kvOn, c => '8', false],
   { head: 'Šilumos punktas' },
   ['graz_temp', 'Grąžinamo į tinklus šilumnešio temperatūra', '°C', null, c => c.s.r_temp_graz, true]
@@ -99,8 +95,6 @@ export const OFFICE = [
     { k: 'rekonstrukcija', l: 'Paskutinė rekonstrukcija (metai, kas atlikta)', span: 2, hint: c => c.obj.renovation ? `registre: ${c.obj.renovation}` : '' },
     { k: 'balansiniai_sild', l: 'Šildymo balansiniai ventiliai (tipas, kiekis)' },
     { k: 'balansiniai_kv', l: 'KV termobalansiniai ventiliai (tipas, kiekis)' },
-    { k: 'prietaisu_butuose', l: 'Šildymo prietaisų butuose kiekis', u: 'vnt.' },
-    { k: 'voniu_sildytuvu', l: 'Vonių šildytuvų kiekis', u: 'vnt.' },
     { k: 'teises_aktai', l: '2.5. Teisės aktai (jei kitokie nei standartinis sąrašas) – po vieną eilutėje', type: 'area', span: 4, common: true }] },
   { title: '4.1. Projektiniai parametrai', fields: [
     { k: 'q_sild', l: 'Šilumos poreikis šildymui', u: 'kW', pre: c => spec(c, 'ivadas', 'agregatas', 'galia_sildymui') },
@@ -479,11 +473,11 @@ export function buildAprasas(input, images = []) {
 
   h2('4.5. Šildymo prietaisai');
   const VS = { kv: 'Prijungti prie karšto vandens sistemos', sildymas: 'Prijungti prie šildymo sistemos', nera: 'Nėra' };
-  table([0.32, 0.38, 0.14, 0.16], ['Prietaisas', 'Tipas', 'Kiekis, vnt.', 'Galia / pastabos'], [
-    ['Šildymo prietaisai butuose', cap(lc(s.prietaisai_butuose)) || D('', 'Šildymo prietaisai butuose'), c.val('prietaisu_butuose') || '–', '–'],
-    ['Šildymo prietaisai bendrojo naudojimo patalpose', cap(lc(s.prietaisai_butuose)) || D('', 'Šildymo prietaisai bendrose patalpose'), '–', '–'],
-    ['Vonių šildytuvai (gyvatukai)', VS[s.voniu_sildytuvai] || D('', 'Vonių šildytuvai'), c.val('voniu_sildytuvu') || '–', '–']
-  ], { center: [2, 3] });
+  table([0.4, 0.6], ['Prietaisas', 'Tipas'], [
+    ['Šildymo prietaisai butuose', cap(lc(s.prietaisai_butuose)) || D('', 'Šildymo prietaisai butuose')],
+    ['Šildymo prietaisai bendrojo naudojimo patalpose', cap(lc(s.prietaisai_butuose)) || D('', 'Šildymo prietaisai bendrose patalpose')],
+    ['Vonių šildytuvai (gyvatukai)', VS[s.voniu_sildytuvai] || D('', 'Vonių šildytuvai')]
+  ]);
 
   h2('4.6. Paslėptų vamzdynų vietos');
   p(set.pasleptu_tekstas || DEFAULT_TEXTS.pasleptu_tekstas);
