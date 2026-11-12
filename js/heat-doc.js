@@ -183,6 +183,9 @@ export function makeCtx({ hp, items, photos, obj, set: baseSet, op }) {
 // ---------------------------------------------------------------------
 // Formatavimas
 // ---------------------------------------------------------------------
+/** Jungimo būdas pagal vamzdžių medžiagą (šilumininko neklausiama): plienas – suvirinti ir srieginiai, cinkuotas / daugiasluoksnis / nerūdijantis – presuoti, plastikas / PPR – lituoti. */
+const JOIN = { 'Plienas': ['Suvirinti (dujiniu suvirinimu)', 'srieginiai'], 'Cinkuotas plienas': ['Presuoti'], 'Daugiasluoksniai': ['Presuoti'], 'Nerūdijantis plienas': ['Presuoti'], 'Plastikas': ['Lituoti'], 'PPR': ['Lituoti'] };
+const joinBy = mats => [...new Set((mats || []).flatMap(m => JOIN[m] || []))].join(', ');
 const fixDn = v => String(v).replace(/\bdn\s*(\d+)/gi, 'DN$1').replace(/\s*-\s*/g, ' – ');
 const lc = a => (a || []).map(x => String(x).toLowerCase()).join(', ');
 const cap = t => t ? t.charAt(0).toUpperCase() + t.slice(1) : t;
@@ -467,7 +470,7 @@ export function buildAprasas(input, images = []) {
   table([0.3, 0.35, 0.35], ['Rodiklis', 'Šildymo sistema', 'Karšto vandens sistema'], [
     ['Vamzdžių medžiaga', cap(lc(s.sv_medziaga)) || D('', 'Šildymo vamzdžių medžiaga'), kvc(() => cap(lc(s.kv_medziaga)) || D('', 'KV vamzdžių medžiaga'))],
     ['Skersmenys (magistralės – stovai)', has(s.sv_skersmenys) ? fixDn(s.sv_skersmenys) : D('', 'Šildymo vamzdynų skersmenys'), kvc(() => has(s.kv_skersmenys) ? fixDn(s.kv_skersmenys) : D('', 'KV vamzdynų skersmenys'))],
-    ['Jungimo būdas', cap(lc(s.sv_jungimas)) || D('', 'Šildymo vamzdynų jungimo būdas'), kvc(() => cap(lc(s.kv_jungimas)) || D('', 'KV vamzdynų jungimo būdas'))],
+    ['Jungimo būdas', joinBy(s.sv_medziaga) || D('', 'Šildymo vamzdynų jungimo būdas'), kvc(() => joinBy(s.kv_medziaga) || D('', 'KV vamzdynų jungimo būdas'))],
     ['Šilumos izoliacija', cap(izol(s.sv_izoliacija_tipas, s.sv_izoliacija_bukle)) || D('', 'Šildymo vamzdynų izoliacija'), kvc(() => cap(izol(s.kv_izoliacija_tipas, s.kv_izoliacija_bukle)) || D('', 'KV vamzdynų izoliacija'))],
     ['Uždaromoji armatūra', cap(lc(s.sv_armatura)) || D('', 'Šildymo uždaromoji armatūra'), kvc(() => cap(lc(s.kv_armatura)) || D('', 'KV uždaromoji armatūra'))],
     ['Stovų skaičius', has(s.sv_stovu_sk) ? `${s.sv_stovu_sk} vnt.` : D('', 'Šildymo stovų skaičius'),
