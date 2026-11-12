@@ -27,6 +27,12 @@ Tikslas: kiekvienam prižiūrimam ŠP parengti „Pastato šildymo ir karšto va
 4. **Suvestinė (dashboard).** Pažanga pagal šilumininką, kiek ŠP aplankyta / paruošta, kiek trūksta kiekvienam aprašui.
 5. **Schema.** DI perbraižymas, sutikrinimas su įrenginiais, žymenys, peržiūra ir taisymas.
 
+## Būklė (2026-11-12)
+- 1 etapas – padaryta. 2 etapas – padaryta: funkcija `hp-ai`, mygtukas „Nuskaityti nuotraukas“ žingsnyje „Aprašas (biuras)“ ir prie kiekvieno įrenginio (tik admin). 3 etapas – padaryta: biuro laukai, bendros reikšmės visiems ŠP (`#/sp/nustatymai`), trūkumų sąrašas, PDF ir Word, keli PDF vienu zip (sąraše pažymėjus ŠP arba „Visi parengti aprašai“).
+- Apraše tuščios vietos virsta „duomenų nėra“ / „–“; biuras mato jų sąrašą prieš atsisiųsdamas. Tikrinimo taisyklių iš specifikacijos 5 sk. (pvz. slėgių tarpusavio palyginimo) dar nėra – tik privalomų laukų ir įrenginių duomenų patikra.
+- Neišbandyta su tikru prisijungimu: DI skaitymas (pirmą kartą paleidžia vartotojas; po to patikrinti `hp_items.ai` ir funkcijos žurnalą) ir sąnaudos vienam ŠP.
+- Idėjos toliau: DI patikra iškart po nuotraukos šilumininko telefone („perfotografuokite“ dar esant ŠP); valdiklio ekrano nuotrauka; pigesnis modelis prietaisams be lentelių.
+
 ## Dar reikia iš vartotojo
 - Prižiūrėtojo buveinės adresas; kas tvirtina aprašą (pareigos, vardas, pavardė).
 - Valdytojas pagal adresą (Mano Būstas Baltija / Mano Būstas Klaipėda) ir kiti trūkstami duomenys pagal adresus (unikalus Nr., šildomas plotas, tūris) – įkels failu.

@@ -12,7 +12,8 @@ export const STEPS = [
   { id: 'kv', label: 'Karštas vanduo', grp: true },
   { id: 'rodmenys', label: 'Rodmenys (biuras)', office: true },   // šilumininkai nepildo; mato tik admin, į „trūksta“ neskaičiuojama
   { id: 'namas', label: 'Vamzdynai ir prietaisai' },
-  { id: 'pabaiga', label: 'Pateikimas' }
+  { id: 'pabaiga', label: 'Pateikimas' },
+  { id: 'aprasas', label: 'Aprašas (biuras)', office: true }       // DI skaitymas, biuro laukai, aprašo atsisiuntimas – tik admin
 ];
 
 export const HP_STATUS = {

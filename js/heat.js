@@ -9,6 +9,7 @@ import { $, esc, toast, confirmDialog, debounce, processImage, buildingSummary, 
 import {
   STEPS, HP_STATUS, QUESTIONS, SLOTS, KINDS, GROUP_LABEL, expectedItems, itemLabel, itemFilled, computeProgress
 } from './heat-model.js';
+import { drawOffice, renderHpSettings, readItem, aiBadge, downloadZip } from './heat-office.js';
 
 const LF = { q: '', st: 'visi', who: 'all', picked: new Set() };
 const ST_CLASS = { nauja: 'st-nauja', pradeta: 'st-planuota', grazinta: 'st-apziureta', pateikta: 'st-aktas', parengta: 'st-baigta' };
@@ -22,6 +23,10 @@ export async function renderHeat(el, parts, go) {
     return;
   }
   document.title = 'Šilumos punktai';
+  if (parts[1] === 'nustatymai') {
+    if (me.role !== 'admin') { el.innerHTML = '<div class="card">Šie nustatymai prieinami tik administratoriui.</div>'; return; }
+    return renderHpSettings(el);
+  }
   if (parts[1]) return renderPoint(el, parts[1], parts[2] || '', me, go);
   return renderList(el, me);
 }
@@ -39,7 +44,7 @@ async function renderList(el, me) {
   const sent = r => r.status === 'pateikta' || r.status === 'parengta';
 
   el.innerHTML = `
-    <div class="page-head"><h1>Šilumos punktai</h1></div>
+    <div class="page-head"><h1>Šilumos punktai</h1>${isAdmin ? `<a class="btn ghost" href="#/sp/nustatymai">${icon('settings')} ŠP nustatymai</a>` : ''}</div>
     <div id="hp-sum"></div>
     <div class="list-tools">
       <div class="search">${icon('search')}<input id="hp-q" placeholder="Ieškoti pagal adresą, miestą ar tipą" value="${esc(LF.q)}" autocomplete="off"></div>
@@ -94,7 +99,9 @@ async function renderList(el, me) {
           <select id="hp-assign"><option value="">— šilumininkas —</option>${techs.map(p => `<option value="${esc(p.id)}">${esc(db.profileName(p))}</option>`).join('')}</select>
           <button class="btn small primary" data-b="assign">Priskirti</button>
           <button class="btn small ghost" data-b="unassign">Nuimti priskyrimą</button>
-          <button class="btn small ghost" data-b="${LF.st === 'isbraukti' ? 'include' : 'exclude'}">${LF.st === 'isbraukti' ? 'Grąžinti į sąrašą' : 'Išbraukti (neprižiūrimi)'}</button>` : '<span class="muted small">Pažymėkite šilumos punktus, kad priskirtumėte juos šilumininkui.</span>'}
+          <button class="btn small ghost" data-b="${LF.st === 'isbraukti' ? 'include' : 'exclude'}">${LF.st === 'isbraukti' ? 'Grąžinti į sąrašą' : 'Išbraukti (neprižiūrimi)'}</button>
+          <button class="btn small" data-b="zip">${icon('file')} Aprašai (PDF, zip)</button>` : '<span class="muted small">Pažymėkite šilumos punktus, kad priskirtumėte juos šilumininkui arba atsisiųstumėte jų aprašus.</span>'}
+        ${!n && rows.some(r => r.status === 'parengta' && !r.excluded) ? `<button class="btn small" data-b="zipready">${icon('file')} Visi parengti aprašai (PDF, zip)</button>` : ''}
       </div>`;
     }
     $('#hp-list').innerHTML = shown.length ? shown.map(r => `
@@ -129,6 +136,16 @@ async function renderList(el, me) {
     const act = b.dataset.b, ids = [...LF.picked];
     if (act === 'all') { filtered().forEach(r => LF.picked.add(r.id)); return draw(); }
     if (act === 'none') { LF.picked.clear(); return draw(); }
+    if (act === 'zip' || act === 'zipready') {
+      const list = act === 'zip' ? rows.filter(r => LF.picked.has(r.id)) : rows.filter(r => r.status === 'parengta' && !r.excluded);
+      if (list.length > 20 && !await confirmDialog(`Bus sudaryta ${list.length} aprašų – tai gali užtrukti kelias minutes. Tęsti?`, 'Tęsti')) return;
+      b.disabled = true;
+      try {
+        await downloadZip(list, (i, total, addr) => { b.textContent = `${i} / ${total} – ${addr}`; });
+        toast(`Aprašų sudaryta: ${list.length}`, 'ok', 5000);
+      } catch (err) { toast('Nepavyko sudaryti aprašų: ' + (err.message || err), 'error', 8000); }
+      return draw();
+    }
     try {
       if (act === 'assign' || act === 'unassign') {
         const uid = act === 'assign' ? $('#hp-assign').value : null;
@@ -286,6 +303,7 @@ async function renderPoint(el, id, stepId, me, go) {
         ${it.sort >= 1000 ? `<button type="button" class="btn small ghost" data-delitem title="Pašalinti įrenginį">${icon('trash')}</button>` : ''}</div>
       ${it.absent ? '' : `
       ${k.hint ? `<div class="muted small">${esc(k.hint)}</div>` : ''}
+      ${aiBadge(it)}
       ${k.plate ? slotHtml({ slot: 'plate', item_id: it.id, title: 'Gamyklinė lentelė', req: true, hint: 'Visa lentelė kadre, ryški, be blizgesio – kad būtų įskaitomi visi skaičiai.' }) : ''}
       ${slotHtml({ slot: 'general', item_id: it.id, title: k.plate ? 'Bendra įrenginio nuotrauka' : 'Nuotrauka', req: !k.plate })}
       <details class="hp-manual" ${itemFilled(it) ? 'open' : ''}><summary>Įvesti duomenis ranka</summary>
@@ -298,7 +316,8 @@ async function renderPoint(el, id, stepId, me, go) {
           ${fld('data-f', 'tag', 'Žymuo schemoje', it.tag)}
           ${fld('data-f', 'condition', 'Būklė', it.condition, '', ['Gera', 'Patenkinama', 'Bloga'])}
           ${fld('data-f', 'note', 'Pastaba', it.note, '', null, 'span4')}
-        </div></details>`}
+        </div></details>
+      ${isAdmin && S.photos.some(p => p.item_id === it.id) ? `<button class="btn small ghost" type="button" data-airead>${icon('spark')} ${it.ai ? 'Nuskaityti nuotraukas iš naujo' : 'Nuskaityti nuotraukas (DI)'}</button>` : ''}`}
     </div>`;
   };
 
@@ -308,6 +327,11 @@ async function renderPoint(el, id, stepId, me, go) {
     const qs = (QUESTIONS[step] || []).map(qHtml).join('');
     const slots = (SLOTS[step] || []).filter(sl => !sl.show || sl.show(s)).map(sl => slotHtml({ ...sl, req: sl.min > 0 })).join('');
     let html = '';
+    if (step === 'aprasas') {
+      body.innerHTML = '<div id="hp-office"></div>';
+      drawOffice($('#hp-office'), S, id, { onStatus: drawTop });
+      return;
+    }
     if (st.grp) {
       const list = S.items.filter(i => i.grp === step);
       html = !typed()
@@ -390,6 +414,16 @@ async function renderPoint(el, id, stepId, me, go) {
       if (!it || !await confirmDialog(`Pašalinti „${itemLabel(it)}“ su jo nuotraukomis?`, 'Pašalinti')) return;
       try { await db.deleteHpItem(it, S.photos); S.items = S.items.filter(x => x !== it); S.photos = S.photos.filter(p => p.item_id !== it.id); drawBody(); touch(); }
       catch (err) { toast(err.message || String(err), 'error'); }
+      return;
+    }
+    const air = e.target.closest('[data-airead]');
+    if (air) {
+      const it = S.items.find(x => x.id === air.closest('[data-item]').dataset.item);
+      if (!it) return;
+      air.disabled = true; air.textContent = 'Skaitoma…';
+      try { await readItem(S, it); toast('Nuskaityta', 'ok'); }
+      catch (err) { toast('Nepavyko nuskaityti: ' + (err.message || err), 'error', 8000); }
+      drawBody();
       return;
     }
     if (e.target.closest('#hp-submit')) {

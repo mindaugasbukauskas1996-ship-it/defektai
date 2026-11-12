@@ -947,3 +947,44 @@ export async function deleteHpPhoto(photo) {
 }
 
 export const hpPhotoUrl = photo => pathUrl(photo.path);
+/** Laikina nuotraukos nuoroda DI funkcijai. */
+export async function hpPhotoForAI(photo) {
+  const { data, error } = await sb.storage.from('photos').createSignedUrl(photo.path, 900);
+  hpErr(error);
+  return { url: data.signedUrl, slot: photo.slot };
+}
+
+/** DI: vieno įrenginio gamyklinės lentelės skaitymas (Edge funkcija „hp-ai“). */
+export async function hpAi(payload) {
+  const { data, error } = await sb.functions.invoke('hp-ai', { body: { payload } });
+  if (error) {
+    let msg = error.message;
+    try { const body = await error.context.json(); if (body && body.error) msg = body.error; } catch (_) { /* ignore */ }
+    throw new Error(msg);
+  }
+  if (data && data.error) throw new Error(data.error);
+  return data;
+}
+
+/** Admin: pastovūs ŠP aprašų duomenys (įmonė, atsakingi asmenys, bendros reikšmės visiems ŠP). */
+export async function getHpSettings() {
+  const { data, error } = await sb.from('hp_settings').select('data').eq('id', 1).maybeSingle();
+  hpErr(error);
+  return (data && data.data) || {};
+}
+
+export async function saveHpSettings(obj) {
+  const { error } = await sb.from('hp_settings').upsert({ id: 1, data: obj });
+  hpErr(error);
+}
+
+/** Admin: visi ŠP su pilnais duomenimis (aprašų generavimui keliems iš karto). */
+export async function getHeatPointsFull(ids) {
+  const out = [];
+  for (const part of chunks(ids, 100)) {
+    const { data, error } = await sb.from('heat_points').select('*').in('id', part);
+    hpErr(error);
+    out.push(...data);
+  }
+  return out;
+}
