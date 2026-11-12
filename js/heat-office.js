@@ -59,14 +59,14 @@ export async function readItem(S, it) {
 }
 
 /** Trumpa DI būsenos eilutė įrenginio kortelei (rodoma ir šilumininkui). */
-export function aiBadge(it) {
+export function aiBadge(it, full = true) {
   const a = it.ai;
   if (!a) return '';
   const k = KINDS[it.kind] || KINDS.kita;
   const names = (a.uncertain || []).map(key => key === 'manufacturer' ? 'gamintojas' : key === 'model' ? 'modelis' : ((k.fields.find(f => f[0] === key) || [])[1] || '').toLowerCase()).filter(Boolean);
   const st = !k.plate && a.readable === 'neiskaitoma' ? 'dalinai' : (a.readable || '');   // prietaisams be lentelės perfotografuoti neprašome
   return `<div class="hp-ai ${esc(st)}">${icon(st === 'gera' ? 'check' : 'alert')}<div><b>Sistema: ${esc(AI_LABEL[st] || 'nuskaityta')}</b>${st === 'neiskaitoma' ? ' – perfotografuokite arba įveskite duomenis ranka' : ''}
-    ${a.comment ? `<div>${esc(a.comment)}</div>` : ''}${names.length ? `<div class="muted small">Patikrinti: ${esc(names.join(', '))}</div>` : ''}${a.extra ? `<div class="muted small">Lentelėje dar: ${esc(a.extra)}</div>` : ''}</div></div>`;
+    ${a.comment ? `<div>${esc(a.comment)}</div>` : ''}${full && names.length ? `<div class="muted small">Patikrinti: ${esc(names.join(', '))}</div>` : ''}${full && a.extra ? `<div class="muted small">Lentelėje dar: ${esc(a.extra)}</div>` : ''}</div></div>`;
 }
 
 async function pool(list, n, fn) {

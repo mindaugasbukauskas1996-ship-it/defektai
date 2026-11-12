@@ -216,6 +216,7 @@ async function renderPoint(el, id, stepId, me, go) {
   const touch = debounce(() => { push({}); drawTop(); drawSteps(); }, 500);
   const refresh = debounce(() => { drawSteps(); }, 400);     // rašant tekstą – tik žingsnių žymos
 
+  const reading = new Set();                                  // įrenginiai, kurių lentelė šiuo metu skaitoma
   let syncChain = Promise.resolve();
   const syncItems = () => (syncChain = syncChain.then(async () => {
     const exp = expectedItems(S.hp.survey);
@@ -303,7 +304,7 @@ async function renderPoint(el, id, stepId, me, go) {
         ${it.sort >= 1000 ? `<button type="button" class="btn small ghost" data-delitem title="Pašalinti įrenginį">${icon('trash')}</button>` : ''}</div>
       ${it.absent ? '' : `
       ${k.hint ? `<div class="muted small">${esc(k.hint)}</div>` : ''}
-      ${aiBadge(it)}
+      ${reading.has(it.id) ? '<div class="muted small">Tikrinama, ar lentelė įskaitoma…</div>' : aiBadge(it, isAdmin)}
       ${k.plate ? slotHtml({ slot: 'plate', item_id: it.id, title: 'Gamyklinė lentelė', req: true, hint: 'Visa lentelė kadre, ryški, be blizgesio – kad būtų įskaitomi visi skaičiai.' }) : ''}
       ${slotHtml({ slot: 'general', item_id: it.id, title: k.plate ? 'Bendra įrenginio nuotrauka' : 'Nuotrauka', req: !k.plate })}
       <details class="hp-manual" ${itemFilled(it) ? 'open' : ''}><summary>Įvesti duomenis ranka</summary>
@@ -461,6 +462,17 @@ async function renderPoint(el, id, stepId, me, go) {
       }
       if (ok) toast(ok > 1 ? `Įkelta nuotraukų: ${ok}` : 'Nuotrauka įkelta', 'ok');
       drawBody(); touch();
+      // gamyklinė lentelė: iškart nuskaitoma, kad šilumininkas sužinotų, ar reikia perfotografuoti, kol dar yra šilumos punkte
+      const it = ok && slot === 'plate' && item_id ? S.items.find(x => x.id === item_id) : null;
+      if (it && !reading.has(it.id)) {
+        reading.add(it.id);
+        try {
+          await readItem(S, it);
+          if (it.ai && it.ai.readable !== 'gera') toast(it.ai.comment || 'Lentelė neįskaitoma – perfotografuokite', 'error', 9000);
+        } catch (err) { /* patikra neprivaloma – biuras nuskaitys vėliau */ }
+        reading.delete(it.id);
+        if (body.isConnected && step !== 'aprasas') drawBody();
+      }
       return;
     }
     const card = t.closest('[data-item]');
