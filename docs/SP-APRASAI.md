@@ -33,6 +33,13 @@ Tikslas: kiekvienam prižiūrimam ŠP parengti „Pastato šildymo ir karšto va
 - Neišbandyta su tikru prisijungimu: DI skaitymas (pirmą kartą paleidžia vartotojas; po to patikrinti `hp_items.ai` ir funkcijos žurnalą) ir sąnaudos vienam ŠP.
 - Idėjos toliau: DI patikra iškart po nuotraukos šilumininko telefone („perfotografuokite“ dar esant ŠP); valdiklio ekrano nuotrauka; pigesnis modelis prietaisams be lentelių.
 
+## Duomenų būklė (2026-11-12; patys duomenys – tik Supabase, ne repozitorijoje)
+- **Aktyvūs ŠP: 323** (Klaipėda 310, Palanga 13). Išbraukta (`excluded`): Neringa 48, Klaipėdos ŠP be Klaipėdos energijos Excel įrašo 98 ir Debreceno g. 20 – neprižiūrimi.
+- **Biuro laukai (`heat_points.office`) užpildyti iš failų:** šildomas plotas, apskaita butuose, valdytojas (`valdytojas_imone`; Klaipėdos energijos „MBP prižiūrimi namai“ Excel, 311 ŠP); tūris (klaipėda.xlsx + baltija.xlsx, 421); unikalus Nr. (PEN sertifikatų CSV + daugiabučių CSV – 280 iš 323; trūksta 43: 13 Palangos, 9 neįrašyti, 21 su keliais pastatų numeriais – laukiama Registrų centro); slėgiai, temperatūros 4.2 skyriui ir ŠP priėmimo metai iš 104 nuskenuotų formų (99 ŠP; rašysena, reikia išrinktinio patikrinimo; `form_statybos_metai` tik informacijai, 53 iš 101 skiriasi nuo registro).
+- **Bendros reikšmės (`hp_settings.data.bendri`):** lubų aukštis 2,5 m; Klaipėdos tinklo temperatūros ir KV ribos; tipiniai slėgiai (0,8/0,6; 0,35/0,2; 0,45/0,4 MPa, ±0,05) tiems, kurie nėra gavę savo; grafikas 80/60, KV 55. Kitų miestų nustatymai – `hp_settings.data.miestai` (Palanga: tiekėjas UAB „Palangos šilumos tinklai“, rajoninės katilinės žiemos temperatūros 95/68/59 per `bendri`; vasaros duomenų ir slėgių nėra).
+- **Dar trūksta:** 43 unikalūs Nr.; Palangos plotas (13); valdytojų rekvizitai (`hp_settings.valdytojai`); projektiniai galios ir debitai, projekto bei aktų Nr.; visų šilumininkų duomenys (pateiktas tik Rumpiškės g. 32); 5 etapas (schema).
+- Duomenų atsarginės kopijos nėra (nemokamas Supabase planas) – prieš masinį darbą apsvarstyti Pro planą ar eksportą.
+
 ## Dar reikia iš vartotojo
 - Prižiūrėtojo buveinės adresas; kas tvirtina aprašą (pareigos, vardas, pavardė).
 - Valdytojas pagal adresą (Mano Būstas Baltija / Mano Būstas Klaipėda) ir kiti trūkstami duomenys pagal adresus (unikalus Nr., šildomas plotas, tūris) – įkels failu.
