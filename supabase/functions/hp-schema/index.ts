@@ -132,7 +132,7 @@ function buildDraw(payload: any, model: string) {
   }
   if (!n) throw new Error('Nėra schemos nuotraukų.');
   content.push({ type: 'text', text: 'Nubraižyk schemą SVG ir pateik per įrankį „pateikti_svg“.' });
-  return { tool, body: { model, max_tokens: 16000, system: DRAW_SYSTEM, tools: [tool], tool_choice: { type: 'auto' }, output_config: { effort: 'high' }, messages: [{ role: 'user', content }] } };
+  return { tool, body: { model, max_tokens: 24000, system: DRAW_SYSTEM, tools: [tool], tool_choice: { type: 'auto' }, output_config: { effort: 'medium' }, messages: [{ role: 'user', content }] } };
 }
 
 const str = (v: unknown, max = 120) => (typeof v === 'string' ? v : v == null ? '' : String(v)).trim().slice(0, max);
@@ -153,8 +153,15 @@ Deno.serve(async (req: Request) => {
       if (!r.ok) throw new Error(`Claude API klaida (${r.status}): ${(dd && dd.error && dd.error.message) || r.statusText}`);
       if (dd.stop_reason === 'refusal') throw new Error('DI atsisakė apdoroti šią nuotrauką.');
       const u = (dd.content || []).find((b: any) => b.type === 'tool_use' && b.name === 'pateikti_svg');
-      if (!u || !u.input) throw new Error('DI negrąžino schemos. Bandykite dar kartą.');
-      return json({ svg: sanitizeSvg(u.input.svg), comment: str(u.input.comment, 500), model_id: dd.model || '', usage: dd.usage || null, truncated: dd.stop_reason === 'max_tokens' });
+      let svg = u && u.input ? sanitizeSvg(u.input.svg) : '';
+      let comment = u && u.input ? str(u.input.comment, 500) : '';
+      if (!svg) {   // atsarginis kelias: SVG gali būti parašytas tiesiog tekstu
+        const txt = (dd.content || []).filter((b: any) => b.type === 'text').map((b: any) => b.text).join('
+');
+        svg = sanitizeSvg(txt);
+      }
+      if (!svg && !comment) throw new Error(`DI negrąžino schemos (${dd.stop_reason || 'nežinoma priežastis'}). Bandykite dar kartą.`);
+      return json({ svg, comment, model_id: dd.model || '', usage: dd.usage || null, truncated: dd.stop_reason === 'max_tokens' });
     }
     const { tool, body } = buildRequest(payload || {}, Deno.env.get('ANTHROPIC_MODEL') || MODEL_DEFAULT);
     const call = (b: unknown) => fetch('https://api.anthropic.com/v1/messages', {

@@ -221,6 +221,13 @@ async function renderPoint(el, id, stepId, me, go) {
   const touch = debounce(() => { push({}); drawTop(); drawSteps(); }, 500);
   const refresh = debounce(() => { drawSteps(); }, 400);     // rašant tekstą – tik žingsnių žymos
 
+  let schemaChecking = false;
+  const schemaWarn = () => {
+    const c = (S.hp.survey || {}).schema_check;
+    if (schemaChecking) return '<div class="muted small">Tikrinama, ar schemą galima nuskaityti…</div>';
+    if (!c || c.readable === 'gera') return '';
+    return `<div class="hp-ai ${c.readable === 'neiskaitoma' ? 'neiskaitoma' : 'dalinai'}">${icon('alert')}<div><b>Schemos nuotrauka ${c.readable === 'neiskaitoma' ? 'neįskaitoma' : 'įskaitoma tik iš dalies'}</b><div>${esc(c.comment || 'Perfotografuokite: visa schema kadre, iš priekio, be blizgesio, iš arčiau.')}</div></div></div>`;
+  };
   const reading = new Set();                                  // įrenginiai, kurių lentelė šiuo metu skaitoma
   let syncChain = Promise.resolve();
   const syncItems = () => (syncChain = syncChain.then(async () => {
@@ -392,7 +399,7 @@ async function renderPoint(el, id, stepId, me, go) {
     } else {
       html = `<div class="card">${step === 'rodmenys' && s.matavimo_data ? `<div class="muted small">Rodmenys užrašyti: ${esc(fmtDate(s.matavimo_data))}</div>` : ''}
         ${step === 'rodmenys' ? '<div class="muted small">Užrašykite tai, ką matote prietaisuose. Ko nėra ar nematyti – palikite tuščia.</div>' : ''}
-        <div class="${step === 'rodmenys' ? 'hp-grid' : ''}">${qs}</div>${slots}</div>`;
+        <div class="${step === 'rodmenys' ? 'hp-grid' : ''}">${qs}</div>${slots}${step === 'bendra' ? schemaWarn() : ''}</div>`;
     }
     body.innerHTML = html;
     loadThumbs(body);
@@ -501,6 +508,16 @@ async function renderPoint(el, id, stepId, me, go) {
           if (!ok) return;
           touch();
           // gamyklinė lentelė: iškart nuskaitoma, kad šilumininkas sužinotų, ar reikia perfotografuoti, kol dar yra šilumos punkte
+          // schema: iškart patikrinama, ar ją įmanoma nuskaityti – jei ne, šilumininkas gauna įspėjimą
+          if (j.slot === 'schema' && !j.item_id && !schemaChecking && !pending.some(q => q.slot === 'schema' && !q.item_id)) {
+            schemaChecking = true;
+            const sph = S.photos.filter(x => !x.item_id && x.slot === 'schema');
+            db.hpSchemaAi({ kinds: Object.keys(KINDS), photos: await Promise.all(sph.map(db.hpPhotoForAI)) }).then(res => {
+              S.hp.survey.schema_check = { readable: res.readable, comment: res.comment || '', n: sph.length };
+              saveSurvey();
+              if (res.readable !== 'gera') toast(res.comment || 'Schema neįskaitoma – perfotografuokite iš arčiau, be blizgesio', 'error', 10000);
+            }).catch(() => { /* patikra neprivaloma */ }).finally(() => { schemaChecking = false; if (body.isConnected && step === 'bendra') drawBody(); });
+          }
           const it = j.slot === 'plate' && j.item_id ? S.items.find(x => x.id === j.item_id) : null;
           if (it && !isFixed(it) && !reading.has(it.id) && !pending.some(p => p.item_id === j.item_id && p.slot === 'plate')) {
             reading.add(it.id);
