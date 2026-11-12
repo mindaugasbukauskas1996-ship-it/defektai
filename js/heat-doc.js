@@ -54,7 +54,7 @@ const R7 = [  // 7 skyrius: [raktas, parametras, vnt., rodyti?, reikšmė iš su
   ['sild_slegis', 'Darbinis slėgis (grąžinimo linijoje)', 'bar', heatOn, c => highRise(c) ? '5,5' : lowRise(c) ? '4' : '', true],
   ['statinis', 'Statinis (užpildymo) slėgis', 'bar', heatOn, null, true],
   ['max_slegis', 'Didžiausias leistinas slėgis', 'bar', heatOn, 'dash', true],
-  ['sild_apsaug', 'Apsauginio vožtuvo suveikimo slėgis', 'bar', indep, c => '8', false],
+  ['sild_apsaug', 'Apsauginio vožtuvo suveikimo slėgis', 'bar', indep, c => '6', false],
   ['indas', 'Išsiplėtimo indo priešslėgis', 'bar', indep, c => highRise(c) ? '2,5' : lowRise(c) ? '1,5' : '', true],
   ['rele', 'Slėgio relės (apsaugos nuo sausos eigos) nustatymas', 'bar', indep, c => '1,5', false],
   ['max_temp', 'Didžiausia tiekiamo šilumnešio temperatūra', '°C', heatOn, c => '85', true],
