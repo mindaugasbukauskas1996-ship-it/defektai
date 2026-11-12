@@ -47,23 +47,23 @@ export const DEFAULT_TEXTS = {
 // ---------------------------------------------------------------------
 const spec = (c, grp, kind, key) => { const it = c.items.find(i => !i.absent && i.grp === grp && i.kind === kind && has((i.specs || {})[key])); return it ? it.specs[key] : ''; };
 
+const fl = c => Number(c.obj.floors) || 0;
+const lowRise = c => fl(c) > 0 && fl(c) <= 5, highRise = c => fl(c) >= 9;     // 5 aukštų / 9 aukštų namai
 const R7 = [  // 7 skyrius: [raktas, parametras, vnt., rodyti?, reikšmė iš surinktų duomenų, ar yra „leistinos ribos“]
   { head: 'Šildymo sistema', show: heatOn },
-  ['sild_slegis', 'Darbinis slėgis (grąžinimo linijoje)', 'bar', heatOn, c => c.s.r_sild_slegis, true],
+  ['sild_slegis', 'Darbinis slėgis (grąžinimo linijoje)', 'bar', heatOn, c => highRise(c) ? '5,5' : lowRise(c) ? '4' : '', true],
   ['statinis', 'Statinis (užpildymo) slėgis', 'bar', heatOn, null, true],
   ['max_slegis', 'Didžiausias leistinas slėgis', 'bar', heatOn, 'dash', true],
-  ['sild_apsaug', 'Apsauginio vožtuvo suveikimo slėgis', 'bar', indep, c => c.s.r_apsaug_sild || spec(c, 'sildymas', 'apsauginis_voztuvas', 'slegis'), false],
-  ['indas', 'Išsiplėtimo indo priešslėgis', 'bar', indep, c => c.s.r_indo_priesslegis || spec(c, 'sildymas', 'ispletimo_indas', 'priesslegis'), true],
-  ['rele', 'Slėgio relės (apsaugos nuo sausos eigos) nustatymas', 'bar', indep, c => c.s.r_rele || spec(c, 'sildymas', 'slegio_rele', 'nustatymas'), false],
-  ['max_temp', 'Didžiausia tiekiamo šilumnešio temperatūra', '°C', heatOn, c => c.s.r_max_temp, true],
-  ['kreive', 'Šildymo kreivė (valdiklio nustatymas)', '–', s => heatOn(s) && s.sildymas !== 'elevatorinis', c => c.s.r_kreive, false],
+  ['sild_apsaug', 'Apsauginio vožtuvo suveikimo slėgis', 'bar', indep, c => '8', false],
+  ['indas', 'Išsiplėtimo indo priešslėgis', 'bar', indep, c => highRise(c) ? '2,5' : lowRise(c) ? '1,5' : '', true],
+  ['rele', 'Slėgio relės (apsaugos nuo sausos eigos) nustatymas', 'bar', indep, c => '1,5', false],
+  ['max_temp', 'Didžiausia tiekiamo šilumnešio temperatūra', '°C', heatOn, c => '85', true],
   ['hidr', 'Hidraulinio bandymo slėgis', 'bar', heatOn, null, false],
   { head: 'Karšto vandens sistema', show: kvOn },
-  ['kv_temp', 'Karšto vandens temperatūra po šilumokaičio', '°C', kvOn, c => c.s.r_kv_temp, true],
+  ['kv_temp', 'Karšto vandens temperatūra po šilumokaičio', '°C', kvOn, 'dash', true],
   ['kv_vart', 'Karšto vandens temperatūra vartojimo vietose', '°C', kvOn, null, true],
-  ['kv_cirk', 'Cirkuliacinio vandens temperatūra', '°C', s => kvOn(s) && s.kv_cirkuliacija === 'taip', c => c.s.r_kv_cirk_temp, true],
-  ['kv_apsaug', 'Apsauginio vožtuvo suveikimo slėgis', 'bar', kvOn, c => c.s.r_kv_apsaug || spec(c, 'kv', 'apsauginis_voztuvas', 'slegis'), false],
-  ['sv_slegis', 'Šalto vandens slėgis įvade', 'bar', kvOn, c => c.s.r_sv_slegis, true],
+  ['kv_cirk', 'Cirkuliacinio vandens temperatūra', '°C', s => kvOn(s) && s.kv_cirkuliacija === 'taip', 'dash', true],
+  ['kv_apsaug', 'Apsauginio vožtuvo suveikimo slėgis', 'bar', kvOn, c => '8', false],
   { head: 'Šilumos punktas' },
   ['graz_temp', 'Grąžinamo į tinklus šilumnešio temperatūra', '°C', null, c => c.s.r_temp_graz, true]
 ];

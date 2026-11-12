@@ -54,21 +54,7 @@ export const QUESTIONS = {
     { key: 'r_slegis_tiek', label: 'Slėgis tiekimo linijoje', type: 'num', unit: 'bar', req: true, show: (s, o = {}) => !o.p42_p_tiek_z },   // jei slėgis žinomas (4.2 skyrius) – nebevedamas
     { key: 'r_slegis_graz', label: 'Slėgis grąžinimo linijoje', type: 'num', unit: 'bar', req: true, show: (s, o = {}) => !o.p42_p_graz_z },
     { key: 'r_temp_tiek', label: 'Tiekiamo šilumnešio temperatūra', type: 'num', unit: '°C', req: true },
-    { key: 'r_temp_graz', label: 'Grąžinamo į tinklus šilumnešio temperatūra', type: 'num', unit: '°C', req: true },
-    { head: 'Šildymo sistema', show: s => s.sildymas && s.sildymas !== 'nera' },
-    { key: 'r_sild_slegis', label: 'Šildymo sistemos darbinis slėgis (grąžinimo linijoje)', type: 'num', unit: 'bar', show: s => s.sildymas && s.sildymas !== 'nera' },
-    { key: 'r_sild_temp_tiek', label: 'Į šildymą tiekiamo šilumnešio temperatūra', type: 'num', unit: '°C', show: s => s.sildymas && s.sildymas !== 'nera' },
-    { key: 'r_sild_temp_graz', label: 'Iš šildymo grįžtančio šilumnešio temperatūra', type: 'num', unit: '°C', show: s => s.sildymas && s.sildymas !== 'nera' },
-    { key: 'r_max_temp', label: 'Didžiausia tiekiamo į šildymą temperatūra (valdiklio nustatymas)', type: 'num', unit: '°C', show: autoSp },
-    { key: 'r_kreive', label: 'Šildymo kreivė (valdiklio nustatymas)', type: 'text', show: autoSp },
-    { key: 'r_apsaug_sild', label: 'Šildymo apsauginio vožtuvo suveikimo slėgis', type: 'num', unit: 'bar', show: s => s.sildymas === 'nepriklausoma' },
-    { key: 'r_indo_priesslegis', label: 'Išsiplėtimo indo priešslėgis', type: 'num', unit: 'bar', show: s => s.sildymas === 'nepriklausoma' },
-    { key: 'r_rele', label: 'Slėgio relės nustatymas', type: 'num', unit: 'bar', show: s => s.sildymas === 'nepriklausoma' },
-    { head: 'Karštas vanduo', show: kvOn },
-    { key: 'r_kv_temp', label: 'Karšto vandens temperatūra po šilumokaičio', type: 'num', unit: '°C', show: kvOn },
-    { key: 'r_kv_cirk_temp', label: 'Cirkuliacinio vandens temperatūra', type: 'num', unit: '°C', show: s => kvOn(s) && s.kv_cirkuliacija === 'taip' },
-    { key: 'r_kv_apsaug', label: 'KV apsauginio vožtuvo suveikimo slėgis', type: 'num', unit: 'bar', show: kvOn },
-    { key: 'r_sv_slegis', label: 'Šalto vandens slėgis įvade', type: 'num', unit: 'bar', show: kvOn }
+    { key: 'r_temp_graz', label: 'Grąžinamo į tinklus šilumnešio temperatūra', type: 'num', unit: '°C', req: true }
   ],
   namas: [
     { head: 'Šildymo sistema name' },
