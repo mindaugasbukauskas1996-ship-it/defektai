@@ -9,6 +9,7 @@ import { icon } from './icons.js';
 import { $, esc, toast, confirmDialog, debounce, blobToDataURL } from './util.js';
 import { KINDS, GROUP_LABEL, itemLabel } from './heat-model.js';
 import { OFFICE, COMPANY, DEFAULT_TEXTS, makeCtx, buildAprasas, aprasasMissing, specsText } from './heat-doc.js';
+import { makeScan } from './heat-scan.js';
 import { aprasasDocx, aprasasPdf, zipBlobs, saveBlob } from './heat-export.js';
 
 const has = v => v !== undefined && v !== null && String(v).trim() !== '';
@@ -90,8 +91,14 @@ async function svgToImage(svg) {
 }
 
 async function schemaImages(photos, office = {}) {
-  if (office.schema_svg && office.schema_svg_ok) { try { return [await svgToImage(office.schema_svg)]; } catch (_) { /* naudojame nuotrauką */ } }
   const out = [];
+  const scan = office.schema_scan_ok && photos.find(x => !x.item_id && x.slot === 'schema_scan');
+  if (scan) {
+    try {
+      const blob = await (await fetch(await db.hpPhotoUrl(scan))).blob();
+      return [{ dataUrl: await blobToDataURL(blob), bytes: new Uint8Array(await blob.arrayBuffer()), width: scan.width, height: scan.height }];
+    } catch (_) { /* naudojame originalią nuotrauką */ }
+  }
   for (const p of photos.filter(x => !x.item_id && x.slot === 'schema')) {
     try {
       const blob = await (await fetch(await db.hpPhotoUrl(p))).blob();
@@ -199,6 +206,8 @@ export async function drawOffice(root, S, id, hooks = {}) {
   const GN = { ivadas: 'Įvadas', sildymas: 'Šildymas', kv: 'Karštas vanduo' };
   function drawSchema(msg = '') {
     const sch = S.hp.office.schema_ai, photos = S.photos.filter(p => !p.item_id && p.slot === 'schema');
+    const scanPh = S.photos.find(p => !p.item_id && p.slot === 'schema_scan');
+    if (scanPh && !S.scanUrl) db.hpPhotoUrl(scanPh).then(u => { S.scanUrl = u; drawSchema(msg); }).catch(() => {});
     const tagged = S.items.filter(i => !i.absent && i.tag).length;
     $('#of-schema', root).innerHTML = `
       <div class="card-title">2. Schema</div>
@@ -210,13 +219,12 @@ export async function drawOffice(root, S, id, hooks = {}) {
         <span class="muted small">${esc(msg || (photos.length ? '' : 'Pirma šilumininkas turi nufotografuoti schemą.'))}</span>
       </div>
       <div class="of-actions">
-        <input id="of-svg-instr" class="of-instr" placeholder="Pataisymas perbraižymui (neprivaloma), pvz. „išsiplėtimo indas turi būti prie šildymo šilumokaičio“" value="${esc(S.svgInstr || '')}">
-        <button class="btn" type="button" data-sch="draw" ${photos.length && !busy ? '' : 'disabled'}>${icon('spark')} ${S.hp.office.schema_svg ? 'Perbraižyti iš naujo' : 'Perbraižyti schemą (DI)'}</button>
+        <button class="btn" type="button" data-sch="scan" ${photos.length && !busy ? '' : 'disabled'}>${icon('spark')} ${scanPh ? 'Nuskenuoti iš naujo' : 'Nuskenuoti schemą (nespalvota, be rankraščio)'}</button>
       </div>
-      ${S.hp.office.schema_svg ? `<div class="of-svg"><img alt="Perbraižyta schema" src="data:image/svg+xml;charset=utf-8,${encodeURIComponent(S.hp.office.schema_svg)}"></div>
-        ${S.hp.office.schema_svg_comment ? `<div class="muted small">DI pastaba: ${esc(S.hp.office.schema_svg_comment)}</div>` : ''}
-        <label class="chk"><input type="checkbox" data-sch="ok" ${S.hp.office.schema_svg_ok ? 'checked' : ''}> Patikrinau ir patvirtinu – naudoti šią schemą apraše (kitaip dedama nuotrauka)</label>
-        <button class="btn small ghost" type="button" data-sch="clear">Pašalinti perbraižytą schemą</button>` : ''}
+      ${scanPh ? `<div class="of-svg"><img alt="Nuskenuota schema" src="${esc(S.scanUrl || '')}"></div>
+        ${S.hp.office.schema_scan_comment ? `<div class="muted small">DI pastaba: ${esc(S.hp.office.schema_scan_comment)}</div>` : ''}
+        <label class="chk"><input type="checkbox" data-sch="ok" ${S.hp.office.schema_scan_ok ? 'checked' : ''}> Patikrinau ir patvirtinu – naudoti šią schemą apraše (kitaip dedama originali nuotrauka)</label>
+        <button class="btn small ghost" type="button" data-sch="clear">Pašalinti nuskenuotą schemą</button>` : ''}
       ${sch ? `<div class="hp-ai ${esc(sch.readable)}">${icon(sch.readable === 'gera' ? 'check' : 'alert')}<div><b>Schema: ${esc(AI_LABEL[sch.readable] || '')}</b>${sch.comment ? `<div>${esc(sch.comment)}</div>` : ''}</div></div>
         ${sch.elements.length ? `<table class="of-table"><tr><th>Žymuo</th><th>Pavadinimas schemoje</th><th>Kontūras</th><th>Rūšis</th></tr>
           ${sch.elements.map(e => `<tr><td><b>${esc(e.tag || '—')}</b></td><td>${esc(e.name)}</td><td>${esc(GN[e.grp] || '')}</td><td>${esc((KINDS[e.kind] || KINDS.kita).label)}</td></tr>`).join('')}</table>` : ''}` : ''}`;
@@ -236,23 +244,31 @@ export async function drawOffice(root, S, id, hooks = {}) {
     } catch (err) { busy = false; drawSchema(''); toast('Nepavyko nuskaityti schemos: ' + (err.message || err), 'error', 8000); }
   }
 
-  async function drawSvg() {
+  async function scanSchema() {
     const photos = S.photos.filter(p => !p.item_id && p.slot === 'schema');
     if (!photos.length || busy) return;
-    const instr = ($('#of-svg-instr', root) || {}).value || '';
-    S.svgInstr = instr;
-    busy = true; drawSchema('Braižoma (gali užtrukti iki minutės)…');
+    busy = true; drawSchema('Skenuojama…');
     try {
-      const s = S.hp.survey || {};
-      const known = S.items.filter(i => !i.absent).map(i => ({ tag: i.tag || '', name: itemLabel(i) }));
-      const res = await db.hpSchemaAi({ mode: 'draw', address: S.hp.address, sp_type: `šildymas – ${s.sildymas || '?'}, karštas vanduo – ${s.kv || '?'}`, items: known, instruction: instr, photos: await Promise.all(photos.map(db.hpPhotoForAI)) });
-      if (!res.svg) throw new Error(res.comment || 'DI nepavyko nubraižyti schemos (perfotografuokite)');
-      if (res.truncated) toast('Schema galėjo nutrūkti per ilga – patikrinkite', 'error', 6000);
-      S.hp.office = { ...S.hp.office, schema_svg: res.svg, schema_svg_comment: res.comment || '', schema_svg_ok: false, schema_svg_usage: res.usage || null };
+      const p = photos[photos.length - 1];
+      const res = await db.hpSchemaAi({ mode: 'scan', photos: [await db.hpPhotoForAI(p)] });
+      const blob = await (await fetch(await db.hpPhotoUrl(p))).blob();
+      const out = await makeScan(blob, { corners: res.corners, erase: res.erase });
+      const old = S.photos.find(x => !x.item_id && x.slot === 'schema_scan');
+      const ph = await db.addHpPhoto(id, out, { slot: 'schema_scan' });
+      if (old) { await db.deleteHpPhoto(old).catch(() => {}); S.photos = S.photos.filter(x => x.id !== old.id); }
+      S.photos.push(ph); S.scanUrl = URL.createObjectURL(out);
+      S.hp.office = { ...S.hp.office, schema_scan_comment: res.comment || '', schema_scan_ok: false };
       const r = await db.updateHeatPoint(id, { office: S.hp.office });
       S.hp = { ...r, survey: S.hp.survey, office: S.hp.office };
-      busy = false; drawSchema('Schema nubraižyta – patikrinkite su nuotrauka'); drawOut();
-    } catch (err) { busy = false; drawSchema(''); toast('Nepavyko perbraižyti: ' + (err.message || err), 'error', 9000); }
+      busy = false; drawSchema('Nuskenuota – patikrinkite su nuotrauka'); drawOut();
+    } catch (err) { busy = false; drawSchema(''); toast('Nepavyko nuskenuoti: ' + (err.message || err), 'error', 9000); }
+  }
+
+  async function clearScan() {
+    const old = S.photos.find(x => !x.item_id && x.slot === 'schema_scan');
+    if (old) { await db.deleteHpPhoto(old).catch(() => {}); S.photos = S.photos.filter(x => x.id !== old.id); }
+    S.scanUrl = '';
+    await saveSvgFlag({ schema_scan_comment: null, schema_scan_ok: null });
   }
 
   async function saveSvgFlag(patch) {
@@ -344,9 +360,9 @@ export async function drawOffice(root, S, id, hooks = {}) {
       const a = sc.dataset.sch;
       if (a === 'read') return readSchema();
       if (a === 'apply') return applyTags();
-      if (a === 'draw') return drawSvg();
-      if (a === 'clear') return saveSvgFlag({ schema_svg: null, schema_svg_comment: null, schema_svg_ok: null, schema_svg_usage: null });
-      if (a === 'ok') return saveSvgFlag({ schema_svg_ok: sc.checked });
+      if (a === 'scan') return scanSchema();
+      if (a === 'clear') return clearScan();
+      if (a === 'ok') return saveSvgFlag({ schema_scan_ok: sc.checked });
     }
     const dl = e.target.closest('[data-dl]');
     if (dl) {

@@ -135,6 +135,43 @@ function buildDraw(payload: any, model: string) {
   return { tool, body: { model, max_tokens: 24000, system: DRAW_SYSTEM, tools: [tool], tool_choice: { type: 'auto' }, output_config: { effort: 'medium' }, messages: [{ role: 'user', content }] } };
 }
 
+// „Skenavimas“: DI tik nurodo lapo kampus ir ranka rašytas vietas; vaizdą apdoroja naršyklė.
+const SCAN_SYSTEM = `Gausi ant sienos kabančios šilumos punkto principinės schemos (spausdinto lapo) nuotrauką, darytą telefonu. Reikia paruošti jos „skenuotą“ kopiją, todėl nurodyk:
+1) corners – spausdinto lapo (popieriaus) 4 kampus nuotraukoje, normalizuotomis koordinatėmis (x, y nuo 0 iki 1; x į dešinę, y žemyn), TIKSLIAI tokia tvarka pagal lapo TEKSTO skaitymo kryptį: kairysis viršutinis, dešinysis viršutinis, dešinysis apatinis, kairysis apatinis (taip, tarsi lapas būtų pasuktas taip, kad tekstas skaitytųsi įprastai; jei nuotrauka pasukta ar apversta – tvarka tai atitinkamai atspindi). Jei lapas užima visą kadrą – kampai (0,0),(1,0),(1,1),(0,1). Kampai turi apimti visą lapą, nieko neatkirpdami.
+2) erase – stačiakampiai (x, y, w, h; normalizuoti nuo 0 iki 1 pagal PASUKTO IR IŠTIESINTO lapo plotą, t. y. lapo kairysis viršutinis kampas = (0,0)), kuriuos reikia išbalinti, nes juose yra RANKA rašytas ar pieštas turinys: parašai, rašiklio/flomasterio užrašai, pataisymai, apibrauktos vietos, datos ranka, antspaudai, lipdukai. Spausdinto teksto, simbolių ir schemos linijų NEŽYMĖK. Stačiakampis turi būti glaudus (tik tas rankraštis, su nedidele atsarga). Jei rankraščio nėra – tuščias sąrašas.
+3) readable: "gera" / "dalinai" / "neiskaitoma"; comment – kai nėra "gera", vienas sakinys, kaip perfotografuoti; kitaip tuščia.
+Rezultatą pateik per įrankį „pateikti_skena“.`;
+
+function buildScan(payload: any, model: string) {
+  const rect = { type: 'object', additionalProperties: false, properties: { x: { type: 'number' }, y: { type: 'number' }, w: { type: 'number' }, h: { type: 'number' } }, required: ['x', 'y', 'w', 'h'] };
+  const pt = { type: 'object', additionalProperties: false, properties: { x: { type: 'number' }, y: { type: 'number' } }, required: ['x', 'y'] };
+  const tool = {
+    name: 'pateikti_skena',
+    description: 'Pateikia lapo kampus ir ranka rašytų vietų stačiakampius.',
+    strict: true,
+    input_schema: {
+      type: 'object', additionalProperties: false,
+      properties: {
+        readable: { type: 'string', enum: ['gera', 'dalinai', 'neiskaitoma'] },
+        comment: { type: 'string' },
+        corners: { type: 'array', items: pt },
+        erase: { type: 'array', items: rect }
+      },
+      required: ['readable', 'comment', 'corners', 'erase']
+    }
+  };
+  const content: any[] = [];
+  let n = 0;
+  for (const p of (payload.photos || []).slice(0, 1)) {
+    if (p && typeof p.url === 'string' && /^https:\/\//.test(p.url)) { content.push({ type: 'image', source: { type: 'url', url: p.url } }); n++; }
+  }
+  if (!n) throw new Error('Nėra schemos nuotraukos.');
+  content.push({ type: 'text', text: 'Pateik kampus ir ranka rašytas vietas per įrankį „pateikti_skena“.' });
+  return { tool, body: { model, max_tokens: 4000, system: SCAN_SYSTEM, tools: [tool], tool_choice: { type: 'auto' }, output_config: { effort: 'medium' }, messages: [{ role: 'user', content }] } };
+}
+
+const num01 = (v: unknown) => Math.min(1, Math.max(0, Number(v) || 0));
+
 const str = (v: unknown, max = 120) => (typeof v === 'string' ? v : v == null ? '' : String(v)).trim().slice(0, max);
 
 Deno.serve(async (req: Request) => {
@@ -146,6 +183,29 @@ Deno.serve(async (req: Request) => {
   if (!apiKey) return json({ error: 'Serveryje nenustatytas ANTHROPIC_API_KEY' }, 500);
   try {
     const { payload } = await req.json();
+    if (payload && payload.mode === 'scan') {
+      const d = buildScan(payload, Deno.env.get('ANTHROPIC_MODEL') || MODEL_DEFAULT);
+      const call = (b: unknown) => fetch('https://api.anthropic.com/v1/messages', { method: 'POST', headers: { 'content-type': 'application/json', 'x-api-key': apiKey, 'anthropic-version': '2023-06-01' }, body: JSON.stringify(b) });
+      let r = await call(d.body);
+      let dd = await r.json().catch(() => ({}));
+      if (r.status === 400) {
+        const { strict: _s, ...plainTool } = d.tool as any;
+        const { output_config: _o, ...plain } = d.body as any;
+        r = await call({ ...plain, tools: [plainTool] });
+        dd = await r.json().catch(() => ({}));
+      }
+      if (!r.ok) throw new Error(`Claude API klaida (${r.status}): ${(dd && dd.error && dd.error.message) || r.statusText}`);
+      if (dd.stop_reason === 'refusal') throw new Error('DI atsisakė apdoroti šią nuotrauką.');
+      const u = (dd.content || []).find((b: any) => b.type === 'tool_use' && b.name === 'pateikti_skena');
+      if (!u || !u.input) throw new Error('DI negrąžino atsakymo. Bandykite dar kartą.');
+      const raw: any = u.input;
+      const corners = (Array.isArray(raw.corners) ? raw.corners : []).slice(0, 4).map((p: any) => ({ x: num01(p && p.x), y: num01(p && p.y) }));
+      const erase = (Array.isArray(raw.erase) ? raw.erase : []).slice(0, 60).map((e: any) => ({ x: num01(e && e.x), y: num01(e && e.y), w: num01(e && e.w), h: num01(e && e.h) })).filter((e: any) => e.w > 0 && e.h > 0 && e.w * e.h < 0.25);
+      return json({
+        readable: ['gera', 'dalinai', 'neiskaitoma'].includes(raw.readable) ? raw.readable : 'dalinai',
+        comment: str(raw.comment, 400), corners: corners.length === 4 ? corners : [], erase, usage: dd.usage || null
+      });
+    }
     if (payload && payload.mode === 'draw') {
       const d = buildDraw(payload, Deno.env.get('ANTHROPIC_MODEL') || MODEL_DEFAULT);
       const r = await fetch('https://api.anthropic.com/v1/messages', { method: 'POST', headers: { 'content-type': 'application/json', 'x-api-key': apiKey, 'anthropic-version': '2023-06-01' }, body: JSON.stringify(d.body) });
@@ -156,8 +216,7 @@ Deno.serve(async (req: Request) => {
       let svg = u && u.input ? sanitizeSvg(u.input.svg) : '';
       let comment = u && u.input ? str(u.input.comment, 500) : '';
       if (!svg) {   // atsarginis kelias: SVG gali būti parašytas tiesiog tekstu
-        const txt = (dd.content || []).filter((b: any) => b.type === 'text').map((b: any) => b.text).join('
-');
+        const txt = (dd.content || []).filter((b: any) => b.type === 'text').map((b: any) => b.text).join('\n');
         svg = sanitizeSvg(txt);
       }
       if (!svg && !comment) throw new Error(`DI negrąžino schemos (${dd.stop_reason || 'nežinoma priežastis'}). Bandykite dar kartą.`);
