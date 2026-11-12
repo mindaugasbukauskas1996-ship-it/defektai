@@ -102,7 +102,11 @@ export async function makeScan(blob, spec) {
   og.fillStyle = '#fff';
   for (const e of spec.erase || []) {
     const ex = clamp01(e.x) * ow, ey = clamp01(e.y) * oh, ew = clamp01(e.w) * ow, eh = clamp01(e.h) * oh;
-    og.fillRect(ex - 4, ey - 4, ew + 8, eh + 8);
+    const mx = ow * 0.012, my = oh * 0.012;
+    og.fillRect(ex - mx, ey - my, ew + 2 * mx, eh + 2 * my);
   }
+  // pakraščių dėmės (lapo kraštai, segtukai, šešėliai) – baltas rėmelis
+  const bx = Math.round(ow * 0.012), by = Math.round(oh * 0.012);
+  og.fillRect(0, 0, ow, by); og.fillRect(0, oh - by, ow, by); og.fillRect(0, 0, bx, oh); og.fillRect(ow - bx, 0, bx, oh);
   return new Promise(res => out.toBlob(res, 'image/jpeg', 0.9));
 }
