@@ -75,13 +75,9 @@ export const QUESTIONS = {
     { key: 'kv_skersmenys', office: true, label: 'Skersmenys (magistralės – stovai)', type: 'text', ph: 'pvz. DN50 – DN15', show: s => s.kv !== 'nera' },
     { key: 'kv_izoliacija_tipas', office: true, label: 'Šilumos izoliacija (tipas, storis)', type: 'text', show: s => s.kv !== 'nera' },
     { key: 'kv_armatura', label: 'Uždaromoji armatūra', type: 'many', options: ['Rutuliniai ventiliai', 'Sklendės', 'Kūginiai ventiliai'], show: s => s.kv !== 'nera' },
-    { key: 'kv_stovu_tiek', office: true, label: 'Tiekimo stovų skaičius', type: 'num', unit: 'vnt.', show: s => s.kv !== 'nera' },
-    { key: 'kv_stovu_cirk', office: true, label: 'Cirkuliacijos stovų skaičius', type: 'num', unit: 'vnt.', show: s => s.kv !== 'nera' && s.kv_cirkuliacija !== 'ne' },
     { key: 'kv_balansiniai', label: 'Termobalansiniai ventiliai cirkuliacijos stovuose', type: 'one', options: [...YN, ['nezinau', 'Nežinau']], show: s => s.kv !== 'nera' },
     { head: 'Šildymo prietaisai' },
-    { key: 'prietaisai_butuose', label: 'Šildymo prietaisai butuose', type: 'many', req: true, options: ['Ketiniai radiatoriai', 'Plieniniai radiatoriai', 'Aliumininiai radiatoriai', 'Konvektoriai'] },
-    { key: 'prietaisai_bendr', label: 'Šildymo prietaisai laiptinėse ir kitose bendrose patalpose', type: 'many', options: ['Ketiniai radiatoriai', 'Plieniniai radiatoriai', 'Konvektoriai', 'Registrai (vamzdiniai)', 'Nėra'] },
-    { key: 'prietaisai_bendr_kiekis', label: 'Prietaisų bendrose patalpose kiekis', type: 'num', unit: 'vnt.' },
+    { key: 'prietaisai_butuose', label: 'Šildymo prietaisai butuose', type: 'many', req: true, options: ['Ketiniai radiatoriai', 'Plieniniai radiatoriai'] },
     { key: 'voniu_sildytuvai', label: 'Vonių šildytuvai (gyvatukai)', type: 'one', req: true, options: [['kv', 'Prijungti prie karšto vandens'], ['sildymas', 'Prijungti prie šildymo'], ['nera', 'Nėra'], ['nezinau', 'Nežinau']] },
     { key: 'termostatiniai', label: 'Termostatiniai ventiliai prie šildymo prietaisų', type: 'one', options: [['taip', 'Yra'], ['dalinai', 'Dalinai'], ['ne', 'Nėra'], ['nezinau', 'Nežinau']] }
   ],
@@ -100,9 +96,7 @@ export const SLOTS = {
   rodmenys: [
     { slot: 'readings', title: 'Valdiklio ekrano ir prietaisų rodmenų nuotraukos', min: 0, hint: 'Valdiklio nustatymai (šildymo kreivė, temperatūros), manometrai, termometrai.' }
   ],
-  namas: [
-    { slot: 'house', title: 'Vamzdynų ir stovų nuotraukos', min: 0, hint: 'Magistralės rūsyje, izoliacija, balansiniai ventiliai, radiatoriai laiptinėje.' }
-  ],
+  namas: [],
   pabaiga: [
     { slot: 'docs', title: 'Dokumentai šilumos punkte', min: 0, hint: 'Priežiūros žurnalas, ant sienos kabantys aktai, instrukcijos, montuotojo lentelė ar lipdukas.' }
   ]

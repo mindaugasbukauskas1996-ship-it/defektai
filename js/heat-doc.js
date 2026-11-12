@@ -473,16 +473,15 @@ export function buildAprasas(input, images = []) {
     ['Šilumos izoliacija', cap(izol(s.sv_izoliacija_tipas)) || D('', 'Šildymo vamzdynų izoliacija'), kvc(() => cap(izol(s.kv_izoliacija_tipas)) || D('', 'KV vamzdynų izoliacija'))],
     ['Uždaromoji armatūra', cap(lc(s.sv_armatura)) || D('', 'Šildymo uždaromoji armatūra'), kvc(() => cap(lc(s.kv_armatura)) || D('', 'KV uždaromoji armatūra'))],
     ['Stovų skaičius', has(s.sv_stovu_sk) ? `${s.sv_stovu_sk} vnt.` : D('', 'Šildymo stovų skaičius'),
-      kvc(() => has(s.kv_stovu_tiek) || has(s.kv_stovu_cirk) ? `${has(s.kv_stovu_tiek) ? s.kv_stovu_tiek : '–'} tiekimo / ${has(s.kv_stovu_cirk) ? s.kv_stovu_cirk : '–'} cirkuliacijos` : D('', 'KV stovų skaičius'))],
+      kvc(() => '–')],
     ['Balansiniai (termobalansiniai) ventiliai', bal(s.sv_balansiniai, 'balansiniai_sild') || D('', 'Šildymo balansiniai ventiliai'), kvc(() => bal(s.kv_balansiniai, 'balansiniai_kv') || D('', 'KV termobalansiniai ventiliai'))]
   ]);
 
   h2('4.5. Šildymo prietaisai');
   const VS = { kv: 'Prijungti prie karšto vandens sistemos', sildymas: 'Prijungti prie šildymo sistemos', nera: 'Nėra' };
-  const bendr = (s.prietaisai_bendr || []).filter(x => x !== 'Nėra');
   table([0.32, 0.38, 0.14, 0.16], ['Prietaisas', 'Tipas', 'Kiekis, vnt.', 'Galia / pastabos'], [
     ['Šildymo prietaisai butuose', cap(lc(s.prietaisai_butuose)) || D('', 'Šildymo prietaisai butuose'), c.val('prietaisu_butuose') || '–', '–'],
-    ['Šildymo prietaisai bendrojo naudojimo patalpose', bendr.length ? cap(lc(bendr)) : (s.prietaisai_bendr || []).includes('Nėra') ? 'Nėra' : D('', 'Šildymo prietaisai bendrose patalpose'), has(s.prietaisai_bendr_kiekis) ? String(s.prietaisai_bendr_kiekis) : '–', '–'],
+    ['Šildymo prietaisai bendrojo naudojimo patalpose', cap(lc(s.prietaisai_butuose)) || D('', 'Šildymo prietaisai bendrose patalpose'), '–', '–'],
     ['Vonių šildytuvai (gyvatukai)', VS[s.voniu_sildytuvai] || D('', 'Vonių šildytuvai'), c.val('voniu_sildytuvu') || '–', '–']
   ], { center: [2, 3] });
 
