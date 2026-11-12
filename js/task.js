@@ -231,6 +231,40 @@ function drawInfo(body) {
 // Nuotraukos
 // ---------------------------------------------------------------------
 
+/** Vienu paspaudimu – visos užduoties nuotraukos (originalai, be žymėjimų) viename zip faile. */
+async function downloadAllPhotos(btn) {
+  const list = S.photos.slice();
+  if (!list.length) return;
+  const label = btn.innerHTML;
+  btn.disabled = true;
+  try {
+    const { zipBlobs, saveBlob } = await import('./heat-export.js');
+    const files = new Array(list.length);
+    let done = 0, next = 0;
+    const clean = s => String(s || '').replace(/[\\/:*?"<>|\r\n]+/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 60);
+    const width = String(list.length).length;
+    await Promise.all(Array.from({ length: Math.min(4, list.length) }, async () => {
+      while (next < list.length) {
+        const i = next++, p = list[i];
+        const res = await fetch(await db.photoUrl(p, false));
+        if (!res.ok) throw new Error('Nuotraukos parsisiųsti nepavyko');
+        const cap = clean(p.caption);
+        files[i] = { name: `${String(i + 1).padStart(Math.max(2, width), '0')}${cap ? ' - ' + cap : ''}.jpg`, blob: await res.blob() };
+        btn.textContent = `Ruošiama: ${++done} / ${list.length}`;
+      }
+    }));
+    btn.textContent = 'Pakuojama…';
+    const t = S.task || {};
+    const base = clean([t.act_number, t.address, t.city].filter(Boolean).join(' ')) || 'nuotraukos';
+    saveBlob(await zipBlobs(files), `${base} nuotraukos.zip`);
+    toast(`Atsisiųsta nuotraukų: ${list.length}`, 'ok');
+  } catch (err) {
+    toast('Nepavyko atsisiųsti: ' + (err.message || err), 'error', 6000);
+  }
+  btn.disabled = false;
+  btn.innerHTML = label;
+}
+
 async function drawPhotos(body) {
   body = fresh(body);
   const numbers = photoNumbers();
@@ -238,6 +272,7 @@ async function drawPhotos(body) {
     <div class="photo-actions">
       <label class="btn primary big">${icon('camera')} Fotografuoti<input type="file" accept="image/*" capture="environment" multiple hidden data-up></label>
       <label class="btn big">${icon('image')} Įkelti nuotraukas<input type="file" accept="image/*" multiple hidden data-up></label>
+      ${S.photos.length ? `<button class="btn big" type="button" id="ph-zip">${icon('image')} Atsisiųsti visas (${S.photos.length})</button>` : ''}
       <span class="muted small hide-mobile">arba nutempkite failus čia. Paspaudę ant nuotraukos galėsite pažymėti vietas.</span>
     </div>
     <div id="up-progress"></div>
@@ -267,6 +302,9 @@ async function drawPhotos(body) {
   }
 
   $$('[data-up]', body).forEach(inp => inp.addEventListener('change', e => upload(e.target.files)));
+
+  const zipBtn = $('#ph-zip', body);
+  if (zipBtn) zipBtn.addEventListener('click', () => downloadAllPhotos(zipBtn));
 
   const grid = $('#pgrid');
   ['dragover', 'dragenter'].forEach(ev => body.addEventListener(ev, e => { e.preventDefault(); grid.classList.add('drop'); }));
