@@ -231,7 +231,7 @@ async function renderPoint(el, id, stepId, me, go) {
     const add = exp.map((e, i) => ({ ...e, sort: i })).filter(e => !have.some(h => key(h) === key(e)));
     const off = S.hp.office || {};
     const created = await db.addHpItems(add.map(e => ({
-      heat_point_id: id, grp: e.grp, kind: e.kind, label: e.label, sort: e.sort, owner: KINDS[e.kind].owner || 'Bendraturčiai',
+      heat_point_id: id, grp: e.grp, kind: e.kind, label: e.label, sort: e.sort, owner: KINDS[e.kind].owner || 'Bendraturčiai', specs: {},
       // žinomas valdiklis (pvz. nuotoliniu būdu valdomi ŠP) – iš anksto užpildomas, šilumininkui lieka tik nufotografuoti
       ...(e.kind === 'valdiklis' && off.valdiklis_modelis ? { manufacturer: off.valdiklis_gam || null, model: off.valdiklis_modelis, specs: off.nuotolinis === 'taip' ? { nuotolinis: 'Yra' } : {} } : {})
     })));

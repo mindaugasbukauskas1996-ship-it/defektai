@@ -91,7 +91,6 @@ export const QUESTIONS = {
   ],
   pabaiga: [
     { key: 'montuotojas', label: 'ŠP sumontavusi įmonė (jei yra lipdukas ar lentelė)', type: 'text', ph: 'pavadinimas, miestas' },
-    { key: 'zurnalas_yra', label: 'Ar ŠP yra priežiūros žurnalas?', type: 'one', options: YN },
     { key: 'pastabos', label: 'Pastabos biurui', type: 'area', ph: 'Kas neaišku, ko nepavyko rasti ar nufotografuoti' }
   ]
 };
