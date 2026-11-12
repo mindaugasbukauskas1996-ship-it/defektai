@@ -33,7 +33,7 @@ export const COMPANY = [
     { k: 'atsakomybes_riba', l: 'Nuosavybės ir priežiūros atsakomybės riba', span: 4 },
     { k: 'valdytojai', l: 'Valdytojų rekvizitai – po vieną eilutėje (pavadinimas, kodas, tel., el. paštas). Parenkama pagal registre nurodytą valdytoją.', type: 'area', span: 4 }] },
   { title: 'Bendri tekstai', fields: [
-    { k: 'pasleptu_tekstas', l: '4.6. Paslėptų vamzdynų vietos (vienas tekstas visiems ŠP)', type: 'area', span: 4 }] }
+    { k: 'pasleptu_tekstas', l: '4.5. Paslėptų vamzdynų vietos (vienas tekstas visiems ŠP)', type: 'area', span: 4 }] }
 ];
 
 export const DEFAULT_TEXTS = {
@@ -94,37 +94,13 @@ export const OFFICE = [
     { k: 'balansiniai_sild', l: 'Šildymo balansiniai ventiliai (tipas, kiekis)' },
     { k: 'balansiniai_kv', l: 'KV termobalansiniai ventiliai (tipas, kiekis)' },
     { k: 'teises_aktai', l: '2.5. Teisės aktai (jei kitokie nei standartinis sąrašas) – po vieną eilutėje', type: 'area', span: 4, common: true }] },
-  { title: '4.1. Projektiniai parametrai', fields: [
-    { k: 'q_sild', l: 'Šilumos poreikis šildymui', u: 'kW', pre: c => spec(c, 'ivadas', 'agregatas', 'galia_sildymui') },
-    { k: 'q_kv', l: 'Šilumos poreikis karštam vandeniui', u: 'kW', pre: c => spec(c, 'ivadas', 'agregatas', 'galia_kv') },
-    { k: 'q_ved', l: 'Šilumos poreikis vėdinimui', u: 'kW', common: true },
-    { k: 'q_sum', l: 'Suminis šilumos poreikis', u: 'kW' },
-    { k: 'g_sild', l: 'Šilumnešio debitas šildymo sistemoje', u: 'm³/h' },
-    { k: 'g_kv', l: 'Debitas karšto vandens sistemoje', u: 'm³/h' },
-    { k: 'g_sum', l: 'Suminis debitas iš šilumos tinklų', u: 'm³/h' },
-    { k: 'grafikas', l: 'Šildymo sistemos temperatūrinis grafikas', u: '°C', ph: '80/60', common: true },
-    { k: 't_kv', l: 'Karšto vandens temperatūra', u: '°C', common: true },
-    { k: 't_lauko', l: 'Projektinė lauko oro temperatūra', u: '°C', common: true },
-    { k: 't_patalpu', l: 'Projektinė gyvenamųjų patalpų temperatūra', u: '°C', common: true },
-    { k: 't_bendr', l: 'Projektinė bendrojo naudojimo patalpų temperatūra', u: '°C', common: true },
-    { k: 'dp_sild', l: 'Slėgio nuostoliai šildymo sistemoje', u: 'kPa' },
-    { k: 'dp_kv', l: 'Slėgio nuostoliai karšto vandens sistemoje', u: 'kPa' }] },
-  { title: '4.2. Parametrai prijungimo prie šilumos tinklų taške (iš tiekėjo techninių sąlygų)', common: true,
+  { title: '4.1. Parametrai prijungimo prie šilumos tinklų taške (iš tiekėjo techninių sąlygų)', common: true,
     cols: [['z', 'Žiemą'], ['v', 'Vasarą'], ['n', 'Leistinas nuokrypis']],
     rows: R42.map(([k, l, u]) => ({ k: 'p42_' + k, l, u })) },
-  { title: '5. Pripažinimo tinkama naudoti ir projekto duomenys', fields: [
-    { k: 'projektas', l: 'Projekto pavadinimas, Nr., metai (arba „projektas neišlikęs“)', span: 2 },
-    { k: 'tech_salygos', l: 'Šilumos tiekėjo techninės (prisijungimo) sąlygos (Nr., data)', span: 2 },
-    { k: 'priemimo_aktas', l: 'ŠP priėmimo eksploatuoti aktas (Nr., data)', span: 2 },
-    { k: 'hidraulinis_aktas', l: 'Paskutinis hidraulinio bandymo aktas (Nr., data, bandymo slėgis)', span: 2 },
-    { k: 'parengties_aktas', l: 'Paskutinis parengties šildymo sezonui aktas (Nr., data)', span: 2 },
-    { k: 'dok_vieta', l: 'Dokumentacijos saugojimo vieta (adresas, atsakingas asmuo)', span: 2, common: true }] },
-  { title: '6. Garantijos', fields: [
-    { k: 'garantija', l: 'Garantijos sąlygos (tekstas; pvz. „Sistemai garantija negalioja (eksploatuojama nuo … m.)“)', type: 'area', span: 4, common: true }] },
-  { title: '7. Saugios būklės ir veikimo režimų ribos', common: true,
+  { title: '5. Saugios būklės ir veikimo režimų ribos', common: true,
     cols: [['v', 'Nustatyta (darbinė) reikšmė'], ['r', 'Leistinos ribos']],
     rows: R7.filter(Array.isArray).map(([k, l, u, show, pre, hasR]) => ({ k: 'r7_' + k, l, u, show, noCols: [pre === 'dash' ? 'v' : '', hasR ? '' : 'r'].filter(Boolean), pre: typeof pre === 'function' ? { v: pre } : null })) },
-  { title: '7–8. Priežiūros informacija ir susiję dokumentai', fields: [
+  { title: '5–6. Priežiūros informacija ir susiję dokumentai', fields: [
     { k: 'tikrinimo_daznumas', l: 'Parametrų tikrinimo dažnumas', ph: 'kas savaitę', common: true },
     { k: 'instrukciju_vieta', l: 'Įrenginių gamintojų instrukcijų saugojimo vieta', common: true },
     { k: 'raktai', l: 'ŠP raktus turi', span: 2, common: true },
@@ -184,7 +160,7 @@ const cap = t => t ? t.charAt(0).toUpperCase() + t.slice(1) : t;
 const dateIso = v => { const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(String(v || '')); return m ? `${m[1]}-${m[2]}-${m[3]}` : String(v || ''); };
 const todayIso = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; };
 
-/** Įrenginio techniniai rodikliai viena eilute (4.3 lentelei). */
+/** Įrenginio techniniai rodikliai viena eilute (4.2 lentelei). */
 export function specsText(it) {
   const k = KINDS[it.kind] || KINDS.kita, sp = it.specs || {};
   const parts = [];
@@ -402,40 +378,17 @@ export function buildAprasas(input, images = []) {
     'kontrolės, matavimo, saugos ir apskaitos prietaisai;',
     'šilumnešio tekėjimo kryptys;',
     'nuosavybės ir priežiūros atsakomybės riba.'] });
-  p('Schemos žymenys turi sutapti su 4.3 skyriaus lentelės žymenimis ir su žymenimis ant įrenginių šilumos punkte. Pakeitus įrenginį, schema ir lentelė atnaujinamos.');
+  p('Schemos žymenys turi sutapti su 4.2 skyriaus lentelės žymenimis ir su žymenimis ant įrenginių šilumos punkte. Pakeitus įrenginį, schema ir lentelė atnaujinamos.');
 
   // ---- 4 ----
   h1('4. Svarbiausi sistemos komponentai ir jų charakteristikos');
-  h2('4.1. Projektiniai parametrai');
-  const g0 = gaps.length;
-  const q = (k, l) => D(c.val(k), l);
-  table([0.52, 0.16, 0.32], ['Parametras', 'Mato vnt.', 'Reikšmė'], [
-    { group: 'Šilumos poreikis' },
-    ['Šildymui', 'kW', q('q_sild', 'Šilumos poreikis šildymui')],
-    ['Karštam vandeniui', 'kW', q('q_kv', 'Šilumos poreikis karštam vandeniui')],
-    ['Vėdinimui', 'kW', c.val('q_ved') || 'nėra'],
-    ['Suminis', 'kW', q('q_sum', 'Suminis šilumos poreikis')],
-    { group: 'Šilumnešio debitas' },
-    ['Šildymo sistemoje', 'm³/h', q('g_sild', 'Debitas šildymo sistemoje')],
-    ['Karšto vandens sistemoje', 'm³/h', q('g_kv', 'Debitas karšto vandens sistemoje')],
-    ['Suminis iš šilumos tinklų', 'm³/h', q('g_sum', 'Suminis debitas')],
-    { group: 'Temperatūros' },
-    ['Šildymo sistemos temperatūrinis grafikas', '°C', q('grafikas', 'Temperatūrinis grafikas')],
-    ['Karšto vandens temperatūra', '°C', q('t_kv', 'Karšto vandens temperatūra (projektinė)')],
-    ['Projektinė lauko oro temperatūra', '°C', q('t_lauko', 'Projektinė lauko oro temperatūra')],
-    ['Projektinė gyvenamųjų patalpų temperatūra', '°C', q('t_patalpu', 'Projektinė gyvenamųjų patalpų temperatūra')],
-    ['Projektinė bendrojo naudojimo patalpų temperatūra', '°C', q('t_bendr', 'Projektinė bendrojo naudojimo patalpų temperatūra')],
-    ['Slėgio nuostoliai šildymo / karšto vandens sistemoje', 'kPa', `${q('dp_sild', 'Slėgio nuostoliai šildymo sistemoje')} / ${q('dp_kv', 'Slėgio nuostoliai KV sistemoje')}`]
-  ], { center: [1, 2] });
-  if (gaps.length > g0) p('„–“ – duomenų nėra (projektinė dokumentacija neišlikusi arba neperduota).', { small: true });
-
-  h2('4.2. Parametrai prijungimo prie šilumos tinklų taške');
+  h2('4.1. Parametrai prijungimo prie šilumos tinklų taške');
   const g1 = gaps.length;
   table([0.4, 0.12, 0.16, 0.16, 0.16], ['Parametras', 'Mato vnt.', 'Žiemą', 'Vasarą', 'Leistinas nuokrypis'],
     R42.map(([k, l, u]) => [l, u, D(c.val(`p42_${k}_z`), `${l} (žiemą)`), D(c.val(`p42_${k}_v`), `${l} (vasarą)`), D(c.val(`p42_${k}_n`), `${l} (nuokrypis)`)]), { center: [1, 2, 3, 4] });
   p(gaps.length > g1 ? 'Duomenys – iš šilumos tiekėjo techninių (prisijungimo) sąlygų. „–“ – duomenų nėra.' : 'Duomenys – iš šilumos tiekėjo techninių (prisijungimo) sąlygų.', { small: true });
 
-  h2('4.3. Šilumos punkto įrenginiai');
+  h2('4.2. Šilumos punkto įrenginiai');
   const rows43 = [];
   for (const grp of ['ivadas', 'sildymas', 'kv']) {
     const list = c.items.filter(i => i.grp === grp && !i.absent);
@@ -455,7 +408,7 @@ export function buildAprasas(input, images = []) {
   table([0.1, 0.25, 0.21, 0.28, 0.16], ['Žymuo schemoje', 'Įrenginys', 'Tipas, gamintojas', 'Techniniai rodikliai', 'Savininkas'], rows43, { center: [0] });
   p('Rodikliai surašyti pagal įrenginių gamyklines lenteles.', { small: true });
 
-  h2('4.4. Vamzdynai ir armatūra');
+  h2('4.3. Vamzdynai ir armatūra');
   const izol = tipas => [tipas, 'būklė patenkinama'].filter(has).join(', ');      // izoliacijos būklė visur patenkinama (neklausiama)
   const kvc = fn => s.kv === 'nera' ? '–' : fn();
   table([0.3, 0.35, 0.35], ['Rodiklis', 'Šildymo sistema', 'Karšto vandens sistema'], [
@@ -467,7 +420,7 @@ export function buildAprasas(input, images = []) {
     ['Balansiniai (termobalansiniai) ventiliai', bal(s.sv_balansiniai, 'balansiniai_sild') || D('', 'Šildymo balansiniai ventiliai'), kvc(() => bal(s.kv_balansiniai, 'balansiniai_kv') || D('', 'KV termobalansiniai ventiliai'))]
   ]);
 
-  h2('4.5. Šildymo prietaisai');
+  h2('4.4. Šildymo prietaisai');
   const VS = { kv: 'Prijungti prie karšto vandens sistemos', sildymas: 'Prijungti prie šildymo sistemos', nera: 'Nėra' };
   table([0.4, 0.6], ['Prietaisas', 'Tipas'], [
     ['Šildymo prietaisai butuose', cap(lc(s.prietaisai_butuose)) || D('', 'Šildymo prietaisai butuose')],
@@ -475,40 +428,22 @@ export function buildAprasas(input, images = []) {
     ['Vonių šildytuvai (gyvatukai)', VS[s.voniu_sildytuvai] || D('', 'Vonių šildytuvai')]
   ]);
 
-  h2('4.6. Paslėptų vamzdynų vietos');
+  h2('4.5. Paslėptų vamzdynų vietos');
   p(set.pasleptu_tekstas || DEFAULT_TEXTS.pasleptu_tekstas);
 
-  h2('4.7. Bendrai naudojamos sistemos dalys');
+  h2('4.6. Bendrai naudojamos sistemos dalys');
   p('Bendroji dalinė nuosavybė: šilumos punkto įrenginiai, magistraliniai vamzdynai, stovai, uždaromoji ir balansinė armatūra, bendrojo naudojimo patalpų šildymo prietaisai.');
   p('Butų ir kitų patalpų savininkų asmeninė nuosavybė: šildymo prietaisai butuose, atšakos nuo stovų iki prietaisų.');
 
-  h2('4.8. Vamzdynų žymėjimas');
+  h2('4.7. Vamzdynų žymėjimas');
   table([0.5, 0.5], ['Vamzdynas', 'Žymėjimo spalva'], [
     { group: 'Termofikacinis vanduo' }, ['Tiekiamas', 'Žalia–geltona'], ['Grąžinamas', 'Žalia–ruda–žalia'],
     { group: 'Geriamasis vanduo' }, ['Šaltas vanduo', 'Mėlyna'],
     { group: 'Karštas vanduo' }, ['Tiekiamas vartotojams', 'Mėlyna–oranžinė–mėlyna'], ['Cirkuliacinė linija', 'Mėlyna–balta–mėlyna']
   ]);
 
-  // ---- 5 ----
-  h1('5. Pripažinimo tinkama naudoti ir projekto duomenys');
-  kv([
-    ['Projekto pavadinimas, Nr., metai', O('projektas', 'Projekto pavadinimas, Nr., metai')],
-    ['Projektuotojas', O('projektuotojas', 'Projektuotojas')],
-    ['Šilumos tiekėjo techninės (prisijungimo) sąlygos', O('tech_salygos', 'Techninės (prisijungimo) sąlygos')],
-    ['Šilumos punkto priėmimo eksploatuoti aktas', O('priemimo_aktas', 'ŠP priėmimo eksploatuoti aktas')],
-    ['Paskutinis hidraulinio bandymo aktas', O('hidraulinis_aktas', 'Hidraulinio bandymo aktas')],
-    ['Paskutinis parengties šildymo sezonui aktas', O('parengties_aktas', 'Parengties šildymo sezonui aktas')],
-    ['Projektinės ir techninės dokumentacijos saugojimo vieta', O('dok_vieta', 'Dokumentacijos saugojimo vieta')]
-  ]);
-
-  // ---- 6 ----
-  h1('6. Garantijos sąlygos');
-  const gar = c.val('garantija');
-  if (gar) gar.split('\n').map(x => x.trim()).filter(Boolean).forEach(x => p(x));
-  else { gaps.push('Garantijos sąlygos'); p('Duomenų apie galiojančias garantijas nėra.'); }
-
   // ---- 7 ----
-  h1('7. Saugios būklės ir veikimo režimų kriterijai bei ribos');
+  h1('5. Saugios būklės ir veikimo režimų kriterijai bei ribos');
   const g7 = gaps.length;
   const rows7 = [];
   for (const r of R7) {
@@ -528,14 +463,14 @@ export function buildAprasas(input, images = []) {
     `Šilumos punkto raktus turi: ${O('raktai', 'Kas turi ŠP raktus')}.`] });
 
   // ---- 8 ----
-  h1('8. Susiję dokumentai');
+  h1('6. Susiję dokumentai');
   B.push({ t: 'list', items: [
     `Sistemos veikimo instrukcija (Priežiūros tvarkos aprašo 14 punktas) – ${O('veikimo_instr', 'Sistemos veikimo instrukcija')}.`,
     `Sistemos priežiūros instrukcija (Priežiūros tvarkos aprašo 15 punktas) – ${O('prieziuros_instr', 'Sistemos priežiūros instrukcija')}.`,
     'Šilumos punkto priežiūros žurnalas – saugomas šilumos punkte.'] });
 
   // ---- 9 ----
-  h1('9. Aprašo pakeitimų registras');
+  h1('7. Aprašo pakeitimų registras');
   table([0.18, 0.47, 0.35], ['Data', 'Pakeitimas (kas pakeista, priežastis)', 'Pakeitė (pareigos, vardas, pavardė, parašas)'], [['', '', ''], ['', '', ''], ['', '', '']], { tall: true });
   B.push({ t: 'space', h: 24 });
   B.push({ t: 'sign', label: 'Aprašą parengė:', position: autPareigos, name: autVardas });

@@ -10,6 +10,7 @@ import {
   STEPS, HP_STATUS, QUESTIONS, SLOTS, KINDS, GROUP_LABEL, expectedItems, itemLabel, itemFilled, computeProgress
 } from './heat-model.js';
 import { drawOffice, renderHpSettings, readItem, aiBadge, downloadZip } from './heat-office.js';
+import { renderSummary } from './heat-summary.js';
 
 const LF = { q: '', st: 'visi', who: 'all', picked: new Set() };
 const ST_CLASS = { nauja: 'st-nauja', pradeta: 'st-planuota', grazinta: 'st-apziureta', pateikta: 'st-aktas', parengta: 'st-baigta' };
@@ -23,6 +24,10 @@ export async function renderHeat(el, parts, go) {
     return;
   }
   document.title = 'Šilumos punktai';
+  if (parts[1] === 'suvestine') {
+    if (me.role !== 'admin') { el.innerHTML = '<div class="card">Suvestinė prieinama tik administratoriui.</div>'; return; }
+    return renderSummary(el);
+  }
   if (parts[1] === 'nustatymai') {
     if (me.role !== 'admin') { el.innerHTML = '<div class="card">Šie nustatymai prieinami tik administratoriui.</div>'; return; }
     return renderHpSettings(el);
@@ -44,7 +49,7 @@ async function renderList(el, me) {
   const sent = r => r.status === 'pateikta' || r.status === 'parengta';
 
   el.innerHTML = `
-    <div class="page-head"><h1>Šilumos punktai</h1>${isAdmin ? `<a class="btn ghost" href="#/sp/nustatymai">${icon('settings')} ŠP nustatymai</a>` : ''}</div>
+    <div class="page-head"><h1>Šilumos punktai</h1>${isAdmin ? `<a class="btn ghost" href="#/sp/suvestine">${icon('list')} Suvestinė</a> <a class="btn ghost" href="#/sp/nustatymai">${icon('settings')} ŠP nustatymai</a>` : ''}</div>
     <div id="hp-sum"></div>
     <div class="list-tools">
       <div class="search">${icon('search')}<input id="hp-q" placeholder="Ieškoti pagal adresą, miestą ar tipą" value="${esc(LF.q)}" autocomplete="off"></div>

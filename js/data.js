@@ -988,3 +988,27 @@ export async function getHeatPointsFull(ids) {
   }
   return out;
 }
+
+/** Suvestinei: visi ŠP su atsakymais ir biuro laukais (tik admin). */
+export async function listHeatPointsFull() {
+  const out = [];
+  for (let from = 0; ; from += 500) {
+    const { data, error } = await sb.from('heat_points').select('id,seq,address,city,registry_type,assigned_to,status,excluded,progress,note,office').order('address').range(from, from + 499);
+    hpErr(error);
+    out.push(...data);
+    if (data.length < 500) break;
+  }
+  return out;
+}
+
+/** ŠP, kurių gamyklinės lentelės DI neįskaitė (kiek įrenginių). */
+export async function listUnreadablePlates() {
+  const counts = new Map();
+  for (let from = 0; ; from += 1000) {
+    const { data, error } = await sb.from('hp_items').select('heat_point_id,ai,absent').eq('absent', false).not('ai', 'is', null).range(from, from + 999);
+    hpErr(error);
+    for (const r of data) if (r.ai && r.ai.readable === 'neiskaitoma') counts.set(r.heat_point_id, (counts.get(r.heat_point_id) || 0) + 1);
+    if (data.length < 1000) break;
+  }
+  return [...counts].map(([heat_point_id, n]) => ({ heat_point_id, n }));
+}
