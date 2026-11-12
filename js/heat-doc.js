@@ -157,7 +157,10 @@ export function officeFields() {
 const get = (o, path) => path.split('.').reduce((a, k) => (a == null ? a : a[k]), o);
 
 /** Kontekstas reikšmėms skaičiuoti. */
-export function makeCtx({ hp, items, photos, obj, set, op }) {
+export function makeCtx({ hp, items, photos, obj, set: baseSet, op }) {
+  // kitų miestų (tiekėjų) ŠP: hp_settings.miestai[miestas] = { nuo: {laukai, kurie keičia pastovius}, bendri: {bendros reikšmės tam miestui} }
+  const city = ((baseSet || {}).miestai || {})[hp.city];
+  const set = city ? { ...baseSet, ...(city.nuo || {}), ...(city.bendri ? { bendri: city.bendri } : {}) } : (baseSet || {});
   const s = hp.survey || {};
   const c = { hp, s, items: items || [], photos: photos || [], obj: obj || {}, set: set || {}, op: op || {}, office: hp.office || {} };
   // valdytojas: registre nurodytas projektas + rekvizitai iš nustatymų
