@@ -464,14 +464,13 @@ export function buildAprasas(input, images = []) {
   p('Rodikliai surašyti pagal įrenginių gamyklines lenteles.', { small: true });
 
   h2('4.4. Vamzdynai ir armatūra');
-  const IZ = { gera: 'būklė gera', daline: 'izoliuota iš dalies', nera: 'izoliacijos nėra' };
-  const izol = (tipas, bukle) => [tipas, IZ[bukle]].filter(has).join(', ');
+  const izol = tipas => [tipas, 'būklė patenkinama'].filter(has).join(', ');      // izoliacijos būklė visur patenkinama (neklausiama)
   const kvc = fn => s.kv === 'nera' ? '–' : fn();
   table([0.3, 0.35, 0.35], ['Rodiklis', 'Šildymo sistema', 'Karšto vandens sistema'], [
     ['Vamzdžių medžiaga', cap(lc(s.sv_medziaga)) || D('', 'Šildymo vamzdžių medžiaga'), kvc(() => cap(lc(s.kv_medziaga)) || D('', 'KV vamzdžių medžiaga'))],
     ['Skersmenys (magistralės – stovai)', has(s.sv_skersmenys) ? fixDn(s.sv_skersmenys) : D('', 'Šildymo vamzdynų skersmenys'), kvc(() => has(s.kv_skersmenys) ? fixDn(s.kv_skersmenys) : D('', 'KV vamzdynų skersmenys'))],
     ['Jungimo būdas', joinBy(s.sv_medziaga) || D('', 'Šildymo vamzdynų jungimo būdas'), kvc(() => joinBy(s.kv_medziaga) || D('', 'KV vamzdynų jungimo būdas'))],
-    ['Šilumos izoliacija', cap(izol(s.sv_izoliacija_tipas, s.sv_izoliacija_bukle)) || D('', 'Šildymo vamzdynų izoliacija'), kvc(() => cap(izol(s.kv_izoliacija_tipas, s.kv_izoliacija_bukle)) || D('', 'KV vamzdynų izoliacija'))],
+    ['Šilumos izoliacija', cap(izol(s.sv_izoliacija_tipas)) || D('', 'Šildymo vamzdynų izoliacija'), kvc(() => cap(izol(s.kv_izoliacija_tipas)) || D('', 'KV vamzdynų izoliacija'))],
     ['Uždaromoji armatūra', cap(lc(s.sv_armatura)) || D('', 'Šildymo uždaromoji armatūra'), kvc(() => cap(lc(s.kv_armatura)) || D('', 'KV uždaromoji armatūra'))],
     ['Stovų skaičius', has(s.sv_stovu_sk) ? `${s.sv_stovu_sk} vnt.` : D('', 'Šildymo stovų skaičius'),
       kvc(() => has(s.kv_stovu_tiek) || has(s.kv_stovu_cirk) ? `${has(s.kv_stovu_tiek) ? s.kv_stovu_tiek : '–'} tiekimo / ${has(s.kv_stovu_cirk) ? s.kv_stovu_cirk : '–'} cirkuliacijos` : D('', 'KV stovų skaičius'))],
