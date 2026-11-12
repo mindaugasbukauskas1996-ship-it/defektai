@@ -271,7 +271,7 @@ async function renderPoint(el, id, stepId, me, go) {
 
   const qHtml = q => {
     const s = S.hp.survey;
-    if ((q.show && !q.show(s)) || (q.office && !isAdmin)) return '';
+    if ((q.show && !q.show(s, S.hp.office || {})) || (q.office && !isAdmin)) return '';
     if (q.head) return `<div class="hp-head">${esc(q.head)}</div>`;
     const v = s[q.key];
     const lab = `<div class="hp-ql">${esc(q.label)}${q.req ? ' <span class="hp-req">*</span>' : ''}${q.unit ? ` <span class="muted small">(${esc(q.unit)})</span>` : ''}${q.office ? ' <span class="tag">pildo biuras</span>' : ''}</div>${q.hint ? `<div class="muted small">${esc(q.hint)}</div>` : ''}`;
@@ -322,18 +322,23 @@ async function renderPoint(el, id, stepId, me, go) {
     ? `<select ${attr}="${key}"><option value=""></option>${opts.map(o => `<option ${o === val ? 'selected' : ''}>${esc(o)}</option>`).join('')}</select>`
     : `<input ${attr}="${key}" value="${esc(val ?? '')}" autocomplete="off">`}</label>`;
 
+  // Tiksliai žinomas įrenginys (pvz. nuotoliniu būdu valdomo ŠP valdiklis): šilumininkas nieko nesirenka ir neveda – tik nufotografuoja
+  const isFixed = it => it.kind === 'valdiklis' && !!(S.hp.office || {}).valdiklis_modelis;
+
   const itemHtml = it => {
     const k = KINDS[it.kind] || KINDS.kita, sp = it.specs || {};
+    const fixed = isFixed(it) && !isAdmin;
     return `<div class="card hp-item${it.absent ? ' absent' : ''}" data-item="${it.id}">
       <div class="hp-item-head"><b>${esc(itemLabel(it))}</b>
-        <label class="chk"><input type="checkbox" data-absent ${it.absent ? 'checked' : ''}> Šio įrenginio nėra</label>
+        ${fixed ? '' : `<label class="chk"><input type="checkbox" data-absent ${it.absent ? 'checked' : ''}> Šio įrenginio nėra</label>`}
         ${it.sort >= 1000 ? `<button type="button" class="btn small ghost" data-delitem title="Pašalinti įrenginį">${icon('trash')}</button>` : ''}</div>
       ${it.absent ? '' : `
-      ${k.hint ? `<div class="muted small">${esc(k.hint)}</div>` : ''}
-      ${reading.has(it.id) ? '<div class="muted small">Tikrinama, ar lentelė įskaitoma…</div>' : aiBadge(it, isAdmin)}
+      ${fixed ? `<div class="hp-fixed"><b>${esc([it.manufacturer, it.model].filter(Boolean).join(' '))}</b> – jau žinoma, nieko rinktis nereikia. Tik nufotografuokite valdiklį.</div>`
+        : `${k.hint ? `<div class="muted small">${esc(k.hint)}</div>` : ''}
+      ${reading.has(it.id) ? '<div class="muted small">Tikrinama, ar lentelė įskaitoma…</div>' : aiBadge(it, isAdmin)}`}
       ${k.plate ? slotHtml({ slot: 'plate', item_id: it.id, title: 'Gamyklinė lentelė', req: true, hint: 'Visa lentelė kadre, ryški, be blizgesio – kad būtų įskaitomi visi skaičiai.' }) : ''}
       ${slotHtml({ slot: 'general', item_id: it.id, title: k.plate ? 'Bendra įrenginio nuotrauka' : 'Nuotrauka', req: !k.plate })}
-      <details class="hp-manual" ${itemFilled(it) ? 'open' : ''}><summary>Įvesti duomenis ranka</summary>
+      <details class="hp-manual${fixed ? ' hp-hide' : ''}" ${itemFilled(it) && !fixed ? 'open' : ''}><summary>Įvesti duomenis ranka</summary>
         <div class="form-grid">
           ${it.kind === 'kita' ? fld('data-f', 'label', 'Įrenginio pavadinimas', it.label, '', null, 'span2') : ''}
           ${fld('data-f', 'manufacturer', 'Gamintojas', it.manufacturer)}
@@ -492,7 +497,7 @@ async function renderPoint(el, id, stepId, me, go) {
           touch();
           // gamyklinė lentelė: iškart nuskaitoma, kad šilumininkas sužinotų, ar reikia perfotografuoti, kol dar yra šilumos punkte
           const it = j.slot === 'plate' && j.item_id ? S.items.find(x => x.id === j.item_id) : null;
-          if (it && !reading.has(it.id) && !pending.some(p => p.item_id === j.item_id && p.slot === 'plate')) {
+          if (it && !isFixed(it) && !reading.has(it.id) && !pending.some(p => p.item_id === j.item_id && p.slot === 'plate')) {
             reading.add(it.id);
             readItem(S, it).then(() => {
               if (it.ai && it.ai.readable !== 'gera') toast(it.ai.comment || 'Lentelė neįskaitoma – perfotografuokite', 'error', 9000);

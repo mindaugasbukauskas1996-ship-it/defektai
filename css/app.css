@@ -628,3 +628,5 @@ input[type=date], select { min-width: 0; max-width: 100%; }
 .hp-thumb.pend { display: flex; align-items: center; justify-content: center; border: 1px dashed #c4cad4; }
 .spin { width: 24px; height: 24px; border: 3px solid #d0d5dd; border-top-color: var(--primary); border-radius: 50%; animation: hpspin .8s linear infinite; }
 @keyframes hpspin { to { transform: rotate(360deg); } }
+.hp-fixed { background: #f0f9ff; border: 1px solid #b9e6fe; border-radius: 8px; padding: 8px 10px; margin: 8px 0; }
+.hp-hide { display: none; }

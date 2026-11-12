@@ -41,7 +41,7 @@ export const QUESTIONS = {
       ['kita', 'Nežinau / kitaip'],
       ['nera', 'Karštas vanduo čia neruošiamas']] },
     { key: 'kv_cirkuliacija', label: 'Ar karšto vandens sistema su cirkuliacija?', type: 'one', req: true, options: YN, show: kvOn },
-    { key: 'nuotolinis', label: 'Ar yra nuotolinis valdymas / stebėjimas?', type: 'one', options: [...YN, ['nezinau', 'Nežinau']] },
+    { key: 'nuotolinis', label: 'Ar yra nuotolinis valdymas / stebėjimas?', type: 'one', options: [...YN, ['nezinau', 'Nežinau']], show: (s, o = {}) => !o.nuotolinis },   // jau žinoma – neklausiama
     { key: 'keli_sp', label: 'Ar šiame name yra daugiau nei vienas šilumos punktas?', type: 'one', options: YN,
       hint: 'Jei taip – praneškite biurui, kad sistemoje pridėtų antrą ŠP.' }
   ],
@@ -51,8 +51,8 @@ export const QUESTIONS = {
   rodmenys: [
     { key: 'lauko_temp', label: 'Lauko oro temperatūra matavimo metu', type: 'num', unit: '°C' },
     { head: 'Įvadas (šilumos tinklai)' },
-    { key: 'r_slegis_tiek', label: 'Slėgis tiekimo linijoje', type: 'num', unit: 'bar', req: true },
-    { key: 'r_slegis_graz', label: 'Slėgis grąžinimo linijoje', type: 'num', unit: 'bar', req: true },
+    { key: 'r_slegis_tiek', label: 'Slėgis tiekimo linijoje', type: 'num', unit: 'bar', req: true, show: (s, o = {}) => !o.p42_p_tiek_z },   // jei slėgis žinomas (4.2 skyrius) – nebevedamas
+    { key: 'r_slegis_graz', label: 'Slėgis grąžinimo linijoje', type: 'num', unit: 'bar', req: true, show: (s, o = {}) => !o.p42_p_graz_z },
     { key: 'r_temp_tiek', label: 'Tiekiamo šilumnešio temperatūra', type: 'num', unit: '°C', req: true },
     { key: 'r_temp_graz', label: 'Grąžinamo į tinklus šilumnešio temperatūra', type: 'num', unit: '°C', req: true },
     { head: 'Šildymo sistema', show: s => s.sildymas && s.sildymas !== 'nera' },
