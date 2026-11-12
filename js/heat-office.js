@@ -138,6 +138,7 @@ export async function drawOffice(root, S, id, hooks = {}) {
 
   root.innerHTML = `
     <div class="card" id="of-ai"></div>
+    <div class="card" id="of-schema"></div>
     <div class="card" id="of-form"></div>
     <div class="card" id="of-out"></div>`;
 
@@ -180,6 +181,58 @@ export async function drawOffice(root, S, id, hooks = {}) {
     if (failed) toast(`Nepavyko nuskaityti: ${failed}. ${lastErr}`, 'error', 9000);
     else toast('Nuotraukos nuskaitytos', 'ok');
     if (root.isConnected) { drawAi(); drawForm(); drawOut(); }
+  }
+
+  // ---- 1b. Schema ----
+  const GN = { ivadas: 'Įvadas', sildymas: 'Šildymas', kv: 'Karštas vanduo' };
+  function drawSchema(msg = '') {
+    const sch = S.hp.office.schema_ai, photos = S.photos.filter(p => !p.item_id && p.slot === 'schema');
+    const tagged = S.items.filter(i => !i.absent && i.tag).length;
+    $('#of-schema', root).innerHTML = `
+      <div class="card-title">2. Schema</div>
+      <div class="muted small">DI iš schemos nuotraukos nuskaito įrenginius ir žymenis (žymenų lentelei). Perbraižytos schemos kol kas nėra – 1 priede dedama nuotrauka. Žymenis visada peržiūrėkite.</div>
+      <div class="of-line">Schemos nuotraukų: <b>${photos.length}</b> · įrenginių su žymeniu: <b>${tagged}</b> iš <b>${S.items.filter(i => !i.absent).length}</b></div>
+      <div class="of-actions">
+        <button class="btn primary" type="button" data-sch="read" ${photos.length && !busy ? '' : 'disabled'}>${icon('spark')} ${sch ? 'Nuskaityti schemą iš naujo' : 'Nuskaityti schemą'}</button>
+        ${sch && sch.elements.length ? `<button class="btn" type="button" data-sch="apply">${icon('check')} Pritaikyti žymenis įrenginiams</button>` : ''}
+        <span class="muted small">${esc(msg || (photos.length ? '' : 'Pirma šilumininkas turi nufotografuoti schemą.'))}</span>
+      </div>
+      ${sch ? `<div class="hp-ai ${esc(sch.readable)}">${icon(sch.readable === 'gera' ? 'check' : 'alert')}<div><b>Schema: ${esc(AI_LABEL[sch.readable] || '')}</b>${sch.comment ? `<div>${esc(sch.comment)}</div>` : ''}</div></div>
+        ${sch.elements.length ? `<table class="of-table"><tr><th>Žymuo</th><th>Pavadinimas schemoje</th><th>Kontūras</th><th>Rūšis</th></tr>
+          ${sch.elements.map(e => `<tr><td><b>${esc(e.tag || '—')}</b></td><td>${esc(e.name)}</td><td>${esc(GN[e.grp] || '')}</td><td>${esc((KINDS[e.kind] || KINDS.kita).label)}</td></tr>`).join('')}</table>` : ''}` : ''}`;
+  }
+
+  async function readSchema() {
+    const photos = S.photos.filter(p => !p.item_id && p.slot === 'schema');
+    if (!photos.length || busy) return;
+    busy = true; drawSchema('Skaitoma…');
+    try {
+      const s = S.hp.survey || {};
+      const res = await db.hpSchemaAi({ sp_type: `šildymas – ${s.sildymas || '?'}, karštas vanduo – ${s.kv || '?'}`, kinds: Object.keys(KINDS), photos: await Promise.all(photos.map(db.hpPhotoForAI)) });
+      S.hp.office = { ...S.hp.office, schema_ai: { at: new Date().toISOString(), readable: res.readable, comment: res.comment, elements: res.elements, usage: res.usage || null } };
+      const r = await db.updateHeatPoint(id, { office: S.hp.office });
+      S.hp = { ...r, survey: S.hp.survey, office: S.hp.office };
+      busy = false; drawSchema(`Rasta elementų: ${res.elements.length}`);
+    } catch (err) { busy = false; drawSchema(''); toast('Nepavyko nuskaityti schemos: ' + (err.message || err), 'error', 8000); }
+  }
+
+  /** Žymenys perkeliami į įrenginius pagal rūšį ir kontūrą (tik tuščius). Armatūros ir manometrų žymenys sujungiami. */
+  async function applyTags() {
+    const els = (S.hp.office.schema_ai || {}).elements || [];
+    const used = new Set();
+    let n = 0;
+    try {
+      for (const e of els) {
+        if (!e.tag) continue;
+        const it = S.items.find(i => !i.absent && !i.tag && !used.has(i.id) && i.kind === e.kind && i.grp === e.grp);
+        if (!it) continue;
+        used.add(it.id);
+        Object.assign(it, await db.updateHpItem(it.id, { tag: e.tag }));
+        n++;
+      }
+      toast(`Žymenys priskirti: ${n}`, 'ok');
+    } catch (err) { toast('Nepavyko išsaugoti žymenų: ' + (err.message || err), 'error', 6000); }
+    drawSchema(`Priskirta žymenų: ${n}`); drawOut();
   }
 
   // ---- 2. Biuro laukai ----
@@ -239,6 +292,8 @@ export async function drawOffice(root, S, id, hooks = {}) {
   root.addEventListener('click', async e => {
     const ai = e.target.closest('[data-ai]');
     if (ai) return runAi(ai.dataset.ai === 'all');
+    const sc = e.target.closest('[data-sch]');
+    if (sc) return sc.dataset.sch === 'read' ? readSchema() : applyTags();
     const dl = e.target.closest('[data-dl]');
     if (dl) {
       dl.disabled = true;
@@ -270,7 +325,7 @@ export async function drawOffice(root, S, id, hooks = {}) {
     saveOffice();
   });
 
-  drawAi(); drawForm(); drawOut();
+  drawAi(); drawSchema(); drawForm(); drawOut();
 }
 
 // ---------------------------------------------------------------------

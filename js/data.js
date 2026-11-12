@@ -1012,3 +1012,15 @@ export async function listUnreadablePlates() {
   }
   return [...counts].map(([heat_point_id, n]) => ({ heat_point_id, n }));
 }
+
+/** DI: schemos nuotraukos skaitymas (Edge funkcija „hp-schema“). */
+export async function hpSchemaAi(payload) {
+  const { data, error } = await sb.functions.invoke('hp-schema', { body: { payload } });
+  if (error) {
+    let msg = error.message;
+    try { const body = await error.context.json(); if (body && body.error) msg = body.error; } catch (_) { /* ignore */ }
+    throw new Error(msg);
+  }
+  if (data && data.error) throw new Error(data.error);
+  return data;
+}
