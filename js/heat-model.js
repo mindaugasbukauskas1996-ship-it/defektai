@@ -33,7 +33,7 @@ export const QUESTIONS = {
       ['elevatorinis', 'Elevatorinis (be automatikos)'],
       ['priklausoma', 'Automatinis, šildymui šilumokaičio NĖRA'],
       ['nepriklausoma', 'Automatinis, šildymui YRA šilumokaitis'],
-      ['nera', 'Šildymas ne per šį ŠP']] },
+      ] },
     { key: 'sild_siurblys', label: 'Ar šildymo kontūre yra cirkuliacinis siurblys?', type: 'one', req: true, options: YN, show: s => s.sildymas === 'elevatorinis' },
     { key: 'kv', label: 'Kaip ruošiamas karštas vanduo?', type: 'one', req: true, options: [
       ['lygiagreti', 'Vienas karšto vandens šilumokaitis'],

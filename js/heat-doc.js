@@ -137,8 +137,7 @@ export const OFFICE = [
     { k: 'instrukciju_vieta', l: 'Įrenginių gamintojų instrukcijų saugojimo vieta', common: true },
     { k: 'raktai', l: 'ŠP raktus turi', span: 2, common: true },
     { k: 'veikimo_instr', l: 'Sistemos veikimo instrukcija (dokumento Nr., data)', span: 2, common: true },
-    { k: 'prieziuros_instr', l: 'Sistemos priežiūros instrukcija (dokumento Nr., data)', span: 2, common: true },
-    { k: 'zurnalo_vieta', l: 'ŠP priežiūros žurnalo saugojimo vieta', span: 2, common: true }] }
+    { k: 'prieziuros_instr', l: 'Sistemos priežiūros instrukcija (dokumento Nr., data)', span: 2, common: true }] }
 ];
 
 /** Visi vieno ŠP biuro laukai plokščiu sąrašu: { k, l, u, req, common, show, pre(c) }. */
@@ -542,7 +541,7 @@ export function buildAprasas(input, images = []) {
   B.push({ t: 'list', items: [
     `Sistemos veikimo instrukcija (Priežiūros tvarkos aprašo 14 punktas) – ${O('veikimo_instr', 'Sistemos veikimo instrukcija')}.`,
     `Sistemos priežiūros instrukcija (Priežiūros tvarkos aprašo 15 punktas) – ${O('prieziuros_instr', 'Sistemos priežiūros instrukcija')}.`,
-    `Šilumos punkto priežiūros žurnalas – ${c.val('zurnalo_vieta') || (s.zurnalas_yra === 'taip' ? 'saugomas šilumos punkte' : V('', 'Priežiūros žurnalo saugojimo vieta'))}.`] });
+    'Šilumos punkto priežiūros žurnalas – saugomas šilumos punkte.'] });
 
   // ---- 9 ----
   h1('9. Aprašo pakeitimų registras');
