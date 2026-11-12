@@ -68,7 +68,6 @@ export const QUESTIONS = {
     { key: 'sv_skersmenys', office: true, label: 'Skersmenys (magistralės – stovai)', type: 'text', ph: 'pvz. DN80 – DN15' },
     { key: 'sv_izoliacija_tipas', office: true, label: 'Šilumos izoliacija (tipas, storis)', type: 'text', ph: 'pvz. akmens vatos kevalai 30 mm' },
     { key: 'sv_armatura', label: 'Uždaromoji armatūra', type: 'many', req: true, options: ['Rutuliniai ventiliai', 'Sklendės', 'Kūginiai ventiliai'] },
-    { key: 'sv_stovu_sk', office: true, label: 'Stovų skaičius', type: 'num', unit: 'vnt.' },
     { key: 'sv_balansiniai', label: 'Balansiniai ventiliai stovuose', type: 'one', options: [...YN, ['nezinau', 'Nežinau']] },
     { head: 'Karšto vandens vamzdynai', show: s => s.kv !== 'nera' },
     { key: 'kv_medziaga', label: 'Vamzdžių medžiaga', type: 'many', req: true, options: ['Cinkuotas plienas', 'Nerūdijantis plienas', 'PPR', 'Plastikas', 'Daugiasluoksniai'], show: s => s.kv !== 'nera' },

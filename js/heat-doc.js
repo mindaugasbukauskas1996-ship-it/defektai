@@ -466,8 +466,6 @@ export function buildAprasas(input, images = []) {
     ['Jungimo būdas', joinBy(s.sv_medziaga) || D('', 'Šildymo vamzdynų jungimo būdas'), kvc(() => joinBy(s.kv_medziaga) || D('', 'KV vamzdynų jungimo būdas'))],
     ['Šilumos izoliacija', cap(izol(s.sv_izoliacija_tipas)) || D('', 'Šildymo vamzdynų izoliacija'), kvc(() => cap(izol(s.kv_izoliacija_tipas)) || D('', 'KV vamzdynų izoliacija'))],
     ['Uždaromoji armatūra', cap(lc(s.sv_armatura)) || D('', 'Šildymo uždaromoji armatūra'), kvc(() => cap(lc(s.kv_armatura)) || D('', 'KV uždaromoji armatūra'))],
-    ['Stovų skaičius', has(s.sv_stovu_sk) ? `${s.sv_stovu_sk} vnt.` : D('', 'Šildymo stovų skaičius'),
-      kvc(() => '–')],
     ['Balansiniai (termobalansiniai) ventiliai', bal(s.sv_balansiniai, 'balansiniai_sild') || D('', 'Šildymo balansiniai ventiliai'), kvc(() => bal(s.kv_balansiniai, 'balansiniai_kv') || D('', 'KV termobalansiniai ventiliai'))]
   ]);
 
