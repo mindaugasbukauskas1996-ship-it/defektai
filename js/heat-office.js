@@ -78,7 +78,19 @@ async function pool(list, n, fn) {
 // Aprašo sudarymas
 // ---------------------------------------------------------------------
 
-async function schemaImages(photos) {
+/** SVG → JPEG baitai (aprašui). */
+async function svgToImage(svg) {
+  const img = new Image();
+  await new Promise((res, rej) => { img.onload = res; img.onerror = () => rej(new Error('Schemos vaizdo nepavyko atvaizduoti')); img.src = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svg); });
+  const W = 2800, H = Math.round(2800 * (img.naturalHeight || 900) / (img.naturalWidth || 1400));
+  const c = document.createElement('canvas'); c.width = W; c.height = H;
+  const g = c.getContext('2d'); g.fillStyle = '#fff'; g.fillRect(0, 0, W, H); g.drawImage(img, 0, 0, W, H);
+  const blob = await new Promise(r => c.toBlob(r, 'image/jpeg', 0.92));
+  return { dataUrl: await blobToDataURL(blob), bytes: new Uint8Array(await blob.arrayBuffer()), width: W, height: H };
+}
+
+async function schemaImages(photos, office = {}) {
+  if (office.schema_svg && office.schema_svg_ok) { try { return [await svgToImage(office.schema_svg)]; } catch (_) { /* naudojame nuotrauką */ } }
   const out = [];
   for (const p of photos.filter(x => !x.item_id && x.slot === 'schema')) {
     try {
@@ -92,7 +104,7 @@ async function schemaImages(photos) {
 const operatorOf = async hp => hp.assigned_to ? db.getSettingsFor(hp.assigned_to).catch(() => ({})) : {};
 
 async function makeFile(src, set, kind) {
-  const images = await schemaImages(src.photos);
+  const images = await schemaImages(src.photos, src.hp.office || {});
   const doc = buildAprasas(makeCtx({ ...src, set, op: await operatorOf(src.hp) }), images);
   const blob = kind === 'pdf' ? await aprasasPdf(doc, images) : await aprasasDocx(doc, images);
   return { name: `${doc.fileName}.${kind === 'pdf' ? 'pdf' : 'docx'}`, blob };
@@ -197,6 +209,14 @@ export async function drawOffice(root, S, id, hooks = {}) {
         ${sch && sch.elements.length ? `<button class="btn" type="button" data-sch="apply">${icon('check')} Pritaikyti žymenis įrenginiams</button>` : ''}
         <span class="muted small">${esc(msg || (photos.length ? '' : 'Pirma šilumininkas turi nufotografuoti schemą.'))}</span>
       </div>
+      <div class="of-actions">
+        <input id="of-svg-instr" class="of-instr" placeholder="Pataisymas perbraižymui (neprivaloma), pvz. „išsiplėtimo indas turi būti prie šildymo šilumokaičio“" value="${esc(S.svgInstr || '')}">
+        <button class="btn" type="button" data-sch="draw" ${photos.length && !busy ? '' : 'disabled'}>${icon('spark')} ${S.hp.office.schema_svg ? 'Perbraižyti iš naujo' : 'Perbraižyti schemą (DI)'}</button>
+      </div>
+      ${S.hp.office.schema_svg ? `<div class="of-svg"><img alt="Perbraižyta schema" src="data:image/svg+xml;charset=utf-8,${encodeURIComponent(S.hp.office.schema_svg)}"></div>
+        ${S.hp.office.schema_svg_comment ? `<div class="muted small">DI pastaba: ${esc(S.hp.office.schema_svg_comment)}</div>` : ''}
+        <label class="chk"><input type="checkbox" data-sch="ok" ${S.hp.office.schema_svg_ok ? 'checked' : ''}> Patikrinau ir patvirtinu – naudoti šią schemą apraše (kitaip dedama nuotrauka)</label>
+        <button class="btn small ghost" type="button" data-sch="clear">Pašalinti perbraižytą schemą</button>` : ''}
       ${sch ? `<div class="hp-ai ${esc(sch.readable)}">${icon(sch.readable === 'gera' ? 'check' : 'alert')}<div><b>Schema: ${esc(AI_LABEL[sch.readable] || '')}</b>${sch.comment ? `<div>${esc(sch.comment)}</div>` : ''}</div></div>
         ${sch.elements.length ? `<table class="of-table"><tr><th>Žymuo</th><th>Pavadinimas schemoje</th><th>Kontūras</th><th>Rūšis</th></tr>
           ${sch.elements.map(e => `<tr><td><b>${esc(e.tag || '—')}</b></td><td>${esc(e.name)}</td><td>${esc(GN[e.grp] || '')}</td><td>${esc((KINDS[e.kind] || KINDS.kita).label)}</td></tr>`).join('')}</table>` : ''}` : ''}`;
@@ -214,6 +234,33 @@ export async function drawOffice(root, S, id, hooks = {}) {
       S.hp = { ...r, survey: S.hp.survey, office: S.hp.office };
       busy = false; drawSchema(`Rasta elementų: ${res.elements.length}`);
     } catch (err) { busy = false; drawSchema(''); toast('Nepavyko nuskaityti schemos: ' + (err.message || err), 'error', 8000); }
+  }
+
+  async function drawSvg() {
+    const photos = S.photos.filter(p => !p.item_id && p.slot === 'schema');
+    if (!photos.length || busy) return;
+    const instr = ($('#of-svg-instr', root) || {}).value || '';
+    S.svgInstr = instr;
+    busy = true; drawSchema('Braižoma (gali užtrukti iki minutės)…');
+    try {
+      const s = S.hp.survey || {};
+      const known = S.items.filter(i => !i.absent).map(i => ({ tag: i.tag || '', name: itemLabel(i) }));
+      const res = await db.hpSchemaAi({ mode: 'draw', address: S.hp.address, sp_type: `šildymas – ${s.sildymas || '?'}, karštas vanduo – ${s.kv || '?'}`, items: known, instruction: instr, photos: await Promise.all(photos.map(db.hpPhotoForAI)) });
+      if (!res.svg) throw new Error(res.comment || 'DI nepavyko nubraižyti schemos (perfotografuokite)');
+      if (res.truncated) toast('Schema galėjo nutrūkti per ilga – patikrinkite', 'error', 6000);
+      S.hp.office = { ...S.hp.office, schema_svg: res.svg, schema_svg_comment: res.comment || '', schema_svg_ok: false, schema_svg_usage: res.usage || null };
+      const r = await db.updateHeatPoint(id, { office: S.hp.office });
+      S.hp = { ...r, survey: S.hp.survey, office: S.hp.office };
+      busy = false; drawSchema('Schema nubraižyta – patikrinkite su nuotrauka'); drawOut();
+    } catch (err) { busy = false; drawSchema(''); toast('Nepavyko perbraižyti: ' + (err.message || err), 'error', 9000); }
+  }
+
+  async function saveSvgFlag(patch) {
+    S.hp.office = { ...S.hp.office, ...patch };
+    for (const k of Object.keys(patch)) if (patch[k] === null) delete S.hp.office[k];
+    try { const r = await db.updateHeatPoint(id, { office: S.hp.office }); S.hp = { ...r, survey: S.hp.survey, office: S.hp.office }; }
+    catch (err) { toast('Nepavyko išsaugoti: ' + (err.message || err), 'error', 6000); }
+    drawSchema(); drawOut();
   }
 
   /** Žymenys perkeliami į įrenginius pagal rūšį ir kontūrą (tik tuščius). Armatūros ir manometrų žymenys sujungiami. */
@@ -293,7 +340,14 @@ export async function drawOffice(root, S, id, hooks = {}) {
     const ai = e.target.closest('[data-ai]');
     if (ai) return runAi(ai.dataset.ai === 'all');
     const sc = e.target.closest('[data-sch]');
-    if (sc) return sc.dataset.sch === 'read' ? readSchema() : applyTags();
+    if (sc) {
+      const a = sc.dataset.sch;
+      if (a === 'read') return readSchema();
+      if (a === 'apply') return applyTags();
+      if (a === 'draw') return drawSvg();
+      if (a === 'clear') return saveSvgFlag({ schema_svg: null, schema_svg_comment: null, schema_svg_ok: null, schema_svg_usage: null });
+      if (a === 'ok') return saveSvgFlag({ schema_svg_ok: sc.checked });
+    }
     const dl = e.target.closest('[data-dl]');
     if (dl) {
       dl.disabled = true;
