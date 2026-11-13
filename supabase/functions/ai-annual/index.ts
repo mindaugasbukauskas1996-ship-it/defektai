@@ -136,6 +136,49 @@ function buildRequest(payload: any, model: string) {
   return { model, max_tokens: 6000, system: SYSTEM, tools: [TOOL], tool_choice: { type: 'auto' }, messages: [{ role: 'user', content }] };
 }
 
+// OpenAI (ChatGPT): ta pati užklausa išversta į Responses API, atsakymas grąžinamas Claude formatu
+function oaiContent(content: any): any[] {
+  if (typeof content === 'string') return [{ type: 'input_text', text: content }];
+  const out: any[] = [];
+  for (const b of content || []) {
+    if (b.type === 'text') out.push({ type: 'input_text', text: b.text });
+    else if (b.type === 'image') {
+      const s = b.source || {};
+      out.push({ type: 'input_image', image_url: s.type === 'base64' ? `data:${s.media_type};base64,${s.data}` : s.url });
+    }
+  }
+  return out;
+}
+
+async function callOpenAI(apiKey: string, body: any, model: string) {
+  const req = {
+    model,
+    instructions: typeof body.system === 'string' ? body.system : '',
+    input: (body.messages || []).map((m: any) => ({ role: m.role, content: oaiContent(m.content) })),
+    tools: (body.tools || []).map((t: any) => ({ type: 'function', name: t.name, description: t.description || '', parameters: t.input_schema, strict: false })),
+    tool_choice: 'required',
+    max_output_tokens: Math.max(16000, (body.max_tokens || 4000) * 2)
+  };
+  const res = await fetch('https://api.openai.com/v1/responses', {
+    method: 'POST', headers: { 'content-type': 'application/json', authorization: `Bearer ${apiKey}` }, body: JSON.stringify(req)
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(`OpenAI API klaida (${res.status}): ${(data && data.error && data.error.message) || res.statusText}`);
+  if (data.status === 'incomplete') throw new Error('OpenAI atsakymas nutrūko (per ilgas). Bandykite dar kartą arba pasirinkite Claude.');
+  const content: any[] = [];
+  for (const it of data.output || []) {
+    if (it.type === 'function_call') {
+      let input: any = {};
+      try { input = JSON.parse(it.arguments || '{}'); } catch (_) { throw new Error('OpenAI grąžino sugadintą atsakymą. Bandykite dar kartą.'); }
+      content.push({ type: 'tool_use', name: it.name, input });
+    } else if (it.type === 'message') {
+      for (const c of it.content || []) if (c.type === 'output_text') content.push({ type: 'text', text: c.text });
+    }
+  }
+  const u = data.usage || {};
+  return { content, usage: { input_tokens: u.input_tokens || 0, output_tokens: u.output_tokens || 0, provider: 'openai', model } };
+}
+
 function extract(resp: any) {
   const blocks = (resp && resp.content) || [];
   const tool = blocks.find((b: any) => b.type === 'tool_use' && b.name === TOOL.name);
@@ -156,6 +199,15 @@ Deno.serve(async (req: Request) => {
   try {
     const { payload } = await req.json();
     const body = buildRequest(payload || {}, Deno.env.get('ANTHROPIC_MODEL') || MODEL_DEFAULT);
+    if (payload && payload.provider === 'openai') {          // pasirinktas ChatGPT
+      const key = Deno.env.get('OPENAI_API_KEY');
+      if (!key) return json({ error: 'Serveryje nenustatytas OPENAI_API_KEY – pasirinkite Claude arba pridėkite raktą.' }, 500);
+      const model = Deno.env.get('OPENAI_MODEL') || 'gpt-5.6-sol';
+      const oai = await callOpenAI(key, body, model);
+      const out = extract(oai);
+      out.usage = oai.usage || null;
+      return json(out);
+    }
     const res = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
       headers: { 'content-type': 'application/json', 'x-api-key': apiKey, 'anthropic-version': '2023-06-01' },

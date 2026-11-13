@@ -744,10 +744,20 @@ export async function deleteLesson(id) {
 // DI
 // ---------------------------------------------------------------------
 
+/** Kuriuo DI formuojami aktai: 'anthropic' (Claude) arba 'openai' (ChatGPT). Saugoma vartotojo nustatymuose. */
+export async function getAiProvider() {
+  try { return (await getSettings()).ai_provider === 'openai' ? 'openai' : 'anthropic'; } catch (_) { return 'anthropic'; }
+}
+export async function setAiProvider(p) {
+  const s = await getSettings(true);
+  await saveSettings({ ...s, ai_provider: p === 'openai' ? 'openai' : 'anthropic' });
+}
+
 /** Metinės apžiūros akto tekstai (atskira Edge funkcija „ai-annual“). */
 export async function aiAnnual(payload) {
   if (isDemo) throw new Error('Metinės apžiūros DI veikia tik prisijungus prie Supabase.');
-  const { data, error } = await sb.functions.invoke('ai-annual', { body: { payload } });
+  const provider = await getAiProvider();
+  const { data, error } = await sb.functions.invoke('ai-annual', { body: { payload: { ...payload, provider } } });
   if (error) {
     let msg = error.message;
     try { const body = await error.context.json(); if (body && body.error) msg = body.error; } catch (_) { /* ignore */ }
@@ -782,7 +792,8 @@ export async function ai(action, payload) {
     return runAction(s.demo_api_key, s.demo_model || DEFAULT_MODEL, action, payload,
       { 'anthropic-dangerous-direct-browser-access': 'true' });
   }
-  const { data, error } = await sb.functions.invoke('ai', { body: { action, payload } });
+  const provider = await getAiProvider();
+  const { data, error } = await sb.functions.invoke('ai', { body: { action, payload: { ...payload, provider } } });
   if (error) {
     let msg = error.message;
     try {

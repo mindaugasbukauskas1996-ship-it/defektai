@@ -7,6 +7,7 @@ import * as db from './data.js';
 import { bindDictation } from './dictate.js';
 import { icon } from './icons.js';
 import { openAnnotator } from './annotator.js';
+import { aiPickHtml, bindAiPick } from './ai-pick.js';
 import { $, $$, esc, toast, today, fmtDate, debounce, processImage, confirmDialog } from './util.js';
 
 const OK_TEXT = 'Apžiūros metu defektų nenustatyta.';
@@ -400,7 +401,7 @@ export function drawAnnualActTab(body, ctx) {
       </div>
       <div class="gen-info muted small">DI gaus: ${used.length} elementų (${nDef} su defektais), jūsų pastabas, nuotraukas ir praėjusių metų tekstus, pastato kontekstą.
         ${nDef ? '' : '<b>Defektų nepažymėta – aktas bus sudarytas iš standartinių tekstų.</b>'}</div>
-      <div class="gen-actions"><button class="btn primary big" id="an-gen">${icon('spark')} ${t.status === 'aktas' ? 'Generuoti iš naujo' : 'Generuoti su DI'}</button></div>
+      <div class="gen-actions">${aiPickHtml()}<button class="btn primary big" id="an-gen">${icon('spark')} ${t.status === 'aktas' ? 'Generuoti iš naujo' : 'Generuoti su DI'}</button></div>
     </div>
 
     <div class="card act-ed">
@@ -451,6 +452,7 @@ export function drawAnnualActTab(body, ctx) {
     if (d) { await persist.flush(); downloadDocx(d.dataset.docx, d); }
   };
 
+  bindAiPick(body);
   $('#an-gen').addEventListener('click', () => generate(ctx));
 }
 

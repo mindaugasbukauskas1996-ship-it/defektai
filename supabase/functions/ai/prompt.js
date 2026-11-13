@@ -511,7 +511,8 @@ export function extractToolInput(response, toolName) {
 }
 
 /** Iškviečia Claude API. extraHeaders – pvz. naršyklės demo režimui. */
-export async function callAnthropic(apiKey, body, extraHeaders = {}) {
+export async function callAnthropic(apiKey, body, extraHeaders = {}) { return callAnthropicApi(apiKey, body, extraHeaders); }
+async function callAnthropicApi(apiKey, body, extraHeaders = {}) {
   const res = await fetch(ANTHROPIC_URL, {
     method: 'POST',
     headers: {
@@ -530,8 +531,73 @@ export async function callAnthropic(apiKey, body, extraHeaders = {}) {
   return data;
 }
 
-/** Vienas įėjimo taškas: action = 'generate_act' | 'generate_nc' | 'parse_task'. */
-export async function runAction(apiKey, model, action, payload, extraHeaders = {}) {
+// ---------------------------------------------------------------------
+// OpenAI (ChatGPT) – ta pati užklausa, išversta į Responses API; atsakymas grąžinamas Claude formatu
+// ---------------------------------------------------------------------
+
+export const OPENAI_URL = 'https://api.openai.com/v1/responses';
+export const OPENAI_DEFAULT_MODEL = 'gpt-5.6-sol';
+
+function oaiContent(content) {
+  if (typeof content === 'string') return [{ type: 'input_text', text: content }];
+  const out = [];
+  for (const b of content || []) {
+    if (b.type === 'text') out.push({ type: 'input_text', text: b.text });
+    else if (b.type === 'image') {
+      const s = b.source || {};
+      out.push({ type: 'input_image', image_url: s.type === 'base64' ? `data:${s.media_type};base64,${s.data}` : s.url });
+    } else if (b.type === 'document') {
+      const s = b.source || {};
+      out.push(s.type === 'base64'
+        ? { type: 'input_file', filename: 'dokumentas.pdf', file_data: `data:${s.media_type || 'application/pdf'};base64,${s.data}` }
+        : { type: 'input_file', file_url: s.url });
+    }
+  }
+  return out;
+}
+
+export function toOpenAIRequest(body, model) {
+  const sys = Array.isArray(body.system) ? body.system.map(x => x.text || '').join('\n') : (body.system || '');
+  return {
+    model,
+    instructions: sys,
+    input: (body.messages || []).map(m => ({ role: m.role, content: oaiContent(m.content) })),
+    tools: (body.tools || []).map(t => ({ type: 'function', name: t.name, description: t.description || '', parameters: t.input_schema, strict: false })),
+    tool_choice: (body.tools || []).length ? 'required' : 'auto',
+    max_output_tokens: Math.max(16000, (body.max_tokens || 4000) * 2)      // dalį sunaudoja „mąstymas“
+  };
+}
+
+/** Iškviečia OpenAI ir grąžina atsakymą Claude formatu ({content: [{type:'tool_use', name, input}], usage}). */
+export async function callOpenAI(apiKey, body, model) {
+  const res = await fetch(OPENAI_URL, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json', authorization: `Bearer ${apiKey}` },
+    body: JSON.stringify(toOpenAIRequest(body, model))
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(`OpenAI API klaida (${res.status}): ${(data && data.error && data.error.message) || res.statusText}`);
+  if (data.status === 'incomplete') throw new Error('OpenAI atsakymas nutrūko (per ilgas). Bandykite dar kartą arba pasirinkite Claude.');
+  const content = [];
+  for (const it of data.output || []) {
+    if (it.type === 'function_call') {
+      let input = {};
+      try { input = JSON.parse(it.arguments || '{}'); } catch (_) { throw new Error('OpenAI grąžino sugadintą atsakymą. Bandykite dar kartą.'); }
+      content.push({ type: 'tool_use', name: it.name, input });
+    } else if (it.type === 'message') {
+      for (const c of it.content || []) if (c.type === 'output_text') content.push({ type: 'text', text: c.text });
+    }
+  }
+  const u = data.usage || {};
+  return { content, usage: { input_tokens: u.input_tokens || 0, output_tokens: u.output_tokens || 0, provider: 'openai', model } };
+}
+
+/** Vienas įėjimo taškas: action = 'generate_act' | 'generate_nc' | 'parse_task'.
+ *  ai = { provider: 'openai', key, model } – jei nurodyta, kviečiamas OpenAI vietoj Claude. */
+export async function runAction(apiKey, model, action, payload, extraHeaders = {}, ai = {}) {
+  const callAnthropic = ai.provider === 'openai' && ai.key
+    ? (_k, body) => callOpenAI(ai.key, body, ai.model || OPENAI_DEFAULT_MODEL)
+    : callAnthropicApi;
   if (action === 'parse_task') {
     const body = buildParseRequest(payload.text || '', payload.service_types || [], model);
     const resp = await callAnthropic(apiKey, body, extraHeaders);

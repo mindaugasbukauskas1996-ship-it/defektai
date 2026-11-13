@@ -405,6 +405,8 @@ textarea.notes { font-size: 16px; min-height: 260px; }
 .seg input { display: none; }
 .an-tools { display: flex; gap: 8px; flex-wrap: wrap; margin: 8px 0; }
 .an-tools .rec, .btn.rec { background: #fef3f2; border-color: #f04438; }
+.ai-pick { display: inline-flex; align-items: center; gap: 8px; font-size: 14px; margin-right: 8px; }
+.ai-pick select { padding: 8px 10px; border-radius: 8px; border: 1px solid var(--line, #d0d5dd); font: inherit; background: #fff; }
 .an-thumbs { display: flex; gap: 8px; flex-wrap: wrap; margin: 6px 0; }
 .an-th { position: relative; display: inline-block; }
 .an-th img { width: 84px; height: 84px; object-fit: cover; border-radius: 8px; border: 1px solid var(--line, #d0d5dd); display: block; background: #f2f4f7; }

@@ -9,7 +9,7 @@
 // Vartotojas tikrinamas pačiame kode (veikia ir su naujais „publishable“,
 // ir su senais „anon“ raktais), todėl platformos JWT tikrinimas išjungtas.
 
-import { runAction, DEFAULT_MODEL } from './prompt.js';
+import { runAction, DEFAULT_MODEL, OPENAI_DEFAULT_MODEL } from './prompt.js';
 
 const CORS = {
   'Access-Control-Allow-Origin': '*',
@@ -69,7 +69,15 @@ Deno.serve(async (req: Request) => {
 
   try {
     const { action, payload } = await req.json();
-    const result = await runAction(apiKey, model, action, payload || {});
+    const p = payload || {};
+    let ai: any = {};
+    if (p.provider === 'openai') {
+      const key = Deno.env.get('OPENAI_API_KEY');
+      if (!key) return json({ error: 'Serveryje nenustatytas OPENAI_API_KEY – pasirinkite Claude arba pridėkite raktą.' }, 500);
+      ai = { provider: 'openai', key, model: Deno.env.get('OPENAI_MODEL') || OPENAI_DEFAULT_MODEL };
+    }
+    delete p.provider;
+    const result = await runAction(apiKey, model, action, p, {}, ai);
     return json(result);
   } catch (e) {
     return json({ error: (e as Error).message || String(e) }, 500);

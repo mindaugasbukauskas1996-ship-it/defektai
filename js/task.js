@@ -10,6 +10,7 @@ import {
   fmtQty, parseQty, buildingSummary
 } from './util.js';
 import { openAnnotator } from './annotator.js';
+import { aiPickHtml, bindAiPick } from './ai-pick.js';
 import { bindDictation } from './dictate.js';
 import { drawAnnualInspection, drawAnnualActTab } from './annual.js';
 
@@ -543,6 +544,7 @@ function drawActs(body) {
         ${!t.field_notes ? `<a href="#/u/${t.id}/apziura">Aprašyti situaciją</a>` : ''}
       </div>
       <div class="gen-actions">
+        ${aiPickHtml()}
         <button class="btn primary big" id="gen" ${hasInput || nPhotos ? '' : 'disabled'}>${icon('spark')} ${t.defect_act ? 'Generuoti iš naujo' : 'Generuoti su DI'}</button>
         ${!t.defect_act ? `<button class="btn ghost" id="manual">Pildyti rankiniu būdu</button>` : ''}
       </div>
@@ -558,6 +560,7 @@ function drawActs(body) {
       </details>` : ''}`;
 
   bindDocs(body, () => drawActs(body));
+  bindAiPick(body);
 
   // Išsamumas
   $$('input[name=detail]', body).forEach(r => r.addEventListener('change', async e => {
@@ -952,6 +955,7 @@ function drawNcActs(body) {
         ${!t.field_notes ? `<a href="#/u/${t.id}/apziura">Aprašyti neatitiktį</a>` : ''}
       </div>
       <div class="gen-actions">
+        ${aiPickHtml()}
         <button class="btn primary big" id="gen-nc" ${hasInput || nPhotos ? '' : 'disabled'}>${icon('spark')} ${a ? 'Generuoti iš naujo' : 'Generuoti su DI'}</button>
         ${!a ? `<button class="btn ghost" id="manual-nc">Pildyti rankiniu būdu</button>` : ''}
       </div>
@@ -959,6 +963,7 @@ function drawNcActs(body) {
     ${a ? drawNcEditor() : ''}`;
 
   bindDocs(body, () => drawNcActs(body));
+  bindAiPick(body);
   $('#gen-nc').addEventListener('click', () => generateNc(body, {}));
   const man = $('#manual-nc');
   if (man) man.addEventListener('click', async () => {
