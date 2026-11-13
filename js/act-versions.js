@@ -33,12 +33,12 @@ function add(list, kind, snap, provider, note = '') {
  * Prieš perrašant aktą: jei dabartinis aktas dar neišsaugotas kaip versija (pvz. redaguotas ranka), jį išsaugo.
  * Grąžina naują sąrašą (nesaugo į DB).
  */
-export function keepCurrent(t, kind, before = snapOf(t, kind)) {
+export function keepCurrent(t, kind, before = snapOf(t, kind), note = 'Prieš naują generavimą') {
   let list = Array.isArray(t.act_versions) ? t.act_versions : [];
   if (!hasAct(before, kind)) return list;
   const last = versionsOf(t, kind).slice(-1)[0];
   if (last && same(last.snap, before)) return list;
-  return add(list, kind, before, 'manual', 'Prieš naują generavimą');
+  return add(list, kind, before, 'manual', note);
 }
 
 /** Naujai sugeneruotą aktą prideda prie sąrašo. */
@@ -51,8 +51,14 @@ const fmt = iso => { try { return new Date(iso).toLocaleString('lt-LT', { month:
 /** Versijų kortelė (HTML). Jei versijų nėra – tuščia. */
 export function versionsHtml(t, kind) {
   const list = versionsOf(t, kind);
-  if (!list.length) return '';
   const cur = snapOf(t, kind);
+  if (!list.length) {
+    if (!hasAct(cur, kind)) return '';
+    return `<div class="card act-vers" data-vers="${kind}">
+      <div class="card-title">Akto versijos</div>
+      <div class="muted small">Versijų dar nėra – jos kaupiasi nuo šiol, kai generuojate aktą su DI. Galite išsaugoti ir dabartinį aktą, kad jis neišnyktų, kai generuosite su kitu modeliu.</div>
+      <div class="of-actions"><button class="btn" type="button" data-ver="snap">Išsaugoti dabartinį aktą kaip versiją</button></div></div>`;
+  }
   return `<div class="card act-vers" data-vers="${kind}">
     <div class="card-title">Akto versijos (${list.length})</div>
     <div class="muted small">Kiekvienas sugeneruotas variantas išsaugomas. Galite grįžti prie bet kurio – dabartinis, jei jį redagavote, taip pat nedingsta.</div>
@@ -71,6 +77,11 @@ export function bindVersions(root, t, kind, { save, redraw }) {
   card.addEventListener('click', async e => {
     const b = e.target.closest('[data-ver]');
     if (!b) return;
+    if (b.dataset.ver === 'snap') {
+      try { await save({ act_versions: keepCurrent(t, kind, snapOf(t, kind), 'Išsaugota ranka') }); toast('Dabartinis aktas išsaugotas kaip versija', 'ok'); }
+      catch (err) { toast('Nepavyko: ' + (err.message || err), 'error', 6000); }
+      return redraw();
+    }
     const v = (t.act_versions || []).find(x => x.id === b.dataset.id);
     if (!v) return;
     try {
