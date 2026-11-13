@@ -45,9 +45,9 @@ export const ANNUAL_TEMPLATE = [
 export const DEFAULT_CONCLUSIONS = [
   'Atlikus pastato apžiūrą pagrindinėse laikančiose konstrukcijose deformacijų, pažeidimų, susilpnėjimų ar griūties pavojaus nėra. Esamos būklės statinio laikančios konstrukcijos atitinka esminius statinio reikalavimus ir yra patikimos toliau eksploatuoti.',
   'Pastato konstrukcijų (dalių) tyrinėjimui poreikio nėra.',
-  'Nuolatinių stebėjimų dažninti, nei numatyta STR 1.07.03:2017 88.1 punkte, nėra poreikio.',
+  'Nuolatinių stebėjimų dažninti nėra poreikio.',
   'Visi kiekiai, darbų apimtys tikslinami darbų suderinamumo eigoje.',
-  'Vykdyti tolimesnius nuolatinius priežiūros darbus (STR 1.07.03:2017 88.1 p.).'
+  'Vykdyti tolimesnius nuolatinius priežiūros darbus.'
 ];
 
 const baseLetter = s => String(s || '').trim().charAt(0).normalize('NFD').replace(/[̀-ͯ]/g, '').toUpperCase();
@@ -82,10 +82,10 @@ export function newAnnualAct(s, object, prev) {
       address: [object.street, object.house].filter(Boolean).join(' ') + (object.city ? `, ${object.city}` : ''),
       unique_no: object.unique_no || g.unique_no || '', built_year: object.built_year || g.built_year || '',
       total_area: fmtNum(object.area || object.usable_area || ''),
-      purpose: g.purpose || 'gyvenamoji (6.3 punktas STR 1.01.03:2017)',
+      purpose: g.purpose || 'gyvenamoji',
       inspector: `inžinierius ${s.engineer_name || ''}${s.inspector_cert ? ` (kv. atestato Nr. ${s.inspector_cert})` : ''}`.trim(),
       category: 'periodinė (kasmetinė)',
-      basis: `${org} techninės priežiūros apimtyje (STR 1.07.03:2017 reikalavimais)`,
+      basis: `${org} techninės priežiūros apimtyje`,
       method: 'vizualus', date: today(), org
     },
     sections, conclusions: DEFAULT_CONCLUSIONS.slice(), assumptions: []
@@ -480,7 +480,7 @@ async function generate(ctx) {
       general: { address: a.general.address, built_year: a.general.built_year, date: a.general.date },
       building,
       items: used.filter(x => x.status === 'defects' && !x.keep).map(x => ({
-        id: x.id, no: x.no, name: x.name, status: x.status, str: x.str, brief: x.brief, prev: x.prev + (x.prevRec ? `\nRekomendacijos: ${x.prevRec}` : ''),
+        id: x.id, no: x.no, name: x.name, status: x.status, brief: x.brief, prev: x.prev + (x.prevRec ? `\nRekomendacijos: ${x.prevRec}` : ''),
         photos: photos.filter(p => p._id === x.id).map(p => p.n)
       })),
       photos: photos.map(({ _id, ...p }) => p)

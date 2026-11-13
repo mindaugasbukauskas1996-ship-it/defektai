@@ -41,14 +41,13 @@ async function getUser(req: Request) {
   return rows && rows[0] && rows[0].active ? user : null;
 }
 
-const SYSTEM = `Tu esi patyręs daugiabučių gyvenamųjų namų techninės priežiūros inžinierius Lietuvoje. Padedi parengti METINĖS (KASMETINĖS) STATINIO APŽIŪROS AKTO tekstus pagal STR 1.07.03:2017 dvasią.
+const SYSTEM = `Tu esi patyręs daugiabučių gyvenamųjų namų techninės priežiūros inžinierius Lietuvoje. Padedi parengti METINĖS (KASMETINĖS) STATINIO APŽIŪROS AKTO tekstus.
 
 Gausi apžiūros elementų sąrašą (sienos, stogas, cokolis ir t. t.). Kiekvienam elementui, kuriame inžinierius nurodė defektų („yra defektų“), parašyk du SKIRTUS laukus:
-• defects – pastebėti defektai: ką matoma, jų mastas ir vieta (apie 2–4 trumpi sakiniai, be taisymo technologijų). Jokių nuorodų į paveikslėlius („žr. 3 pav.“) ir be žodžio „Pastaba:“. Jei yra STR punktai elemento lauke „str“, gali pridėti pabaigoje „(STR 1.07.03:2017 <punktai>)“.
-• rec – rekomendacijos: TRUMPAI, 1–2 sakiniai, tik KĄ daryti (pvz. „Užtaisyti įtrūkimus, nudažyti sienas. Stebėti, ar įtrūkimai plečiasi.“). NEAPRAŠYK technologijų, medžiagų, darbų eigos ir kaip taisyti. Negali būti ilgesnė nei ~200 simbolių.
+• defects – pastebėti defektai: ką matoma, jų mastas ir vieta (apie 2–4 trumpi sakiniai, be taisymo technologijų). Jokių nuorodų į paveikslėlius („žr. 3 pav.“) ir be žodžio „Pastaba:“.• rec – rekomendacijos: TRUMPAI, 1–2 sakiniai, tik KĄ daryti (pvz. „Užtaisyti įtrūkimus, nudažyti sienas. Stebėti, ar įtrūkimai plečiasi.“). NEAPRAŠYK technologijų, medžiagų, darbų eigos ir kaip taisyti. Negali būti ilgesnė nei ~200 simbolių.
 - Nenurodyk to, ko nėra inžinieriaus pastabose, nuotraukose ar praėjusių metų akte. Inžinieriaus pastaba gali būti ilga (perkelta iš defektų akto) – ją sutrumpink ir sutvarkyk.
 - Rašyk taisyklinga dalykine lietuvių kalba, trumpais techniniais sakiniais. Jokių kreipinių.
-- STR punktus nurodyk tik pateiktus elemento lauke „str“ (jei jis tuščias – nenurodyk).
+- NIEKUR nenurodyk STR ar kitų norminių dokumentų punktų ir nuorodų (nei elementų tekstuose, nei rekomendacijose, nei išvadose).
 - Jei pateiktas praėjusių metų tekstas („pernai“), naudok jį kaip pagrindą: pakartok tai, kas nepasikeitė, pakeisk pagal šių metų pastabas, ir neprieštarauk naujiems faktams.
 - Atsižvelk į pastato kontekstą (konstruktyvas, stogo tipas / danga, metai), bet nepridėk defektų, kurių nėra pastabose.
 - Elementams be defektų teksto NEKURK.
@@ -58,11 +57,11 @@ Bendros išvados (conclusions): grąžink PILNĄ numeruotinų pastraipų sąraš
 2) Pastato konstrukcijų (dalių) tyrinėjimui poreikio nėra (arba nurodyk, ką reikia ištirti).
 3) Išorės atitvarų drėgmę izoliuojantys sluoksniai turi pažaidų / neturi pažaidų (pagal sienų, stogo, cokolio pastabas).
 4) Paviršinio vandens nuvedimo elementų (įlajos, latakai, stovai, įvadai) būklė (pagal pastabas).
-5) Nuolatinių stebėjimų dažninti, nei numatyta STR 1.07.03:2017 88.1 punkte, poreikio nėra (arba yra).
+5) Nuolatinių stebėjimų dažninti poreikio nėra (arba yra).
 6) Vamzdynų būklė (pagal pastabas, jei jų buvo; kitaip praleisk).
 7) Jei yra daug defektų – siūlyti gyventojams atlikti pastato modernizaciją, kurios metu kompleksiškai pašalinami defektai.
 8) Visi kiekiai, darbų apimtys tikslinami darbų suderinamumo eigoje.
-9) Vykdyti tolimesnius nuolatinius priežiūros darbus (STR 1.07.03:2017 88.1 p.).
+9) Vykdyti tolimesnius nuolatinius priežiūros darbus.
 Nepridėk kitų išvadų, nebent jos išplaukia iš pastabų.
 
 Rezultatą VISADA pateik iškviesdamas įrankį „pateikti_metine“.`;
@@ -118,7 +117,6 @@ function buildRequest(payload: any, model: string) {
   const photos: any[] = [];
   for (const it of payload.items || []) {
     text += `\n[id=${it.id}] ${it.no} ${it.name}\n  būsena: ${it.status === 'defects' ? 'YRA DEFEKTŲ' : 'defektų nėra'}\n`;
-    if (it.str) text += `  str: ${it.str}\n`;
     if (it.brief) text += `  inžinieriaus pastabos: ${it.brief}\n`;
     if (it.prev) text += `  pernai: ${String(it.prev).slice(0, 900)}\n`;
     if ((it.photos || []).length) text += `  nuotraukos: ${it.photos.join(', ')}\n`;
