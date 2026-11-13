@@ -6,6 +6,7 @@
 import * as db from './data.js';
 import { bindDictation } from './dictate.js';
 import { icon } from './icons.js';
+import { openAnnotator } from './annotator.js';
 import { $, $$, esc, toast, today, fmtDate, debounce, processImage, confirmDialog } from './util.js';
 
 const OK_TEXT = 'Apžiūros metu defektų nenustatyta.';
@@ -279,7 +280,7 @@ export function drawAnnualInspection(body, ctx) {
           <label class="btn small">${icon('camera')} Fotografuoti<input type="file" accept="image/*" capture="environment" hidden data-up></label>
           <label class="btn small">${icon('image')} Iš galerijos<input type="file" accept="image/*" multiple hidden data-up></label>
         </div>
-        ${photosOf(it.id).length ? `<div class="an-thumbs">${photosOf(it.id).map(p => `<span class="an-th"><img alt="" data-src="${p.id}"><button type="button" data-an="delph" data-pid="${p.id}" title="Ištrinti">×</button></span>`).join('')}</div>` : ''}
+        ${photosOf(it.id).length ? `<div class="an-thumbs">${photosOf(it.id).map(p => `<span class="an-th"><img alt="" data-src="${p.id}" data-an="annotate" data-pid="${p.id}" title="Pažymėti ant nuotraukos" style="cursor:pointer">${p.annotated_path ? `<span class="ph-ann" title="Yra žymėjimų">${icon('pen')}</span>` : ''}<button type="button" data-an="annotate" data-pid="${p.id}" class="an-pen" title="Pažymėti ant nuotraukos">${icon('pen')}</button><button type="button" data-an="delph" data-pid="${p.id}" title="Ištrinti">×</button></span>`).join('')}</div>` : ''}
         ${it.prev ? `<details class="an-prev"><summary>Praėjusių metų tekstas</summary><div class="muted small pre">${esc(it.prev)}${it.prevRec ? esc("\nRekomendacijos: " + it.prevRec) : ""}</div>
           <button class="btn small" type="button" data-an="useprev">Naudoti kaip pernai</button></details>` : ''}` : ''}
       ${it.keep ? '<div class="muted small">✓ Bus naudojamas praėjusių metų tekstas (DI jo nekeis).</div>' : ''}
@@ -348,6 +349,18 @@ export function drawAnnualInspection(body, ctx) {
     if (act === 'useprev') {
       const it = find(b); it.text = it.prev; it.rec = it.prevRec || ''; it.keep = true; it.status = isOk(it.prev) ? 'ok' : 'defects';
       await save({ annual_act: a }); return draw();
+    }
+    if (act === 'annotate') {
+      const p = S.photos.find(x => x.id === b.dataset.pid);
+      if (!p) return;
+      const blob = await db.photoBlob(p);
+      if (!blob) return toast('Nepavyko atidaryti nuotraukos', 'error');
+      const res = await openAnnotator({ blob, shapes: p.annotations || [], title: p.caption || 'Nuotraukos žymėjimas' });
+      if (!res) return;
+      toast('Saugoma...', 'info', 1500);
+      Object.assign(p, await db.saveAnnotated(p, res.shapes.length ? res.blob : null, res.shapes));
+      toast('Žymėjimai išsaugoti', 'ok');
+      return draw();
     }
     if (act === 'delph') {
       if (!await confirmDialog('Ištrinti nuotrauką?', 'Ištrinti')) return;
