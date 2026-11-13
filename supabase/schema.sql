@@ -88,6 +88,9 @@ create table if not exists public.tasks (
   act_generated_at   timestamptz
 );
 
+-- Pastato unikalus Nr. (iš ŠP aprašų projekto; naudojamas metinės apžiūros akte)
+alter table public.objects add column if not exists unique_no text;
+
 -- Akto versijos (kiekvienas DI sugeneruotas variantas: Claude / ChatGPT); žr. js/act-versions.js
 alter table public.tasks add column if not exists act_versions jsonb not null default '[]'::jsonb;
 

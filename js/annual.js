@@ -80,7 +80,7 @@ export function newAnnualAct(s, object, prev) {
   return {
     general: {
       address: [object.street, object.house].filter(Boolean).join(' ') + (object.city ? `, ${object.city}` : ''),
-      unique_no: g.unique_no || '', built_year: object.built_year || g.built_year || '',
+      unique_no: object.unique_no || g.unique_no || '', built_year: object.built_year || g.built_year || '',
       total_area: fmtNum(object.area || object.usable_area || ''),
       purpose: g.purpose || 'gyvenamoji (6.3 punktas STR 1.01.03:2017)',
       inspector: `inžinierius ${s.engineer_name || ''}${s.inspector_cert ? ` (kv. atestato Nr. ${s.inspector_cert})` : ''}`.trim(),
