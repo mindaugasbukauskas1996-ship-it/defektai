@@ -297,8 +297,8 @@ textarea.notes { font-size: 16px; min-height: 260px; }
 .an-btn .ic { width: 18px; height: 18px; }
 .an-color { width: 30px; height: 30px; border-radius: 50%; border: 2px solid #334256; cursor: pointer; }
 .an-color.on { outline: 3px solid #fff; outline-offset: 1px; }
-.an-stage { flex: 1; position: relative; display: grid; place-items: center; overflow: hidden; }
-.an-stage canvas { touch-action: none; box-shadow: 0 0 0 1px #334256, 0 10px 40px rgba(0,0,0,.5); background: #000; }
+.an-stage { flex: 1; position: relative; display: flex; overflow: auto; overscroll-behavior: contain; }
+.an-stage canvas { margin: auto; flex: none; touch-action: none; box-shadow: 0 0 0 1px #334256, 0 10px 40px rgba(0,0,0,.5); background: #000; }
 .an-text { position: absolute; width: 260px; z-index: 2; border: 2px solid #3b82f6; }
 @media (min-width: 1500px) { .an-btn span { display: inline; } .an-btn { padding: 0 10px; } }
 .annot .btn.ghost { color: #dbe5f1; }

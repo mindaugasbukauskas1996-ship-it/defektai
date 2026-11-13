@@ -14,8 +14,10 @@ const TOOLS = [
   { id: 'pen', label: 'Laisva linija', svg: '<path d="M3 17c3-6 6 2 9-4s5-6 9-2"/>' },
   { id: 'num', label: 'Numeris', svg: '<circle cx="12" cy="12" r="9"/><path d="M11 8l2-1v10"/>' },
   { id: 'text', label: 'Tekstas', svg: '<path d="M5 6h14M12 6v13"/>' },
-  { id: 'erase', label: 'Trinti žymę', svg: '<path d="M20 20H8l-5-5 10-10 8 8-6 6"/>' }
+  { id: 'erase', label: 'Trinti žymę', svg: '<path d="M20 20H8l-5-5 10-10 8 8-6 6"/>' },
+  { id: 'pan', label: 'Stumdyti', svg: '<path d="M8 12V5a1.5 1.5 0 0 1 3 0v6m0-1V4a1.5 1.5 0 0 1 3 0v7m0-5a1.5 1.5 0 0 1 3 0v8a6 6 0 0 1-6 6h-1a6 6 0 0 1-5-3l-2-3a1.5 1.5 0 0 1 2.5-1.5L8 14"/>' }
 ];
+const ZOOM_MAX = 8;
 const COLORS = ['#e53935', '#ffd600', '#00e5ff', '#76ff03', '#ffffff', '#111111'];
 const WIDTHS = [{ id: 1, label: 'S' }, { id: 2, label: 'M' }, { id: 3, label: 'L' }];
 
@@ -24,9 +26,13 @@ export function openAnnotator({ blob, shapes = [], title = '' }) {
     const img = await loadImage(blob);
     const W = img.naturalWidth, H = img.naturalHeight;
     const u = Math.max(W, H) / 1000;
+    const all = JSON.parse(JSON.stringify(shapes || []));
     const st = {
       tool: 'rect', color: COLORS[0], wl: 2,
-      shapes: JSON.parse(JSON.stringify(shapes || [])),
+      shapes: all.filter(s => s.t !== 'crop'),       // „crop“ – išsaugota pritraukta sritis, ne žymė
+      crop: all.find(s => s.t === 'crop') || null,
+      cropOn: !!all.find(s => s.t === 'crop'),
+      z: 1,
       undo: [], redo: [], cur: null
     };
 
@@ -43,6 +49,12 @@ export function openAnnotator({ blob, shapes = [], title = '' }) {
         </div>
         <div class="an-group">
           ${WIDTHS.map(w => `<button class="an-btn w" data-w="${w.id}" title="Storis">${w.label}</button>`).join('')}
+        </div>
+        <div class="an-group">
+          <button class="an-btn" data-cmd="zout" title="Nutolinti">−</button>
+          <button class="an-btn" data-cmd="zin" title="Pritraukti">+</button>
+          <button class="an-btn" data-cmd="zfit" title="Visa nuotrauka">1:1</button>
+          <button class="an-btn" data-cmd="crop" title="Išsaugoti tik matomą (pritrauktą) sritį"><span style="display:inline">Kirpti</span></button>
         </div>
         <div class="an-group">
           <button class="an-btn" data-cmd="undo" title="Atšaukti (Ctrl+Z)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 14L4 9l5-5"/><path d="M4 9h11a5 5 0 0 1 0 10h-3"/></svg></button>
@@ -70,11 +82,42 @@ export function openAnnotator({ blob, shapes = [], title = '' }) {
     function fit() {
       const r = stage.getBoundingClientRect();
       const k = Math.min((r.width - 16) / W, (r.height - 16) / H);
-      canvas.style.width = Math.max(50, W * k) + 'px';
-      canvas.style.height = Math.max(50, H * k) + 'px';
+      canvas.style.width = Math.max(50, W * k * st.z) + 'px';
+      canvas.style.height = Math.max(50, H * k * st.z) + 'px';
     }
     fit();
     window.addEventListener('resize', fit);
+
+    /** Keičia mastelį (1 = visa nuotrauka) išlaikant tašką (cx, cy) po žymekliu. */
+    function zoomAt(z, cx, cy) {
+      z = Math.min(ZOOM_MAX, Math.max(1, z));
+      const r = canvas.getBoundingClientRect(), s = stage.getBoundingClientRect();
+      cx = cx ?? (s.left + s.width / 2); cy = cy ?? (s.top + s.height / 2);
+      const fx = (cx - r.left) / r.width, fy = (cy - r.top) / r.height;
+      st.z = z; fit();
+      const r2 = canvas.getBoundingClientRect();
+      stage.scrollLeft += (r2.left + fx * r2.width) - cx;
+      stage.scrollTop += (r2.top + fy * r2.height) - cy;
+      syncBar();
+    }
+    /** Pritraukia prie nuotraukos srities (pikseliais). */
+    function viewTo(c) {
+      const s = stage.getBoundingClientRect();
+      const k = Math.min((s.width - 16) / W, (s.height - 16) / H);
+      st.z = Math.min(ZOOM_MAX, Math.max(1, Math.min((s.width - 16) / (c.w * k), (s.height - 16) / (c.h * k))));
+      fit();
+      const r = canvas.getBoundingClientRect();
+      stage.scrollLeft += (r.left + (c.x + c.w / 2) / W * r.width) - (s.left + s.width / 2);
+      stage.scrollTop += (r.top + (c.y + c.h / 2) / H * r.height) - (s.top + s.height / 2);
+    }
+    /** Matoma nuotraukos sritis pikseliais. */
+    function visible() {
+      const r = canvas.getBoundingClientRect(), s = stage.getBoundingClientRect();
+      const l = Math.max(r.left, s.left), t = Math.max(r.top, s.top), rr = Math.min(r.right, s.right), b = Math.min(r.bottom, s.bottom);
+      return { x: Math.round((l - r.left) * W / r.width), y: Math.round((t - r.top) * H / r.height), w: Math.round((rr - l) * W / r.width), h: Math.round((b - t) * H / r.height) };
+    }
+    stage.addEventListener('wheel', e => { e.preventDefault(); zoomAt(st.z * (e.deltaY < 0 ? 1.2 : 1 / 1.2), e.clientX, e.clientY); }, { passive: false });
+    if (st.crop) setTimeout(() => viewTo(st.crop), 0);
 
     function syncBar() {
       root.querySelectorAll('[data-tool]').forEach(b => b.classList.toggle('on', b.dataset.tool === st.tool));
@@ -82,7 +125,10 @@ export function openAnnotator({ blob, shapes = [], title = '' }) {
       root.querySelectorAll('[data-w]').forEach(b => b.classList.toggle('on', +b.dataset.w === st.wl));
       root.querySelector('[data-cmd=undo]').disabled = !st.undo.length;
       root.querySelector('[data-cmd=redo]').disabled = !st.redo.length;
-      canvas.style.cursor = st.tool === 'erase' ? 'not-allowed' : st.tool === 'text' ? 'text' : 'crosshair';
+      root.querySelector('[data-cmd=crop]').classList.toggle('on', st.cropOn);
+      root.querySelector('[data-cmd=zout]').disabled = st.z <= 1.001;
+      root.querySelector('[data-cmd=zin]').disabled = st.z >= ZOOM_MAX - 0.001;
+      canvas.style.cursor = st.tool === 'erase' ? 'not-allowed' : st.tool === 'text' ? 'text' : st.tool === 'pan' ? 'grab' : 'crosshair';
     }
 
     const lw = () => [0, 3, 5, 9][st.wl] * u;
@@ -108,9 +154,19 @@ export function openAnnotator({ blob, shapes = [], title = '' }) {
     }
 
     // ---- Pieštukas / figūros ----
+    const ptrs = new Map();          // aktyvūs lietimai (pirštų suspaudimui)
+    let pinch = null, pan = null;
+    const mid = () => { const p = [...ptrs.values()]; return { x: (p[0].x + p[1].x) / 2, y: (p[0].y + p[1].y) / 2, d: Math.hypot(p[0].x - p[1].x, p[0].y - p[1].y) }; };
     canvas.addEventListener('pointerdown', e => {
+      ptrs.set(e.pointerId, { x: e.clientX, y: e.clientY });
+      if (ptrs.size === 2) {                         // du pirštai: mastelis ir stumdymas, piešimas nutraukiamas
+        st.cur = null; render();
+        const m = mid(); pinch = { d0: m.d, z0: st.z, x: m.x, y: m.y }; e.preventDefault(); return;
+      }
+      if (ptrs.size > 2) return;
       if (!textInp.hidden) commitText();
       e.preventDefault();
+      if (st.tool === 'pan') { canvas.setPointerCapture(e.pointerId); pan = { x: e.clientX, y: e.clientY }; return; }
       const [x, y] = pos(e);
       if (st.tool === 'erase') {
         const i = hitTest(st.shapes, x, y, u);
@@ -127,13 +183,23 @@ export function openAnnotator({ blob, shapes = [], title = '' }) {
       st.cur = { t: st.tool, c: st.color, w: lw(), x1: x, y1: y, x2: x, y2: y, pts: st.tool === 'pen' ? [[x, y]] : undefined };
     });
     canvas.addEventListener('pointermove', e => {
+      if (ptrs.has(e.pointerId)) ptrs.set(e.pointerId, { x: e.clientX, y: e.clientY });
+      if (pinch && ptrs.size >= 2) {
+        const m = mid();
+        zoomAt(pinch.z0 * m.d / pinch.d0, m.x, m.y);
+        stage.scrollLeft -= m.x - pinch.x; stage.scrollTop -= m.y - pinch.y;
+        pinch.x = m.x; pinch.y = m.y; return;
+      }
+      if (pan) { stage.scrollLeft -= e.clientX - pan.x; stage.scrollTop -= e.clientY - pan.y; pan = { x: e.clientX, y: e.clientY }; return; }
       if (!st.cur) return;
       const [x, y] = pos(e);
       st.cur.x2 = x; st.cur.y2 = y;
       if (st.cur.pts) st.cur.pts.push([Math.round(x), Math.round(y)]);
       render();
     });
-    const end = () => {
+    const end = e => {
+      if (e && e.pointerId !== undefined) { ptrs.delete(e.pointerId); if (ptrs.size < 2) pinch = null; }
+      pan = null;
       if (!st.cur) return;
       const s = st.cur; st.cur = null;
       const big = Math.hypot(s.x2 - s.x1, s.y2 - s.y1) > 6 * u || (s.pts && s.pts.length > 3);
@@ -147,8 +213,8 @@ export function openAnnotator({ blob, shapes = [], title = '' }) {
     function openText(e, x, y) {
       textPos = [x, y];
       const sr = stage.getBoundingClientRect();
-      textInp.style.left = (e.clientX - sr.left) + 'px';
-      textInp.style.top = (e.clientY - sr.top) + 'px';
+      textInp.style.left = (e.clientX - sr.left + stage.scrollLeft) + 'px';
+      textInp.style.top = (e.clientY - sr.top + stage.scrollTop) + 'px';
       textInp.value = '';
       textInp.hidden = false;
       textInp.focus();
@@ -177,11 +243,23 @@ export function openAnnotator({ blob, shapes = [], title = '' }) {
       if (cmd === 'undo' && st.undo.length) { st.redo.push(JSON.stringify(st.shapes)); st.shapes = JSON.parse(st.undo.pop()); render(); }
       if (cmd === 'redo' && st.redo.length) { st.undo.push(JSON.stringify(st.shapes)); st.shapes = JSON.parse(st.redo.pop()); render(); }
       if (cmd === 'clear' && st.shapes.length) commit([]);
+      if (cmd === 'zin') zoomAt(st.z * 1.5);
+      if (cmd === 'zout') zoomAt(st.z / 1.5);
+      if (cmd === 'zfit') zoomAt(1);
+      if (cmd === 'crop') st.cropOn = !st.cropOn;
       if (cmd === 'cancel') return close(null);
       if (cmd === 'save') {
         if (!textInp.hidden) commitText();
         st.cur = null; render();
-        canvas.toBlob(b2 => close({ blob: b2, shapes: st.shapes }), 'image/jpeg', 0.88);
+        // pritrauktas vaizdas: išsaugoma tik matoma sritis (jos koordinatės įrašomos kaip „crop“, kad redaguojant vėl pritrauktų)
+        const crop = st.cropOn && st.z > 1.02 ? visible() : (st.cropOn && st.crop ? st.crop : null);
+        const shapesOut = crop ? [...st.shapes, { t: 'crop', ...crop }] : st.shapes;
+        let src = canvas;
+        if (crop) {
+          src = document.createElement('canvas'); src.width = crop.w; src.height = crop.h;
+          src.getContext('2d').drawImage(canvas, crop.x, crop.y, crop.w, crop.h, 0, 0, crop.w, crop.h);
+        }
+        src.toBlob(b2 => close({ blob: b2, shapes: shapesOut, forceBlob: !!crop }), 'image/jpeg', 0.88);
         return;
       }
       syncBar();
