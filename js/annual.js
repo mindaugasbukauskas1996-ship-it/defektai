@@ -8,6 +8,7 @@ import { bindDictation } from './dictate.js';
 import { icon } from './icons.js';
 import { openAnnotator } from './annotator.js';
 import { aiPickHtml, bindAiPick } from './ai-pick.js';
+import { snapOf, keepCurrent, addGenerated, versionsHtml, bindVersions } from './act-versions.js';
 import { $, $$, esc, toast, today, fmtDate, debounce, processImage, confirmDialog } from './util.js';
 
 const OK_TEXT = 'Apžiūros metu defektų nenustatyta.';
@@ -404,6 +405,7 @@ export function drawAnnualActTab(body, ctx) {
       <div class="gen-actions">${aiPickHtml()}<button class="btn primary big" id="an-gen">${icon('spark')} ${t.status === 'aktas' ? 'Generuoti iš naujo' : 'Generuoti su DI'}</button></div>
     </div>
 
+    ${versionsHtml(t, 'annual')}
     <div class="card act-ed">
       <div class="act-ed-head"><div class="card-title">Elementų tekstai</div><span class="save-ind" id="act-save"></span></div>
       ${a.sections.map(sec => {
@@ -453,6 +455,7 @@ export function drawAnnualActTab(body, ctx) {
   };
 
   bindAiPick(body);
+  bindVersions(body, t, 'annual', { save, redraw: draw });
   $('#an-gen').addEventListener('click', () => generate(ctx));
 }
 
@@ -460,6 +463,8 @@ async function generate(ctx) {
   const { S, save, draw, showBusy } = ctx;
   const t = S.task, a = t.annual_act;
   const overlay = showBusy('DI rengia aktą...');
+  const provider = await db.getAiProvider();
+  const before = snapOf(t, 'annual');            // kopija prieš perrašant tekstus
   try {
     const used = allItems(a).filter(x => x.status !== 'skip');
     // nuotraukos tik elementams su defektais (iki 12)
@@ -488,6 +493,7 @@ async function generate(ctx) {
     if (asList(res.conclusions).length) a.conclusions = asList(res.conclusions);
     a.assumptions = asList(res.assumptions);
     const patch = { annual_act: a, act_generated_at: new Date().toISOString() };
+    patch.act_versions = addGenerated(keepCurrent(t, 'annual', before), 'annual', snapOf({ annual_act: a }, 'annual'), provider);
     if (['nauja', 'planuota', 'apziureta'].includes(t.status)) patch.status = 'aktas';
     await save(patch);
     toast('Aktas paruoštas – peržiūrėkite tekstus', 'ok', 4500);

@@ -405,6 +405,10 @@ textarea.notes { font-size: 16px; min-height: 260px; }
 .seg input { display: none; }
 .an-tools { display: flex; gap: 8px; flex-wrap: wrap; margin: 8px 0; }
 .an-tools .rec, .btn.rec { background: #fef3f2; border-color: #f04438; }
+.ver-list { list-style: none; margin: 10px 0 0; padding: 0; display: grid; gap: 8px; }
+.ver-list li { display: flex; justify-content: space-between; align-items: center; gap: 10px; flex-wrap: wrap; padding: 8px 10px; border: 1px solid var(--line, #d0d5dd); border-radius: 8px; }
+.ver-list li.on { border-color: #1d4ed8; background: rgba(29, 78, 216, .06); }
+.ver-actions { display: flex; gap: 6px; }
 .ai-pick { display: inline-flex; align-items: center; gap: 8px; font-size: 14px; margin-right: 8px; }
 .ai-pick select { padding: 8px 10px; border-radius: 8px; border: 1px solid var(--line, #d0d5dd); font: inherit; background: #fff; }
 .an-thumbs { display: flex; gap: 8px; flex-wrap: wrap; margin: 6px 0; }

@@ -88,6 +88,9 @@ create table if not exists public.tasks (
   act_generated_at   timestamptz
 );
 
+-- Akto versijos (kiekvienas DI sugeneruotas variantas: Claude / ChatGPT); žr. js/act-versions.js
+alter table public.tasks add column if not exists act_versions jsonb not null default '[]'::jsonb;
+
 -- Neatikčių aktai (rangovų darbų neatitiktys)
 alter table public.tasks add column if not exists kind       text not null default 'defect';  -- defect | nonconformity
 alter table public.tasks add column if not exists contractor text;                            -- rangovas

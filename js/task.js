@@ -11,6 +11,7 @@ import {
 } from './util.js';
 import { openAnnotator } from './annotator.js';
 import { aiPickHtml, bindAiPick } from './ai-pick.js';
+import { snapOf, keepCurrent, addGenerated, versionsHtml, bindVersions } from './act-versions.js';
 import { bindDictation } from './dictate.js';
 import { drawAnnualInspection, drawAnnualActTab } from './annual.js';
 
@@ -551,6 +552,7 @@ function drawActs(body) {
     </div>
 
     ${pending.length ? drawQuestions(pending) : ''}
+    ${versionsHtml(t, 'defect')}
     ${t.defect_act ? drawActEditor() : ''}
     ${answered.length ? `
       <details class="card qa-hist">
@@ -561,6 +563,7 @@ function drawActs(body) {
 
   bindDocs(body, () => drawActs(body));
   bindAiPick(body);
+  bindVersions(body, t, 'defect', { save, redraw: () => drawActs(body) });
 
   // Išsamumas
   $$('input[name=detail]', body).forEach(r => r.addEventListener('change', async e => {
@@ -649,6 +652,8 @@ async function generate(body, { force = false, instruction = '' }) {
   let learned = '';
   const mode = t.act_mode === 'full' ? 'full' : 'defect';
   const overlay = showBusy(instruction ? 'DI taiso aktą...' : 'DI analizuoja aprašymą ir nuotraukas...');
+  const provider = await db.getAiProvider();
+  const before = snapOf(t, 'defect');
   try {
     const actPhotos = S.photos.filter(p => p.include_in_act);
     const photos = [];
@@ -688,6 +693,8 @@ async function generate(body, { force = false, instruction = '' }) {
         act_generated_at: new Date().toISOString()
       };
       if (['nauja', 'planuota', 'apziureta'].includes(t.status)) patch.status = 'aktas';
+      patch.act_versions = addGenerated(keepCurrent(t, 'defect', before), 'defect',
+        { defect_act: patch.defect_act, works_act: patch.works_act, ai_assumptions: patch.ai_assumptions }, provider, instruction ? 'Pataisyta pagal nurodymą' : '');
       await ensureActNumber(patch);
       await save(patch);
       toast((instruction ? 'Aktas pataisytas.' : 'Aktas paruoštas – peržiūrėkite ir pataisykite, jei reikia') + learned, 'ok', learned ? 8000 : 4500);
@@ -960,10 +967,12 @@ function drawNcActs(body) {
         ${!a ? `<button class="btn ghost" id="manual-nc">Pildyti rankiniu būdu</button>` : ''}
       </div>
     </div>
+    ${versionsHtml(t, 'nc')}
     ${a ? drawNcEditor() : ''}`;
 
   bindDocs(body, () => drawNcActs(body));
   bindAiPick(body);
+  bindVersions(body, t, 'nc', { save, redraw: () => drawNcActs(body) });
   $('#gen-nc').addEventListener('click', () => generateNc(body, {}));
   const man = $('#manual-nc');
   if (man) man.addEventListener('click', async () => {
@@ -979,6 +988,8 @@ async function generateNc(body, { instruction = '' }) {
   const t = S.task;
   let learned = '';
   const overlay = showBusy(instruction ? 'DI taiso aktą...' : 'DI analizuoja aprašymą ir nuotraukas...');
+  const provider = await db.getAiProvider();
+  const before = snapOf(t, 'nc');
   try {
     const actPhotos = S.photos.filter(p => p.include_in_act);
     const photos = [];
@@ -1014,6 +1025,8 @@ async function generateNc(body, { instruction = '' }) {
       act_generated_at: new Date().toISOString()
     };
     if (!t.problem && patch.nc_act.items[0]) patch.problem = patch.nc_act.items[0].description.slice(0, 140);
+    patch.act_versions = addGenerated(keepCurrent(t, 'nc', before), 'nc',
+      { nc_act: patch.nc_act, ai_assumptions: patch.ai_assumptions }, provider, instruction ? 'Pataisyta pagal nurodymą' : '');
     if (['nauja', 'planuota', 'apziureta'].includes(t.status)) patch.status = 'aktas';
     await ensureActNumber(patch);
     await save(patch);
