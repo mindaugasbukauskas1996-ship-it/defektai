@@ -221,7 +221,12 @@ export async function drawOffice(root, S, id, hooks = {}) {
       <div class="of-actions">
         <button class="btn" type="button" data-sch="scan" ${photos.length && !busy ? '' : 'disabled'}>${icon('spark')} ${scanPh ? 'Nuskenuoti iš naujo' : 'Nuskenuoti schemą (nespalvota, be rankraščio)'}</button>
       </div>
-      ${scanPh ? `<div class="of-svg"><img alt="Nuskenuota schema" src="${esc(S.scanUrl || '')}"></div>
+      ${scanPh ? `<div class="muted small">Dar kas nors netrinta? Pele (ar pirštu) pažymėkite stačiakampį ant schemos ir spauskite „Ištrinti pažymėtas vietas“.</div>
+        <div class="of-svg"><div class="of-erase" id="of-erase"><img alt="Nuskenuota schema" draggable="false" src="${esc(S.scanUrl || '')}">${(S.eraseRects || []).map(r => `<i style="left:${r.x * 100}%;top:${r.y * 100}%;width:${r.w * 100}%;height:${r.h * 100}%"></i>`).join('')}</div></div>
+        <div class="of-actions">
+          <button class="btn" type="button" data-sch="erase" ${(S.eraseRects || []).length && !busy ? '' : 'disabled'}>Ištrinti pažymėtas vietas (${(S.eraseRects || []).length})</button>
+          <button class="btn small ghost" type="button" data-sch="unmark" ${(S.eraseRects || []).length ? '' : 'disabled'}>Atšaukti žymėjimą</button>
+        </div>
         ${S.hp.office.schema_scan_comment ? `<div class="muted small">DI pastaba: ${esc(S.hp.office.schema_scan_comment)}</div>` : ''}
         <label class="chk"><input type="checkbox" data-sch="ok" ${S.hp.office.schema_scan_ok ? 'checked' : ''}> Patikrinau ir patvirtinu – naudoti šią schemą apraše (kitaip dedama originali nuotrauka)</label>
         <button class="btn small ghost" type="button" data-sch="clear">Pašalinti nuskenuotą schemą</button>` : ''}
@@ -263,6 +268,52 @@ export async function drawOffice(root, S, id, hooks = {}) {
       busy = false; drawSchema('Nuskenuota – patikrinkite su nuotrauka'); drawOut();
     } catch (err) { busy = false; drawSchema(''); toast('Nepavyko nuskenuoti: ' + (err.message || err), 'error', 9000); }
   }
+
+  /** Rankinis trynimas: pažymėti stačiakampiai išbalinami ir nuskenuota nuotrauka pakeičiama. */
+  async function eraseMarked() {
+    const rects = S.eraseRects || [];
+    const old = S.photos.find(x => !x.item_id && x.slot === 'schema_scan');
+    if (!rects.length || !old || busy) return;
+    busy = true; drawSchema('Valoma…');
+    try {
+      const src = await (await fetch(await db.hpPhotoUrl(old))).blob();
+      const bmp = await createImageBitmap(src);
+      const c = document.createElement('canvas'); c.width = bmp.width; c.height = bmp.height;
+      const g = c.getContext('2d'); g.drawImage(bmp, 0, 0); g.fillStyle = '#fff';
+      for (const r of rects) g.fillRect(r.x * c.width, r.y * c.height, r.w * c.width, r.h * c.height);
+      const out = await new Promise(res => c.toBlob(res, 'image/jpeg', 0.9));
+      const ph = await db.addHpPhoto(id, out, { slot: 'schema_scan', width: c.width, height: c.height });
+      await db.deleteHpPhoto(old).catch(() => {});
+      S.photos = S.photos.filter(x => x.id !== old.id); S.photos.push(ph);
+      S.scanUrl = URL.createObjectURL(out); S.eraseRects = [];
+      busy = false; drawSchema('Išvalyta'); drawOut();
+    } catch (err) { busy = false; drawSchema(''); toast('Nepavyko ištrinti: ' + (err.message || err), 'error', 8000); }
+  }
+
+  // stačiakampių žymėjimas ant nuskenuotos schemos
+  let drag = null;
+  root.addEventListener('pointerdown', e => {
+    const box = e.target.closest('#of-erase');
+    if (!box || busy) return;
+    const b = box.getBoundingClientRect();
+    drag = { box, b, x0: (e.clientX - b.left) / b.width, y0: (e.clientY - b.top) / b.height };
+    const el = document.createElement('i'); el.className = 'of-drag'; box.appendChild(el); drag.el = el;
+    box.setPointerCapture(e.pointerId); e.preventDefault();
+  });
+  root.addEventListener('pointermove', e => {
+    if (!drag) return;
+    const x = Math.min(1, Math.max(0, (e.clientX - drag.b.left) / drag.b.width)), y = Math.min(1, Math.max(0, (e.clientY - drag.b.top) / drag.b.height));
+    drag.r = { x: Math.min(x, drag.x0), y: Math.min(y, drag.y0), w: Math.abs(x - drag.x0), h: Math.abs(y - drag.y0) };
+    Object.assign(drag.el.style, { left: drag.r.x * 100 + '%', top: drag.r.y * 100 + '%', width: drag.r.w * 100 + '%', height: drag.r.h * 100 + '%' });
+  });
+  const endDrag = () => {
+    if (!drag) return;
+    const r = drag.r; drag = null;
+    if (r && r.w > 0.004 && r.h > 0.004) (S.eraseRects = S.eraseRects || []).push(r);
+    drawSchema();
+  };
+  root.addEventListener('pointerup', endDrag);
+  root.addEventListener('pointercancel', endDrag);
 
   async function clearScan() {
     const old = S.photos.find(x => !x.item_id && x.slot === 'schema_scan');
@@ -361,6 +412,8 @@ export async function drawOffice(root, S, id, hooks = {}) {
       if (a === 'read') return readSchema();
       if (a === 'apply') return applyTags();
       if (a === 'scan') return scanSchema();
+      if (a === 'erase') return eraseMarked();
+      if (a === 'unmark') { S.eraseRects = []; return drawSchema(); }
       if (a === 'clear') return clearScan();
       if (a === 'ok') return saveSvgFlag({ schema_scan_ok: sc.checked });
     }

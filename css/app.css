@@ -632,4 +632,7 @@ input[type=date], select { min-width: 0; max-width: 100%; }
 .hp-hide { display: none; }
 .of-svg { border: 1px solid #d0d5dd; border-radius: 8px; margin: 10px 0; background: #fff; overflow: auto; }
 .of-svg img { display: block; width: 100%; min-width: 700px; }
+.of-erase { position: relative; min-width: 700px; cursor: crosshair; touch-action: none; user-select: none; }
+.of-erase img { min-width: 0; pointer-events: none; }
+.of-erase i { position: absolute; background: rgba(229, 57, 53, .25); border: 2px solid #e53935; pointer-events: none; }
 .of-instr { flex: 1 1 320px; }
