@@ -53,10 +53,10 @@ export async function exportDocx({ t, s, doc, figs, refPhotos = {} }) {
   const addr = [t.address, t.city].filter(Boolean).join(', ') + (t.stairwell ? `, ${t.stairwell} laiptinė` : '');
 
   // ---------- parašų eilutės ----------
-  async function signBlock(rows, posNote) {
+  async function signBlock(rows, posNote, totalW = W) {
     const sigCache = s.signature ? await dataUrlBytes(s.signature).catch(() => null) : null;
     const out = [];
-    const cw = [Math.round(W * 0.42), Math.round(W * 0.22), Math.round(W * 0.36)];
+    const cw = [Math.round(totalW * 0.42), Math.round(totalW * 0.22), Math.round(totalW * 0.36)];
     const mk = async r => {
       const sig = r.sig && sigCache ? [new Paragraph({ alignment: AlignmentType.CENTER, children: [new ImageRun({ data: sigCache, transformation: { width: 110, height: 44 }, type: 'png' })] })] : [P('', { after: 0 })];
       return [
@@ -166,9 +166,11 @@ export async function exportDocx({ t, s, doc, figs, refPhotos = {} }) {
 
   async function annualSheet() {
     const a = t.annual_act, g = a.general;
-    const gw = [Math.round(W * 0.30), Math.round(W * 0.70)];
+    const WL = PAGE_H - 2 * MARGIN;                         // gulsčias lapas – platesnė lentelė, didesnės nuotraukos
+    const gw = [Math.round(WL * 0.22), Math.round(WL * 0.78)];
     const gr = (l, v) => row([cell(l, { w: gw[0], borders: ALL, fill: 'F3F4F6' }), cell(String(v ?? ''), { w: gw[1], borders: ALL })]);
-    const rest = W - 600 - 1500 - 1900, cw = [600, 1500, 1900, Math.round(rest * 0.58), rest - Math.round(rest * 0.58)];
+    const PH = 4300;                                        // nuotraukų stulpelis (~7,6 cm)
+    const rest = WL - 600 - 1800 - PH, cw = [600, 1800, PH, Math.round(rest * 0.58), rest - Math.round(rest * 0.58)];
     const body = [headRow(['Eil. Nr.', 'Apžiūrima dalis', 'Apžiūros nuotrauka', 'Pastebėti defektai', 'Rekomendacijos']
       .map((h, i) => cell(h, { w: cw[i], bold: true, fill: 'E9ECEF', align: AlignmentType.CENTER, v: VerticalAlign.CENTER })))];
     for (const sc of a.sections) {
@@ -181,7 +183,7 @@ export async function exportDocx({ t, s, doc, figs, refPhotos = {} }) {
           try {
             const blob = await (await fetch(p.url)).blob();
             const bmp = await createImageBitmap(blob);
-            const k = Math.min(150 / bmp.width, 115 / bmp.height);
+            const k = Math.min(270 / bmp.width, 205 / bmp.height);
             imgs.push(new Paragraph({ spacing: { after: 60 }, alignment: AlignmentType.CENTER, children: [new ImageRun({ data: new Uint8Array(await blob.arrayBuffer()), transformation: { width: Math.round(bmp.width * k), height: Math.round(bmp.height * k) }, type: 'jpg' })] }));
           } catch (_) { /* nuotrauka praleidžiama */ }
         }
@@ -207,7 +209,7 @@ export async function exportDocx({ t, s, doc, figs, refPhotos = {} }) {
     ch.push(await signBlock([
       { position: `Techninis inžinierius${s.inspector_cert ? ` (kv. atestato Nr. ${s.inspector_cert})` : ''}`, name: s.engineer_name, sig: true },
       { position: 'Klientų atstovas', name: '' }, { position: '', name: '' }
-    ], '(pareigos)'));
+    ], '(pareigos)', WL));
     return ch;
   }
 
@@ -245,8 +247,10 @@ export async function exportDocx({ t, s, doc, figs, refPhotos = {} }) {
 
   // ---------- dokumentas ----------
   const sections = [];
-  const add = children => sections.push({ properties: { page: { size: { width: PAGE_W, height: PAGE_H }, margin: { top: MARGIN, right: MARGIN, bottom: MARGIN, left: MARGIN } } }, children });
-  if (doc === 'annual') add(await annualSheet());
+  const add = (children, landscape = false) => sections.push({ properties: { page: {
+    size: landscape ? { width: PAGE_W, height: PAGE_H, orientation: D.PageOrientation.LANDSCAPE } : { width: PAGE_W, height: PAGE_H },
+    margin: { top: MARGIN, right: MARGIN, bottom: MARGIN, left: MARGIN } } }, children });
+  if (doc === 'annual') add(await annualSheet(), true);
   if (doc === 'nc') add(await ncSheet());
   if (doc === 'defect' || doc === 'both') add(await defectSheet());
   if (doc === 'works' || doc === 'both') add(await worksSheet());

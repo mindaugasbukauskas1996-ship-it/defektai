@@ -370,7 +370,7 @@ function annualSheet(t, s, refPhotos) {
       <div class="sign-cell"><div class="sign-val">${esc(name)}</div><div class="under">(vardas, pavardė)</div></div>
     </div>`;
   return `
-  <section class="sheet">
+  <section class="sheet sheet-annual">
     <div class="doc-top">
       <div class="lined">${esc([s.engineer_name, g.org].filter(Boolean).join('  '))}</div>
       <div class="under">(už statinio techninę priežiūrą atsakingo asmens vardas, pavardė, organizacijos pavadinimas)</div>
