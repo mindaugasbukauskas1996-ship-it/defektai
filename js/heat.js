@@ -357,7 +357,7 @@ async function renderPoint(el, id, stepId, me, go) {
         : `${k.hint ? `<div class="muted small">${esc(k.hint)}</div>` : ''}
       ${reading.has(it.id) ? '<div class="muted small">Tikrinama, ar lentelė įskaitoma…</div>' : aiBadge(it, isAdmin)}`}
       ${fixed ? '' : slotHtml({ slot: 'plate', item_id: it.id, title: 'Nuotraukos', req: true,
-        hint: k.plate ? 'Įkelkite 2 nuotraukas: gamyklinę lentelę (visa kadre, ryški, be blizgesio – kad būtų įskaitomi visi skaičiai) ir bendrą įrenginio vaizdą.' : '' })}`}
+        hint: k.plate ? 'Įkelkite 2 nuotraukas: gamyklinę lentelę (visa kadre, ryški, be blizgesio – kad būtų įskaitomi visi skaičiai) ir bendrą įrenginio vaizdą.' : '' })}
       <details class="hp-manual${fixed ? ' hp-hide' : ''}" ${itemFilled(it) && !fixed ? 'open' : ''}><summary>Įvesti duomenis ranka</summary>
         <div class="form-grid">
           ${it.kind === 'kita' ? fld('data-f', 'label', 'Įrenginio pavadinimas', it.label, '', null, 'span2') : ''}
