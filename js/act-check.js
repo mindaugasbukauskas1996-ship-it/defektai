@@ -78,10 +78,9 @@ export async function checkAct(kind, t, photos = []) {
     else if (!(Number(r.qty) > 0)) out.push({ level: 'err', where: nm, text: 'kiekis turi būti didesnis už 0' });
     if (R.units && r.unit && !R.units.has(r.unit)) out.push({ level: 'err', where: nm, text: `mato vienetas „${r.unit}“ nėra įmonės sąraše` });
   });
-  const prelim = rows.filter(r => /preliminar/i.test(r.notes || '')).length;
-  if (prelim) out.push({ level: 'info', text: `${prelim} iš ${rows.length} kiekių – preliminarūs (rangovas tikslins vietoje).` });
-
-  for (const a of [].concat(t.ai_assumptions || []).map(String).filter(Boolean)) out.push({ level: 'warn', where: 'DI prielaida', text: a });
+  // DI prielaidos jau rodomos atskiroje kortelėje – čia tik viena eilutė, kad nebūtų dubliavimo
+  const nA = [].concat(t.ai_assumptions || []).map(String).filter(Boolean).length;
+  if (nA) out.push({ level: 'warn', text: `DI padarė prielaidų: ${nA} – peržiūrėkite kortelę „DI prielaidos“ aukščiau.` });
   return out;
 }
 
