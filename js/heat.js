@@ -181,7 +181,7 @@ async function renderPoint(el, id, stepId, me, go) {
   const S = { hp, items, photos, obj: null, techs: [] };
   S.hp.survey = S.hp.survey || {};
   // šildymo tipas iš registro – kad šilumininkui tereikėtų patvirtinti (išsaugoma su pirmu pakeitimu)
-  const REG = { 'Automatizuotas priklausomas': 'priklausoma', 'Automatizuotas nepriklausomas': 'nepriklausoma', 'Elevatorinis': 'elevatorinis' };
+  const REG = { 'Automatizuotas nepriklausomas': 'nepriklausoma', 'Elevatorinis': 'elevatorinis' };   // „priklausomas“ nebesiūlomas – šilumininkas pasirenka pats
   if (!S.hp.survey.sildymas && REG[S.hp.registry_type]) S.hp.survey.sildymas = REG[S.hp.registry_type];
   if (S.hp.object_id) S.obj = await db.getObject(S.hp.object_id).catch(() => null);
   if (isAdmin) S.techs = (await db.listProfiles()).filter(p => p.role === 'heat');
@@ -192,7 +192,7 @@ async function renderPoint(el, id, stepId, me, go) {
   let step = visSteps().some(s => s.id === stepId) ? stepId : 'tipas';
   if (!stepId && typed()) {                                   // tęsiam nuo pirmo nebaigto žingsnio
     const first = prog().checks.find(c => !c.ok);
-    step = first ? first.step : 'pabaiga';
+    step = first ? first.step : 'namas';
   }
 
   el.innerHTML = `
@@ -232,7 +232,7 @@ async function renderPoint(el, id, stepId, me, go) {
   let syncChain = Promise.resolve();
   const syncItems = () => (syncChain = syncChain.then(async () => {
     const exp = expectedItems(S.hp.survey);
-    const key = x => x.grp + '/' + x.kind;
+    const key = x => x.grp + '/' + x.kind + '/' + (x.label || '');
     const have = S.items.filter(i => i.sort < 1000);
     const drop = have.filter(h => !exp.some(e => key(e) === key(h)) && !itemFilled(h) && !S.photos.some(p => p.item_id === h.id));
     for (const d of drop) await db.deleteHpItem(d, S.photos);
@@ -300,8 +300,9 @@ async function renderPoint(el, id, stepId, me, go) {
   const pending = [];                                         // { key, slot, item_id }
   let upChain = Promise.resolve();
   const skey = (slot, item_id) => `${slot}|${item_id || ''}`;
+  const inSlot = (p, slot, item_id) => (p.item_id || null) === (item_id || null) && (item_id ? true : p.slot === slot);   // įrenginiui – viena nuotraukų vieta (visos jo nuotraukos)
   const thumbsHtml = (slot, item_id) => {
-    const ph = S.photos.filter(p => (p.item_id || null) === (item_id || null) && p.slot === slot);
+    const ph = S.photos.filter(p => inSlot(p, slot, item_id));
     const wait = pending.filter(p => p.slot === slot && (p.item_id || null) === (item_id || null));
     return `${ph.map(p => `<div class="hp-thumb"><img data-ph="${p.id}" alt="nuotrauka"><button type="button" class="hp-del" data-delph="${p.id}" title="Ištrinti nuotrauką">${icon('x')}</button></div>`).join('')}
         ${wait.map(() => '<div class="hp-thumb pend" title="Keliama…"><span class="spin"></span></div>').join('')}
@@ -318,16 +319,23 @@ async function renderPoint(el, id, stepId, me, go) {
     if (!box) return;
     const th = box.querySelector('.hp-thumbs');
     th.innerHTML = thumbsHtml(slot, item_id);
-    box.classList.toggle('need', box.dataset.req === '1' && !S.photos.some(p => (p.item_id || null) === (item_id || null) && p.slot === slot));
+    box.classList.toggle('need', box.dataset.req === '1' && !S.photos.some(p => inSlot(p, slot, item_id)));
     loadThumbs(th);
   };
 
   const slotHtml = ({ slot, item_id = null, title, hint, req }) => {
-    const ph = S.photos.filter(p => (p.item_id || null) === item_id && p.slot === slot);
+    const ph = S.photos.filter(p => inSlot(p, slot, item_id));
     return `<div class="hp-slot${req && !ph.length ? ' need' : ''}" data-sk="${skey(slot, item_id)}" data-req="${req ? 1 : 0}">
       <div class="hp-ql">${esc(title)}${req ? ' <span class="hp-req">*</span>' : ''}</div>
       ${hint ? `<div class="muted small">${esc(hint)}</div>` : ''}
       <div class="hp-thumbs">${thumbsHtml(slot, item_id)}</div></div>`;
+  };
+
+  // Įrenginio nuotraukų vieta viena: pirma nuotrauka laikoma lentelės (DI skaito pirmiausia ją), kitos – bendros
+  const dbSlot = j => {
+    if (!j.item_id) return j.slot;
+    const it = S.items.find(x => x.id === j.item_id), k = it && (KINDS[it.kind] || KINDS.kita);
+    return k && k.plate && !S.photos.some(p => p.item_id === j.item_id && p.slot === 'plate') ? 'plate' : 'general';
   };
 
   const fld = (attr, key, label, val, unit, opts, cls = '') => `<label class="${cls}">${esc(label)}${unit ? ` <span class="muted small">(${esc(unit)})</span>` : ''}${opts
@@ -348,8 +356,8 @@ async function renderPoint(el, id, stepId, me, go) {
       ${fixed ? `<div class="hp-fixed"><b>${esc([it.manufacturer, it.model].filter(Boolean).join(' '))}</b> – jau žinoma. Nieko rinktis, vesti ar fotografuoti nereikia.</div>`
         : `${k.hint ? `<div class="muted small">${esc(k.hint)}</div>` : ''}
       ${reading.has(it.id) ? '<div class="muted small">Tikrinama, ar lentelė įskaitoma…</div>' : aiBadge(it, isAdmin)}`}
-      ${fixed ? '' : `${k.plate ? slotHtml({ slot: 'plate', item_id: it.id, title: 'Gamyklinė lentelė', req: true, hint: 'Visa lentelė kadre, ryški, be blizgesio – kad būtų įskaitomi visi skaičiai.' }) : ''}
-      ${slotHtml({ slot: 'general', item_id: it.id, title: k.plate ? 'Bendra įrenginio nuotrauka' : 'Nuotrauka', req: !k.plate })}`}
+      ${fixed ? '' : slotHtml({ slot: 'plate', item_id: it.id, title: 'Nuotraukos', req: true,
+        hint: k.plate ? 'Įkelkite 2 nuotraukas: gamyklinę lentelę (visa kadre, ryški, be blizgesio – kad būtų įskaitomi visi skaičiai) ir bendrą įrenginio vaizdą.' : '' })}`}
       <details class="hp-manual${fixed ? ' hp-hide' : ''}" ${itemFilled(it) && !fixed ? 'open' : ''}><summary>Įvesti duomenis ranka</summary>
         <div class="form-grid">
           ${it.kind === 'kita' ? fld('data-f', 'label', 'Įrenginio pavadinimas', it.label, '', null, 'span2') : ''}
@@ -380,12 +388,12 @@ async function renderPoint(el, id, stepId, me, go) {
       const list = S.items.filter(i => i.grp === step);
       html = !typed()
         ? `<div class="card">Pirmiausia 1 žingsnyje pasirinkite šildymo ir karšto vandens tipą – tada čia atsiras įrenginių sąrašas.</div>`
-        : `<div class="hp-intro muted small">${esc(GROUP_LABEL[step])}: kiekvienam įrenginiui nufotografuokite gamyklinę lentelę. Jei įrenginio nėra – pažymėkite „Šio įrenginio nėra“. Duomenis iš nuotraukų vėliau nuskaitys sistema; jei lentelė neįskaitoma, įveskite ranka.</div>
+        : `<div class="hp-intro muted small">${esc(GROUP_LABEL[step])}: kiekvienam įrenginiui įkelkite nuotraukas (gamyklinę lentelę ir bendrą vaizdą). Jei įrenginio nėra – pažymėkite „Šio įrenginio nėra“. Duomenis iš nuotraukų vėliau nuskaitys sistema; jei lentelė neįskaitoma, įveskite ranka.</div>
           ${list.map(itemHtml).join('')}
           <div class="card hp-add"><span class="lbl">Yra dar vienas įrenginys?</span>
             <select id="hp-addkind">${Object.entries(KINDS).map(([k, v]) => `<option value="${k}">${esc(v.label)}</option>`).join('')}</select>
             <button class="btn small" type="button" data-additem>${icon('plus')} Pridėti</button></div>`;
-    } else if (step === 'pabaiga') {
+    } else if (step === 'namas') {
       const p = prog();
       const miss = p.checks.filter(c => !c.ok);
       html = `<div class="card">${qs}${slots}</div>
@@ -500,7 +508,7 @@ async function renderPoint(el, id, stepId, me, go) {
           try {
             await new Promise(r => setTimeout(r, 30));          // leidžiame naršyklei perpiešti ekraną
             const im = await processImage(j.f, 2000, 0.82);
-            S.photos.push(await db.addHpPhoto(id, im.blob, { slot: j.slot, item_id: j.item_id, width: im.width, height: im.height }));
+            S.photos.push(await db.addHpPhoto(id, im.blob, { slot: dbSlot(j), item_id: j.item_id, width: im.width, height: im.height }));
             ok = true;
           } catch (err) { toast('Nuotraukos įkelti nepavyko: ' + (err.message || err), 'error', 6000); }
           pending.splice(pending.indexOf(j), 1);
@@ -518,8 +526,8 @@ async function renderPoint(el, id, stepId, me, go) {
               if (res.readable !== 'gera') toast(res.comment || 'Schema neįskaitoma – perfotografuokite iš arčiau, be blizgesio', 'error', 10000);
             }).catch(() => { /* patikra neprivaloma */ }).finally(() => { schemaChecking = false; if (body.isConnected && step === 'bendra') drawBody(); });
           }
-          const it = j.slot === 'plate' && j.item_id ? S.items.find(x => x.id === j.item_id) : null;
-          if (it && !isFixed(it) && !reading.has(it.id) && !pending.some(p => p.item_id === j.item_id && p.slot === 'plate')) {
+          const it = j.item_id ? S.items.find(x => x.id === j.item_id) : null;
+          if (it && (KINDS[it.kind] || KINDS.kita).plate && !isFixed(it) && !reading.has(it.id) && !pending.some(p => p.item_id === j.item_id)) {
             reading.add(it.id);
             readItem(S, it).then(() => {
               if (it.ai && it.ai.readable !== 'gera') toast(it.ai.comment || 'Lentelė neįskaitoma – perfotografuokite', 'error', 9000);

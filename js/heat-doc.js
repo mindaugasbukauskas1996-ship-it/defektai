@@ -9,7 +9,9 @@ import { KINDS, GROUP_LABEL, itemLabel, computeProgress } from './heat-model.js'
 
 export const ND = 'duomenų nėra';
 const has = v => Array.isArray(v) ? v.length > 0 : v !== undefined && v !== null && String(v).trim() !== '';
-const kvOn = s => ['lygiagreti', 'dvi_pakopos', 'kita'].includes(s.kv);
+const kvOn = s => ['lygiagreti', 'dvi_pakopos', 'boileris', 'kita'].includes(s.kv);
+const elev = s => s.sildymas === 'elevatorinis' || s.sildymas === 'elevatorinis_valdiklis';
+const jn = v => Array.isArray(v) ? v.join('; ') : v;           // keli pasirinkimai → tekstas
 const heatOn = s => !!s.sildymas && s.sildymas !== 'nera';
 const indep = s => s.sildymas === 'nepriklausoma';
 
@@ -298,10 +300,10 @@ export function buildAprasas(input, images = []) {
   p('Šildymo sistema skirta šilumą perduoti į šildomas patalpas ir palaikyti jose higienos normų nustatytą temperatūrą šildymo sezono metu.');
   p('Karšto vandens sistema skirta šaltą geriamąjį vandenį pašildyti iki higienos normų nustatytos temperatūros ir tiekti jį į vandens ėmimo vietas.');
   h2('2.2. Pagrindiniai sistemos duomenys');
-  const auto = s.sildymas === 'priklausoma' || s.sildymas === 'nepriklausoma' || (s.sildymas !== 'elevatorinis' && kvOn(s));
-  const spTipas = s.sildymas === 'elevatorinis' ? (kvOn(s) ? 'Elevatorinis (karšto vandens ruošimas automatizuotas)' : 'Elevatorinis') : auto ? 'Automatizuotas' : '';
-  const SILD = { nepriklausoma: 'Nepriklausoma (per šilumokaitį)', priklausoma: 'Priklausoma (be šilumokaičio, su pamaišymo siurbliu)', elevatorinis: 'Priklausoma (per elevatorių)', nera: 'Šildymas per šį šilumos punktą neprijungtas' };
-  const KV = { lygiagreti: 'Lygiagreti (vienos pakopos)', dvi_pakopos: 'Dviejų pakopų', nera: 'Karštas vanduo šilumos punkte neruošiamas' };
+  const auto = s.sildymas === 'priklausoma' || s.sildymas === 'nepriklausoma' || (!elev(s) && kvOn(s));
+  const spTipas = elev(s) ? (kvOn(s) ? 'Elevatorinis (karšto vandens ruošimas automatizuotas)' : 'Elevatorinis') : auto ? 'Automatizuotas' : '';
+  const SILD = { nepriklausoma: 'Nepriklausoma (per šilumokaitį)', priklausoma: 'Priklausoma (be šilumokaičio, su pamaišymo siurbliu)', elevatorinis: 'Priklausoma (per elevatorių)', elevatorinis_valdiklis: 'Priklausoma (per elevatorių su valdikliu)', nera: 'Šildymas per šį šilumos punktą neprijungtas' };
+  const KV = { lygiagreti: 'Lygiagreti (vienos pakopos)', dvi_pakopos: 'Dviejų pakopų', boileris: 'Greitaeigis boileris', kita: 'Kita', nera: 'Karštas vanduo šilumos punkte neruošiamas' };
   const yn = (v, yes = 'Yra', no = 'Nėra') => v === 'taip' ? yes : v === 'ne' ? no : '';
   const gyv = { kv: 'su vonių šildytuvais', sildymas: 'vonių šildytuvai prijungti prie šildymo sistemos', nera: 'be vonių šildytuvų' }[s.voniu_sildytuvai] || '';
   const bal = (v, k) => v === 'taip' ? ['Yra', c.val(k)].filter(has).join(', ') : v === 'ne' ? 'Nėra' : '';
@@ -332,7 +334,7 @@ export function buildAprasas(input, images = []) {
   } else if (s.sildymas === 'priklausoma') {
     p('Šildymo sistema prie šilumos tinklų prijungta pagal priklausomą schemą (be šilumokaičio) su pamaišymo cirkuliaciniu siurbliu ir reguliavimo vožtuvu.');
     p('Į sistemą tiekiamo šilumnešio temperatūra reguliuojama automatiškai pagal lauko oro temperatūrą.');
-  } else if (s.sildymas === 'elevatorinis') {
+  } else if (elev(s)) {
     p(`Šildymo sistema prie šilumos tinklų prijungta pagal priklausomą schemą per elevatorių${s.sild_siurblys === 'taip' ? ' su cirkuliaciniu siurbliu' : ''}.`);
     p('Į sistemą tiekiamo šilumnešio temperatūra automatiškai nereguliuojama – ji priklauso nuo šilumos tinklų temperatūrinio grafiko.');
   } else if (s.sildymas === 'nera') {
@@ -413,9 +415,9 @@ export function buildAprasas(input, images = []) {
   const kvc = fn => s.kv === 'nera' ? '–' : fn();
   table([0.3, 0.35, 0.35], ['Rodiklis', 'Šildymo sistema', 'Karšto vandens sistema'], [
     ['Vamzdžių medžiaga', cap(lc(s.sv_medziaga)) || D('', 'Šildymo vamzdžių medžiaga'), kvc(() => cap(lc(s.kv_medziaga)) || D('', 'KV vamzdžių medžiaga'))],
-    ['Skersmenys (magistralės – stovai)', has(s.sv_skersmenys) ? fixDn(s.sv_skersmenys) : D('', 'Šildymo vamzdynų skersmenys'), kvc(() => has(s.kv_skersmenys) ? fixDn(s.kv_skersmenys) : D('', 'KV vamzdynų skersmenys'))],
+    ['Skersmenys (magistralės – stovai)', has(jn(s.sv_skersmenys)) ? fixDn(jn(s.sv_skersmenys)) : D('', 'Šildymo vamzdynų skersmenys'), kvc(() => has(jn(s.kv_skersmenys)) ? fixDn(jn(s.kv_skersmenys)) : D('', 'KV vamzdynų skersmenys'))],
     ['Jungimo būdas', joinBy(s.sv_medziaga) || D('', 'Šildymo vamzdynų jungimo būdas'), kvc(() => joinBy(s.kv_medziaga) || D('', 'KV vamzdynų jungimo būdas'))],
-    ['Šilumos izoliacija', cap(izol(s.sv_izoliacija_tipas)) || D('', 'Šildymo vamzdynų izoliacija'), kvc(() => cap(izol(s.kv_izoliacija_tipas)) || D('', 'KV vamzdynų izoliacija'))],
+    ['Šilumos izoliacija', cap(izol(jn(s.sv_izoliacija_tipas))) || D('', 'Šildymo vamzdynų izoliacija'), kvc(() => cap(izol(jn(s.kv_izoliacija_tipas))) || D('', 'KV vamzdynų izoliacija'))],
     ['Uždaromoji armatūra', cap(lc(s.sv_armatura)) || D('', 'Šildymo uždaromoji armatūra'), kvc(() => cap(lc(s.kv_armatura)) || D('', 'KV uždaromoji armatūra'))],
     ['Balansiniai (termobalansiniai) ventiliai', bal(s.sv_balansiniai, 'balansiniai_sild') || D('', 'Šildymo balansiniai ventiliai'), kvc(() => bal(s.kv_balansiniai, 'balansiniai_kv') || D('', 'KV termobalansiniai ventiliai'))]
   ]);

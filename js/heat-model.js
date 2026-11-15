@@ -11,7 +11,6 @@ export const STEPS = [
   { id: 'sildymas', label: 'Šildymas', grp: true },
   { id: 'kv', label: 'Karštas vanduo', grp: true },
   { id: 'namas', label: 'Vamzdynai ir prietaisai' },
-  { id: 'pabaiga', label: 'Pateikimas' },
   { id: 'aprasas', label: 'Aprašas (biuras)', office: true }       // DI skaitymas, biuro laukai, aprašo atsisiuntimas – tik admin
 ];
 
@@ -20,7 +19,8 @@ export const HP_STATUS = {
 };
 
 const YN = [['taip', 'Taip'], ['ne', 'Ne']];
-const kvOn = s => ['lygiagreti', 'dvi_pakopos', 'kita'].includes(s.kv);
+const kvOn = s => ['lygiagreti', 'dvi_pakopos', 'boileris', 'kita'].includes(s.kv);
+const elev = s => s.sildymas === 'elevatorinis' || s.sildymas === 'elevatorinis_valdiklis';
 const autoSp = s => s.sildymas === 'priklausoma' || s.sildymas === 'nepriklausoma' || kvOn(s);
 
 // Klausimo tipai: one – vienas pasirinkimas, many – keli, text, num, area (ilgas tekstas)
@@ -29,16 +29,18 @@ export const QUESTIONS = {
     { key: 'sp_vieta', label: 'Kur yra šilumos punktas?', type: 'text', req: true, ph: 'pvz. rūsys, 2 laiptinė' },
     { key: 'sildymas', label: 'Koks šildymas šiame šilumos punkte?', type: 'one', req: true,
       hint: 'Jei jau pažymėta – taip nurodyta registre. Pakeiskite, jei vietoje yra kitaip.', options: [
-      ['elevatorinis', 'Elevatorinis (be automatikos)'],
-      ['priklausoma', 'Automatinis, šildymui šilumokaičio NĖRA'],
-      ['nepriklausoma', 'Automatinis, šildymui YRA šilumokaitis'],
+      ['nepriklausoma', 'Automatizuotas su šilumokaičiu'],
+      ['elevatorinis', 'Elevatorinis be valdiklio'],
+      ['elevatorinis_valdiklis', 'Elevatorinis su valdikliu'],
       ] },
-    { key: 'sild_siurblys', label: 'Ar šildymo kontūre yra cirkuliacinis siurblys?', type: 'one', req: true, options: YN, show: s => s.sildymas === 'elevatorinis' },
+    { key: 'sild_siurblys', label: 'Ar šildymo kontūre yra cirkuliacinis siurblys?', type: 'one', req: true, options: YN, show: elev },
     { key: 'kv', label: 'Kaip ruošiamas karštas vanduo?', type: 'one', req: true, options: [
-      ['lygiagreti', 'Vienas karšto vandens šilumokaitis'],
-      ['dvi_pakopos', 'Dviejų pakopų'],
-      ['kita', 'Nežinau / kitaip'],
-      ['nera', 'Karštas vanduo čia neruošiamas']] },
+      ['dvi_pakopos', 'Karšto vandens šilumokaitis + dviejų pakopų šildymo šilumokaitis'],
+      ['lygiagreti', 'Karšto vandens šilumokaitis'],
+      ['nera', 'Karštas vanduo neruošiamas'],
+      ['boileris', 'Greitaeigis boileris'],
+      ['kita', 'Kita']] },
+    { key: 'kv_kita', label: 'Komentaras (kaip ruošiamas karštas vanduo)', type: 'area', ph: 'Aprašykite trumpai', show: s => s.kv === 'kita' },
     { key: 'kv_cirkuliacija', label: 'Ar karšto vandens sistema su cirkuliacija?', type: 'one', req: true, options: YN, show: kvOn },
     { key: 'nuotolinis', label: 'Ar yra nuotolinis valdymas / stebėjimas?', type: 'one', options: [...YN, ['nezinau', 'Nežinau']], show: (s, o = {}) => !o.nuotolinis },   // jau žinoma – neklausiama
     { key: 'keli_sp', label: 'Ar šiame name yra daugiau nei vienas šilumos punktas?', type: 'one', options: YN,
@@ -56,14 +58,14 @@ export const QUESTIONS = {
     { key: 'nuorinimas', office: true, label: 'Kaip šalinamas oras?', type: 'many', options: ['Nuorinimo čiaupai viršutinio aukšto prietaisuose', 'Automatiniai nuorintojai'] },
     { head: 'Šildymo vamzdynai' },
     { key: 'sv_medziaga', label: 'Vamzdžių medžiaga', type: 'many', req: true, options: ['Plienas', 'Cinkuotas plienas', 'Plastikas', 'Daugiasluoksniai'] },
-    { key: 'sv_skersmenys', office: true, label: 'Skersmenys (magistralės – stovai)', type: 'text', ph: 'pvz. DN80 – DN15' },
-    { key: 'sv_izoliacija_tipas', office: true, label: 'Šilumos izoliacija (tipas, storis)', type: 'text', ph: 'pvz. akmens vatos kevalai 30 mm' },
+    { key: 'sv_skersmenys', label: 'Skersmenys (magistralės – stovai)', type: 'many', options: ['DN100 – DN15', 'DN80 – DN15', 'DN65 – DN15', 'DN50 – DN15', 'DN40 – DN15', 'DN32 – DN15'] },
+    { key: 'sv_izoliacija_tipas', label: 'Šilumos izoliacija (tipas, storis)', type: 'many', options: ['Akmens vatos kevalai 30 mm', 'Akmens vatos kevalai 50 mm', 'Putų polietileno kevalai', 'Stiklo vata', 'Izoliacijos nėra'] },
     { key: 'sv_armatura', label: 'Uždaromoji armatūra', type: 'many', req: true, options: ['Rutuliniai ventiliai', 'Sklendės', 'Kūginiai ventiliai'] },
     { key: 'sv_balansiniai', label: 'Balansiniai ventiliai stovuose', type: 'one', options: [...YN, ['nezinau', 'Nežinau']] },
     { head: 'Karšto vandens vamzdynai', show: s => s.kv !== 'nera' },
     { key: 'kv_medziaga', label: 'Vamzdžių medžiaga', type: 'many', req: true, options: ['Cinkuotas plienas', 'Nerūdijantis plienas', 'PPR', 'Plastikas', 'Daugiasluoksniai'], show: s => s.kv !== 'nera' },
-    { key: 'kv_skersmenys', office: true, label: 'Skersmenys (magistralės – stovai)', type: 'text', ph: 'pvz. DN50 – DN15', show: s => s.kv !== 'nera' },
-    { key: 'kv_izoliacija_tipas', office: true, label: 'Šilumos izoliacija (tipas, storis)', type: 'text', show: s => s.kv !== 'nera' },
+    { key: 'kv_skersmenys', label: 'Skersmenys (magistralės – stovai)', type: 'many', options: ['DN50 – DN15', 'DN40 – DN15', 'DN32 – DN15', 'DN25 – DN15', 'DN20 – DN15'], show: s => s.kv !== 'nera' },
+    { key: 'kv_izoliacija_tipas', label: 'Šilumos izoliacija (tipas, storis)', type: 'many', options: ['Akmens vatos kevalai 30 mm', 'Akmens vatos kevalai 50 mm', 'Putų polietileno kevalai', 'Stiklo vata', 'Izoliacijos nėra'], show: s => s.kv !== 'nera' },
     { key: 'kv_armatura', label: 'Uždaromoji armatūra', type: 'many', options: ['Rutuliniai ventiliai', 'Sklendės', 'Kūginiai ventiliai'], show: s => s.kv !== 'nera' },
     { key: 'kv_balansiniai', label: 'Termobalansiniai ventiliai cirkuliacijos stovuose', type: 'one', options: [...YN, ['nezinau', 'Nežinau']], show: s => s.kv !== 'nera' },
     { head: 'Šildymo prietaisai' },
@@ -71,10 +73,6 @@ export const QUESTIONS = {
     { key: 'voniu_sildytuvai', label: 'Vonių šildytuvai (gyvatukai)', type: 'one', req: true, options: [['kv', 'Prijungti prie karšto vandens'], ['sildymas', 'Prijungti prie šildymo'], ['nera', 'Nėra'], ['nezinau', 'Nežinau']] },
     { key: 'termostatiniai', label: 'Termostatiniai ventiliai prie šildymo prietaisų', type: 'one', options: [['taip', 'Yra'], ['dalinai', 'Dalinai'], ['ne', 'Nėra'], ['nezinau', 'Nežinau']] }
   ],
-  pabaiga: [
-    { key: 'montuotojas', label: 'ŠP sumontavusi įmonė (jei yra lipdukas ar lentelė)', type: 'text', ph: 'pavadinimas, miestas' },
-    { key: 'pastabos', label: 'Pastabos biurui', type: 'area', ph: 'Kas neaišku, ko nepavyko rasti ar nufotografuoti' }
-  ]
 };
 
 // Nuotraukų vietos, nesusietos su konkrečiu įrenginiu
@@ -83,10 +81,7 @@ export const SLOTS = {
     { slot: 'overview', title: 'Bendros ŠP nuotraukos', min: 2, hint: 'Nufotografuokite visą šilumos punktą iš kelių kampų (geriausia 4), kad matytųsi visi įrenginiai ir vamzdynai.' },
     { slot: 'schema', title: 'Schemos nuotrauka', min: 1, show: s => s.schema_yra === 'taip', hint: 'Fotografuokite tiesiai iš priekio, visa schema kadre, be blizgesio. Jei schema didelė – padarykite ir kelias nuotraukas iš arčiau.' }
   ],
-  namas: [],
-  pabaiga: [
-    { slot: 'docs', title: 'Dokumentai šilumos punkte', min: 0, hint: 'Priežiūros žurnalas, ant sienos kabantys aktai, instrukcijos, montuotojo lentelė ar lipdukas.' }
-  ]
+  namas: []
 };
 
 export const GROUP_LABEL = { ivadas: 'Įvadas ir apskaita', sildymas: 'Šildymo kontūras', kv: 'Karšto vandens kontūras' };
@@ -105,24 +100,32 @@ export const KINDS = {
   valdiklis: { label: 'Valdiklis (reguliatorius)', plate: true, hint: 'Nufotografuokite valdiklio priekį taip, kad matytųsi modelis.',
     fields: [['nuotolinis', 'Nuotolinis ryšys', '', ['Yra', 'Nėra']]] },
   lauko_jutiklis: { label: 'Lauko oro temperatūros jutiklis', plate: false, fields: [['tipas', 'Tipas'], ['vieta', 'Vieta (fasadas, pusė)']] },
-  filtras: { label: 'Nuosėdų rinktuvas / filtras', plate: false, qty: true, fields: [['dn', 'Skersmuo', 'DN']] },
+  filtras: { label: 'Grubaus valymo filtras', plate: false, qty: true, fields: [['dn', 'Skersmuo', 'DN']] },
   elevatorius: { label: 'Elevatorius', plate: false, hint: 'Nufotografuokite elevatorių ir, jei yra, lentelę ar užrašą su numeriu.',
     fields: [['numeris', 'Elevatoriaus Nr.'], ['tuta', 'Tūtos (antgalio) skersmuo', 'mm'], ['dn', 'Skersmuo', 'DN']] },
   silumokaitis: { label: 'Šilumokaitis', plate: true,
     fields: [['ploksteles', 'Plokštelių skaičius', 'vnt.'], ['galia', 'Galia', 'kW'], ['pn', 'Slėgio klasė PN', 'bar'], ['tipas', 'Tipas', '', ['Plokštelinis lituotas', 'Plokštelinis surenkamas', 'Vamzdinis (greitaeigis)']], ['pakopos', 'Pakopų skaičius']] },
   siurblys: { label: 'Cirkuliacinis siurblys', plate: true,
     fields: [['q', 'Našumas Q', 'm³/h'], ['h', 'Slėgis H', 'm'], ['p', 'Galia P', 'W'], ['rezimas', 'Nustatytas režimas']] },
-  reg_voztuvas: { label: 'Reguliavimo vožtuvas su pavara', plate: true, hint: 'Nufotografuokite ir vožtuvo, ir pavaros lenteles.',
-    fields: [['dn', 'Skersmuo', 'DN'], ['kvs', 'Kvs', 'm³/h'], ['pavara', 'Pavaros modelis']] },
+  reg_voztuvas: { label: 'Reguliavimo (dviejų eigų) vožtuvas', plate: true,
+    fields: [['dn', 'Skersmuo', 'DN'], ['kvs', 'Kvs', 'm³/h']] },
+  pavara: { label: 'Pavara', plate: true, hint: 'Nufotografuokite pavaros lentelę ir bendrą vaizdą.',
+    fields: [['tipas', 'Tipas / valdymo signalas'], ['itampa', 'Maitinimo įtampa', 'V']] },
   ispletimo_indas: { label: 'Išsiplėtimo indas', plate: true, fields: [['turis', 'Tūris', 'l'], ['pn', 'Slėgio klasė PN', 'bar'], ['priesslegis', 'Priešslėgis', 'bar']] },
   apsauginis_voztuvas: { label: 'Apsauginis vožtuvas', plate: true, hint: 'Suveikimo slėgis būna užrašytas ant vožtuvo dangtelio.',
     fields: [['dn', 'Skersmuo', 'DN'], ['slegis', 'Suveikimo slėgis', 'bar']] },
   papildymas: { label: 'Papildymo linija (vožtuvas / siurblys, skaitiklis)', plate: false,
-    fields: [['irenginys', 'Vožtuvas ar siurblys (modelis)'], ['skaitiklio_dn', 'Papildymo skaitiklio skersmuo', 'DN'], ['rodmuo', 'Skaitiklio rodmuo', 'm³']] },
+    fields: [['irenginys', 'Vožtuvas ar siurblys (modelis)'], ['skaitiklio_dn', 'Papildymo skaitiklio skersmuo', 'DN'], ['rodmuo', 'Skaitiklio rodmuo', 'm³']] },   // sena (nebededama), paliekama jau surinktiems duomenims
+  pap_voztuvas: { label: 'Papildymo vožtuvas', plate: false, fields: [['dn', 'Skersmuo', 'DN']] },
+  pap_siurblys: { label: 'Papildymo siurblys', plate: true,
+    fields: [['q', 'Našumas Q', 'm³/h'], ['h', 'Slėgis H', 'm'], ['p', 'Galia P', 'W']] },
+  pap_skaitiklis: { label: 'Papildymo skaitiklis', plate: true, fields: [['dn', 'Skersmuo', 'DN'], ['rodmuo', 'Rodmuo', 'm³'], ['gam_nr', 'Gamyklinis Nr.']] },
   slegio_rele: { label: 'Slėgio relė', plate: true, fields: [['nustatymas', 'Nustatymas', 'bar']] },
   sv_skaitiklis: { label: 'Šalto vandens skaitiklis prieš šilumokaitį', plate: true, fields: SK },
   manometrai: { label: 'Manometrai', plate: false, qty: true, fields: [['skale', 'Skalė', 'bar'], ['patikra', 'Patikros žyma (metai)']] },
   termometrai: { label: 'Termometrai', plate: false, qty: true, fields: [['skale', 'Skalė', '°C']] },
+  manotermo: { label: 'Manometrai ir termometrai', plate: false, qty: true, hint: 'Nufotografuokite visus manometrus ir termometrus (visame ŠP) – pakanka kelių bendrų nuotraukų.',
+    fields: [['skale_bar', 'Manometrų skalė', 'bar'], ['skale_c', 'Termometrų skalė', '°C'], ['patikra', 'Manometrų patikros žyma (metai)']] },
   armatura: { label: 'Uždaromoji armatūra', plate: false, qty: true,
     fields: [['tipas', 'Tipas', '', ['Rutuliniai ventiliai', 'Sklendės', 'Kūginiai ventiliai']], ['dn', 'Skersmuo', 'DN'], ['numeriai', 'Numeriai pagal schemą']] },
   atbulinis: { label: 'Atbulinis vožtuvas', plate: false, qty: true, fields: [['dn', 'Skersmuo', 'DN']] },
@@ -135,44 +138,44 @@ export function expectedItems(s) {
   const out = [];
   const add = (grp, kind, label = null) => out.push({ grp, kind, label });
   if (!s.sildymas || !s.kv) return out;                    // tipas dar nepasirinktas
-  add('ivadas', 'armatura', 'Įvadinės sklendės (atsakomybės riba)');
+  add('ivadas', 'armatura', 'Įvadinė sklendė (1)');
+  add('ivadas', 'armatura', 'Įvadinė sklendė (2)');
   if (autoSp(s)) add('ivadas', 'agregatas');
   add('ivadas', 'silumos_skaitiklis');
   add('ivadas', 'filtras');
-  if (autoSp(s)) {
-    add('ivadas', 'slegio_reguliatorius');
-    add('ivadas', 'valdiklis');                           // lauko jutiklis neklausiamas – nustatomas pagal valdiklį
-    add('ivadas', 'el_skydelis');
-  }
-  add('ivadas', 'manometrai');
-  add('ivadas', 'termometrai');
+  if (autoSp(s)) add('ivadas', 'slegio_reguliatorius');
+  if (autoSp(s) || s.sildymas === 'elevatorinis_valdiklis') add('ivadas', 'valdiklis');   // lauko jutiklis neklausiamas – nustatomas pagal valdiklį
+  if (autoSp(s)) add('ivadas', 'el_skydelis');
+  add('ivadas', 'manotermo');                                // visi manometrai ir termometrai – viena bendra kortelė
 
-  if (s.sildymas === 'elevatorinis') {
+  if (elev(s)) {
     add('sildymas', 'elevatorius');
     if (s.sild_siurblys === 'taip') add('sildymas', 'siurblys');
-  } else if (s.sildymas === 'priklausoma') {
+  } else if (s.sildymas === 'priklausoma') {               // sena reikšmė (nebepasirenkama)
     add('sildymas', 'reg_voztuvas');
+    add('sildymas', 'pavara');
     add('sildymas', 'siurblys');
   } else if (s.sildymas === 'nepriklausoma') {
     add('sildymas', 'silumokaitis');
     add('sildymas', 'reg_voztuvas');
+    add('sildymas', 'pavara');
     add('sildymas', 'siurblys');
     add('sildymas', 'ispletimo_indas');
     add('sildymas', 'apsauginis_voztuvas');
-    add('sildymas', 'papildymas');
-    add('sildymas', 'slegio_rele');
+    add('sildymas', 'pap_voztuvas');
+    add('sildymas', 'pap_siurblys');
+    add('sildymas', 'pap_skaitiklis');
   }
-  if (s.sildymas !== 'nera') { add('sildymas', 'manometrai'); add('sildymas', 'termometrai'); }
 
   if (kvOn(s)) {
     add('kv', 'silumokaitis');
     add('kv', 'reg_voztuvas');
+    add('kv', 'pavara');
     if (s.kv_cirkuliacija === 'taip') add('kv', 'siurblys');
     add('kv', 'apsauginis_voztuvas');
+    add('kv', 'slegio_rele');
     add('kv', 'sv_skaitiklis');
     add('kv', 'atbulinis');
-    add('kv', 'manometrai');
-    add('kv', 'termometrai');
   }
   return out;
 }
@@ -211,8 +214,8 @@ export function computeProgress(hp, items, photos) {
     if (it.kind === 'valdiklis' && (hp.office || {}).valdiklis_modelis) continue;     // žinomas valdiklis – nei duomenų, nei nuotraukų nereikia
     const k = KINDS[it.kind] || KINDS.kita;
     const ph = photos.filter(p => p.item_id === it.id);
-    const ok = k.plate ? ph.some(p => p.slot === 'plate') : ph.length > 0;
-    checks.push({ step: it.grp, label: `${itemLabel(it)}: ${k.plate ? 'gamyklinės lentelės nuotrauka' : 'nuotrauka'}`, ok });
+    const ok = ph.length > 0;
+    checks.push({ step: it.grp, label: `${itemLabel(it)}: nuotrauka`, ok });
   }
   const total = checks.length, done = checks.filter(c => c.ok).length;
   return { checks, done, total, missing: total - done, percent: total ? Math.round(done * 100 / total) : 0 };
