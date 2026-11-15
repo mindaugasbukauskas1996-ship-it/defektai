@@ -3,6 +3,7 @@
 // Šis failas sugeneruotas iš supabase/functions/ai/prompt.js + index.ts.
 // Įklijuokite VISĄ turinį į funkcijos "ai" failą index.ts ir spauskite Deploy.
 // =====================================================================
+
 // =====================================================================
 // Bendras DI (Claude API) modulis.
 // Naudojamas ir Supabase Edge funkcijoje (serveryje), ir naršyklėje
@@ -143,6 +144,11 @@ Numatomų darbų aktas (tik kai režimas „full“):
 - Mato vienetus rinkis TIK iš sąrašo: ${UNITS.join(', ')}. Dažniausiai: vamzdžiai, kabeliai, latakai, siūlės – m; dangos, dažymas, tinkavimas, hidroizoliacija – m²; atliekos, gruntas – m³ arba T; keičiami daiktai – Vnt.; rinkiniai – Komplektas.
 - Kiekį nurodyk, jei jį galima nustatyti iš aprašymo, matmenų ar nuotraukų. Jei galima tik apytiksliai įvertinti – pateik pagrįstą preliminarų kiekį ir pastabose parašyk „preliminarus, tikslinti vietoje“. Jei kiekio nustatyti neįmanoma – kiekis null ir pastaba, ką išmatuoti.
 
+Kiekiai pagal pastato duomenis (nespėliok):
+- Jei pateiktas „PASTATO KONTEKSTAS“, kiekius skaičiuok iš jo: stovo ilgis ≈ (aukštų skaičius × 2,8 m) + 2 m; stogo darbai – ne daugiau nei „Stogo plotas“; butų / laiptinių skaičius – iš konteksto. Skaičiavimo pagrindą trumpai surašyk eilutės pastabose (pvz. „9 aukštai × 2,8 m + 2 m, preliminarus, tikslinti vietoje“).
+- Kiekių, kurių nei aprašymas, nei nuotraukos, nei pastato duomenys nepagrindžia, NEIŠGALVOK – palik tuščią ir pastabose parašyk „kiekį nustato rangovas vietoje“.
+- Jei pateikti „PAVYZDŽIAI IŠ ANKSTESNIŲ AKTŲ“, perimk jų stilių, apimtį, darbų sudėtį ir formuluotes, bet faktų, kiekių ir adresų iš jų nekopijuok.
+
 Papildomi klausimai:
 - Jei trūksta informacijos, kuri ESMINGAI pakeistų aktą (pvz., nežinomas pažeisto ploto dydis, kai reikia kiekių; neaišku, kuri sistema pažeista; neaišku, ar defektas bendrojo naudojimo objekte), grąžink status = "questions" ir iki 5 trumpų, konkrečių klausimų su galimais atsakymų variantais.
 - Neklausk to, kas jau aprašyta ar matyti nuotraukose. Neklausk smulkmenų, kurias galima pažymėti kaip prielaidą.
@@ -249,6 +255,15 @@ function line(label, value) {
   return value ? `${label}: ${value}\n` : '';
 }
 
+// Ankstesni to paties inžinieriaus aktai panašiems defektams (siunčia naršyklė): stiliui ir apimčiai, ne faktams.
+function examplesBlock(payload) {
+  const ex = (payload.examples || []).slice(0, 3).filter(x => x && (x.defects || x.works));
+  if (!ex.length) return '';
+  const cut = (s, n) => String(s || '').slice(0, n);
+  return '\nPAVYZDŽIAI IŠ ANKSTESNIŲ AKTŲ (to paties inžinieriaus; perimk stilių, apimtį ir darbų sudėtį, faktų ir kiekių nekopijuok):\n' +
+    ex.map((x, i) => `${i + 1}) Sistema: ${cut(x.system, 120)}\n   Defektai: ${cut(x.defects, 600)}\n   Darbai: ${cut(x.works, 500)}${x.rows ? '\n   Darbų lentelė: ' + cut(x.rows, 500) : ''}`).join('\n') + '\n';
+}
+
 // Inžinieriaus bendri pageidavimai, išmokti iš ankstesnių pataisymų (siunčia naršyklė).
 function lessonsBlock(payload) {
   const ls = (payload.lessons || []).map(x => String(x || '').trim()).filter(Boolean).slice(0, 30);
@@ -303,6 +318,7 @@ export function buildActRequest(payload, model = DEFAULT_MODEL) {
   }
   text += buildingBlock(payload);
   text += lessonsBlock(payload);
+  text += examplesBlock(payload);
 
   const photos = (payload.photos || []).slice(0, MAX_PHOTOS);
   text += photos.length
@@ -599,12 +615,40 @@ export async function callOpenAI(apiKey, body, model) {
 
 /** Vienas įėjimo taškas: action = 'generate_act' | 'generate_nc' | 'parse_task'.
  *  ai = { provider: 'openai', key, model } – jei nurodyta, kviečiamas OpenAI vietoj Claude. */
+// Taisymų analizė: iš skirtumų tarp DI ir galutinio teksto išveda bendras taisykles.
+const EDITS_TOOL = {
+  name: 'siulomos_taisykles',
+  description: 'Bendros rašymo taisyklės, išvestos iš inžinieriaus taisymų.',
+  input_schema: { type: 'object', properties: {
+    lessons: { type: 'array', maxItems: 5, items: { type: 'string', description: 'Viena trumpa bendra taisyklė be adresų, kiekių ir konkrečių faktų.' } }
+  }, required: ['lessons'] }
+};
+function buildEditsRequest(payload, model = DEFAULT_MODEL) {
+  const d = (payload.diffs || []).slice(0, 12).map((x, i) => `${i + 1}. [${String(x.field || '').slice(0, 40)}]\n   DI parašė: ${String(x.before || '').slice(0, 700)}\n   Inžinierius pakeitė į: ${String(x.after || '').slice(0, 700)}`).join('\n');
+  return {
+    model, max_tokens: 1200,
+    system: 'Lygini DI parašytus aktų tekstus su inžinieriaus galutiniais variantais ir iš pakartotinų ar akivaizdžių pakeitimų išveski BENDRAS rašymo taisykles (stilius, formuluotės, kas visada įtraukiama ar išmetama). Konkrečių faktų, adresų, kiekių ir vienkartinių pataisymų netaisyk į taisykles. Jei bendros taisyklės nėra – grąžink tuščią sąrašą. Rezultatą pateik per įrankį.',
+    tools: [EDITS_TOOL], tool_choice: { type: 'auto' },
+    messages: [{ role: 'user', content: 'PAKEITIMAI:\n' + d }]
+  };
+}
+
+// Sistemos nurodymas talpinamas (prompt caching): ilgas STR žinynas nebemokamas pilna kaina kiekvieną kartą.
+const withCache = body => (typeof body.system === 'string' && body.system.length > 3000)
+  ? { ...body, system: [{ type: 'text', text: body.system, cache_control: { type: 'ephemeral' } }] } : body;
+
 export async function runAction(apiKey, model, action, payload, extraHeaders = {}, ai = {}) {
-  const callAnthropic = ai.provider === 'openai' && ai.key
+  const openai = ai.provider === 'openai' && ai.key;
+  const callAnthropic = openai
     ? (_k, body) => callOpenAI(ai.key, body, ai.model || OPENAI_DEFAULT_MODEL)
-    : callAnthropicApi;
+    : (k, body, h) => callAnthropicApi(k, withCache(body), h);
+  if (action === 'learn_edits') {
+    const resp = await callAnthropic(apiKey, buildEditsRequest(payload, ai.fastModel || model), extraHeaders);
+    const out = extractToolInput(resp, EDITS_TOOL.name);
+    return { lessons: (out.lessons || []).map(String).filter(Boolean).slice(0, 5), usage: resp.usage || null };
+  }
   if (action === 'parse_task') {
-    const body = buildParseRequest(payload.text || '', payload.service_types || [], model);
+    const body = buildParseRequest(payload.text || '', payload.service_types || [], ai.fastModel || model);   // paprasta užduotis – pigesnis modelis, jei nustatytas
     const resp = await callAnthropic(apiKey, body, extraHeaders);
     return extractToolInput(resp, PARSE_TOOL.name);
   }
@@ -708,6 +752,7 @@ Deno.serve(async (req: Request) => {
       ai = { provider: 'openai', key, model: Deno.env.get('OPENAI_MODEL') || OPENAI_DEFAULT_MODEL };
     }
     delete p.provider;
+    ai.fastModel = Deno.env.get('ANTHROPIC_MODEL_FAST') || '';   // neprivaloma: pigesnis modelis paprastoms užduotims (laiško skaitymas, taisyklių išvedimas)
     const result = await runAction(apiKey, model, action, p, {}, ai);
     return json(result);
   } catch (e) {

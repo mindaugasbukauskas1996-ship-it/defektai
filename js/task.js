@@ -13,6 +13,7 @@ import { openAnnotator } from './annotator.js';
 import { aiPickHtml, bindAiPick } from './ai-pick.js';
 import { snapOf, keepCurrent, addGenerated, versionsHtml, bindVersions } from './act-versions.js';
 import { bindDictation } from './dictate.js';
+import { checkAct, diffAct } from './act-check.js';
 import { drawAnnualInspection, drawAnnualActTab } from './annual.js';
 
 const UNITS = ['Vnt.', 'm', 'm²', 'm³', 'Komplektas', 'val.', 'kg', 'T', 'Ltr', 'cm', 'para',
@@ -673,6 +674,7 @@ async function generate(body, { force = false, instruction = '' }) {
       qa: (t.ai_questions || []).filter(q => q.done).map(q => ({ question: q.question, answer: q.answer })),
       current: instruction ? { defect_act: t.defect_act, works_act: t.works_act } : undefined,
       lessons: await db.activeLessons('defect').catch(() => []),
+      examples: instruction ? [] : await db.exampleActs(t),            // panašūs ankstesni aktai – stiliui ir apimčiai
       docs: await docsForAI(),
       photos
     };
@@ -696,6 +698,7 @@ async function generate(body, { force = false, instruction = '' }) {
       patch.act_versions = addGenerated(keepCurrent(t, 'defect', before), 'defect',
         { defect_act: patch.defect_act, works_act: patch.works_act, ai_assumptions: patch.ai_assumptions }, provider, instruction ? 'Pataisyta pagal nurodymą' : '');
       await ensureActNumber(patch);
+      S.checkOk = false;
       await save(patch);
       toast((instruction ? 'Aktas pataisytas.' : 'Aktas paruoštas – peržiūrėkite ir pataisykite, jei reikia') + learned, 'ok', learned ? 8000 : 4500);
     }
@@ -779,6 +782,7 @@ function drawActEditor() {
             </div>
             <div class="obj-body">
               <label>Pastebėti defektai, deformacijos, gedimai${ta(o.defects, 'data-o="defects"')}</label>
+              <button type="button" class="linkbtn" data-rewrite="${i}">${icon('spark')} Perrašyti šį objektą su DI</button>
               <label>Rekomenduojami darbai defektams pašalinti${ta(o.works, 'data-o="works"')}</label>
             </div>
           </div>`).join('')}
@@ -817,6 +821,8 @@ function drawActEditor() {
       <ul>${assumptions.map(a => `<li>${esc(a)}</li>`).join('')}</ul>
     </div>` : ''}
 
+    ${checkCardHtml()}
+
     <div class="card refine">
       <div class="card-title">${icon('spark')} Pataisyti su DI</div>
       <p class="muted small">Jei nurodymas tinka ir kitiems aktams, DI jį įsimins ir taikys ateityje (Nustatymai → DI taisyklės).</p>
@@ -842,6 +848,49 @@ function drawActEditor() {
     </div>`;
 }
 
+// ---------- Patikra prieš eksportą ir mokymasis iš taisymų ----------
+
+const checkCardHtml = () => `<div class="card act-check" id="act-check"><div class="card-title">Patikra prieš eksportą</div><div class="muted small">Tikrinama…</div></div>`;
+
+async function bindChecks(body, kind) {
+  const box = $('#act-check', body);
+  if (!box) return;
+  const draw = async () => {
+    const t = S.task;
+    let list = [];
+    try { list = await checkAct(kind, t, S.photos.filter(p => p.include_in_act)); } catch (e) { console.warn(e); }
+    const diffs = diffAct(kind, t);
+    const errs = list.filter(x => x.level === 'err').length, warns = list.filter(x => x.level === 'warn').length;
+    const ico = { err: '🔴', warn: '🟡', info: 'ℹ️' };
+    box.innerHTML = `<div class="card-title">Patikra prieš eksportą ${errs ? `<span class="tag nc">${errs} klaidos</span>` : warns ? `<span class="tag">${warns} patikrinti</span>` : '<span class="tag">✓ viskas gerai</span>'}</div>
+      ${list.length ? `<ul class="chk-list">${list.map(x => `<li>${ico[x.level]} ${x.where ? `<b>${esc(x.where)}:</b> ` : ''}${esc(x.text)}</li>`).join('')}</ul>` : '<p class="muted small">Nuorodos į STR žinyną, nuotraukos, kiekiai ir mato vienetai – be pastabų.</p>'}
+      ${errs || warns ? `<label class="chk"><input type="checkbox" id="chk-ok" ${S.checkOk ? 'checked' : ''}> Peržiūrėjau pastabas – eksportuoti galima</label>` : ''}
+      ${diffs.length ? `<div class="of-actions"><button class="btn small" type="button" id="learn-edits">${icon('spark')} Išmokyti DI iš mano taisymų (${diffs.length})</button></div><div id="learn-out"></div>` : ''}`;
+    S.checkOk = !(errs || warns) || !!S.checkOk;
+    const ok = $('#chk-ok', box); if (ok) ok.addEventListener('change', () => { S.checkOk = ok.checked; });
+    const le = $('#learn-edits', box);
+    if (le) le.addEventListener('click', async () => {
+      le.disabled = true; le.textContent = 'Analizuojama…';
+      try {
+        const res = await db.ai('learn_edits', { diffs });
+        const out = $('#learn-out', box);
+        out.innerHTML = (res.lessons || []).length
+          ? `<p class="muted small">DI siūlo įsiminti (pažymėkite tinkamas):</p>${res.lessons.map((l, i) => `<label class="chk"><input type="checkbox" data-les="${i}" checked> ${esc(l)}</label>`).join('')}<button class="btn small primary" type="button" id="les-save">Įsiminti pažymėtas</button>`
+          : '<p class="muted small">Bendrų taisyklių iš šių pakeitimų neišvesta – jie atrodo vienkartiniai.</p>';
+        le.remove();
+        const sv = $('#les-save', box);
+        if (sv) sv.addEventListener('click', async () => {
+          let n = 0;
+          for (const c of out.querySelectorAll('[data-les]:checked')) { try { if (await db.addLesson(kind === 'nc' ? 'nonconformity' : 'defect', res.lessons[+c.dataset.les], S.task.id)) n++; } catch (_) { /* tęsiame */ } }
+          toast(n ? `Įsiminta taisyklių: ${n}` : 'Nieko neįsiminta', n ? 'ok' : 'info'); sv.remove();
+        });
+      } catch (e) { toast(e.message || String(e), 'error', 6000); le.disabled = false; le.textContent = 'Bandyti dar kartą'; }
+    });
+  };
+  await draw();
+  let timer; body.addEventListener('input', () => { clearTimeout(timer); timer = setTimeout(draw, 1500); });
+}
+
 /** Tekstų laukai užauga pagal turinį – be slinkties juostų. */
 const fitTa = ta => { ta.style.height = 'auto'; ta.style.height = (ta.scrollHeight + 2) + 'px'; };
 function autosize(root) {
@@ -852,6 +901,9 @@ window.addEventListener('resize', debounce(() => { const b = document.getElement
 
 /** Word (.docx) atsisiuntimas tiesiai iš akto redaktoriaus (naudoja dabartinius, net ir dar neišsaugotus, duomenis). */
 async function downloadDocx(doc, btn) {
+  const kind = doc === 'nc' ? 'nc' : 'defect';
+  const issues = (await checkAct(kind, S.task, S.photos.filter(p => p.include_in_act)).catch(() => [])).filter(x => x.level === 'err');
+  if (issues.length && !S.checkOk && !await confirmDialog(`Aktas turi ${issues.length} klaidų (žr. „Patikra prieš eksportą“). Vis tiek eksportuoti?`, 'Eksportuoti')) return;
   const old = btn.innerHTML;
   btn.disabled = true; btn.innerHTML = '<span class="spinner"></span> Ruošiama...';
   try {
@@ -878,6 +930,16 @@ function bindDocx(body) {
 
 function bindActEditor(body) {
   bindDocx(body);
+  bindChecks(body, 'defect');
+  body.addEventListener('click', e => {                       // „Perrašyti šį objektą su DI“ – užpildo nurodymą ir perkelia prie jo
+    const b = e.target.closest('[data-rewrite]');
+    if (!b) return;
+    const o = S.task.defect_act.objects[+b.dataset.rewrite], inp = $('#refine-txt', body);
+    if (!o || !inp) return;
+    inp.value = `Perrašyk objektą „${o.system || b.dataset.rewrite}“: `;
+    inp.scrollIntoView({ block: 'center', behavior: 'smooth' }); inp.focus();
+    inp.setSelectionRange(inp.value.length, inp.value.length);
+  });
   autosize(body);
   body.addEventListener('input', e => { if (e.target.matches && e.target.matches('.act-ed textarea')) fitTa(e.target); });
   const ind = () => $('#act-save', body);
@@ -1084,6 +1146,8 @@ function drawNcEditor() {
       <ul>${assumptions.map(x => `<li>${esc(x)}</li>`).join('')}</ul>
     </div>` : ''}
 
+    ${checkCardHtml()}
+
     <div class="card refine">
       <div class="card-title">${icon('spark')} Pataisyti su DI</div>
       <p class="muted small">Jei nurodymas tinka ir kitiems aktams, DI jį įsimins ir taikys ateityje (Nustatymai → DI taisyklės).</p>
@@ -1106,6 +1170,7 @@ function drawNcEditor() {
 }
 
 function bindNcEditor(body) {
+  bindChecks(body, 'nc');
   bindDocx(body);
   autosize(body);
   body.addEventListener('input', e => { if (e.target.matches && e.target.matches('.act-ed textarea')) fitTa(e.target); });

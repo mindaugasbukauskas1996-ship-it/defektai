@@ -77,6 +77,7 @@ Deno.serve(async (req: Request) => {
       ai = { provider: 'openai', key, model: Deno.env.get('OPENAI_MODEL') || OPENAI_DEFAULT_MODEL };
     }
     delete p.provider;
+    ai.fastModel = Deno.env.get('ANTHROPIC_MODEL_FAST') || '';   // neprivaloma: pigesnis modelis paprastoms užduotims (laiško skaitymas, taisyklių išvedimas)
     const result = await runAction(apiKey, model, action, p, {}, ai);
     return json(result);
   } catch (e) {

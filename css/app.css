@@ -645,3 +645,9 @@ input[type=date], select { min-width: 0; max-width: 100%; }
 .of-erase img { min-width: 0; pointer-events: none; }
 .of-erase i { position: absolute; background: rgba(229, 57, 53, .25); border: 2px solid #e53935; pointer-events: none; }
 .of-instr { flex: 1 1 320px; }
+
+/* Patikra prieš eksportą */
+.act-check .chk-list { list-style: none; margin: 8px 0; padding: 0; display: grid; gap: 6px; font-size: 14px; }
+.act-check .chk-list li { padding: 6px 8px; background: var(--bg, #f4f5f7); border-radius: 8px; }
+.act-check .chk { display: flex; gap: 8px; align-items: flex-start; margin: 6px 0; }
+.linkbtn[data-rewrite] { margin: 4px 0 10px; }

@@ -4,7 +4,7 @@
 // =====================================================================
 
 import { CONFIG } from './config.js';
-import { uuid, blobToDataURL, normKey, splitAddress, parseNum } from './util.js';
+import { uuid, blobToDataURL, normKey, splitAddress, parseNum, toast } from './util.js';
 
 export const isDemo = !CONFIG.SUPABASE_URL;
 
@@ -226,11 +226,80 @@ export async function addPhoto(taskId, blob, meta = {}) {
     await idbPut('photos', row);
     return row;
   }
-  const up = await sb.storage.from('photos').upload(path, blob, { contentType: 'image/jpeg', upsert: false });
-  if (up.error) throw up.error;
-  const { data, error } = await sb.from('photos').insert(row).select('*').single();
-  if (error) throw error;
-  return data;
+  try {
+    const up = await sb.storage.from('photos').upload(path, blob, { contentType: 'image/jpeg', upsert: false });
+    if (up.error) throw up.error;
+    const { data, error } = await sb.from('photos').insert(row).select('*').single();
+    if (error) throw error;
+    return data;
+  } catch (err) {
+    if (!isNetworkErr(err)) throw err;
+    // nėra ryšio (pvz. laiptinėje) – nuotrauka saugoma telefone ir bus įkelta, kai ryšys atsiras
+    await qPut({ id, row, blob });
+    urlCache.set(path, { url: URL.createObjectURL(blob), exp: Infinity });
+    toast('Nėra ryšio – nuotrauka išsaugota telefone ir bus įkelta vėliau', 'info', 5000);
+    return { ...row, created_at: new Date().toISOString(), queued: true };
+  }
+}
+
+// ---- Nuotraukų eilė be ryšio ----
+const isNetworkErr = e => !navigator.onLine || /failed to fetch|network|load failed|timeout|fetch/i.test(String((e && (e.message || e.name)) || e));
+const qOpen = () => new Promise((res, rej) => {
+  const r = indexedDB.open('defektai-queue', 1);
+  r.onupgradeneeded = () => r.result.createObjectStore('photos', { keyPath: 'id' });
+  r.onsuccess = () => res(r.result);
+  r.onerror = () => rej(r.error);
+});
+const qTx = async (mode, fn) => { const d = await qOpen(); return new Promise((res, rej) => { const q = fn(d.transaction('photos', mode).objectStore('photos')); q.onsuccess = () => res(q.result); q.onerror = () => rej(q.error); }); };
+const qPut = rec => qTx('readwrite', s => s.put(rec));
+const qAll = () => qTx('readonly', s => s.getAll());
+const qDel = id => qTx('readwrite', s => s.delete(id));
+export const queuedPhotoCount = async () => { try { return (await qAll()).length; } catch (_) { return 0; } };
+
+let flushing = false;
+/** Įkelia telefone laukiančias nuotraukas. Grąžina įkeltų skaičių. */
+export async function flushPhotoQueue() {
+  if (isDemo || flushing || !navigator.onLine) return 0;
+  flushing = true;
+  let n = 0;
+  try {
+    for (const rec of await qAll()) {
+      try {
+        const up = await sb.storage.from('photos').upload(rec.row.path, rec.blob, { contentType: 'image/jpeg', upsert: true });
+        if (up.error) throw up.error;
+        const { error } = await sb.from('photos').upsert(rec.row);
+        if (error) throw error;
+        await qDel(rec.id); n++;
+      } catch (err) { if (isNetworkErr(err)) break; console.warn('Eilės nuotrauka neįkelta', err); }
+    }
+  } catch (_) { /* eilė nepasiekiama */ } finally { flushing = false; }
+  if (n) toast(`Įkeltos laukusios nuotraukos: ${n}`, 'ok', 5000);
+  return n;
+}
+if (!isDemo && typeof window !== 'undefined') {
+  window.addEventListener('online', () => flushPhotoQueue());
+  setTimeout(() => flushPhotoQueue(), 4000);
+}
+
+/** Ankstesni to paties naudotojo aktai panašiems defektams – DI pavyzdžiams (stilius, apimtis; be adresų ir gyventojų duomenų). */
+export async function exampleActs(task, max = 3) {
+  try {
+    const all = isDemo ? await listTasks() : (await sb.from('tasks').select('id,kind,defect_act,works_act,created_at').not('defect_act', 'is', null).order('created_at', { ascending: false }).limit(60)).data || [];
+    const tok = s => new Set(String(s || '').toLowerCase().replace(/[^a-ząčęėįšųūž0-9 ]/g, ' ').split(/\s+/).filter(w => w.length >= 5).map(w => w.slice(0, 6)));
+    const want = tok([task.service_type, task.problem, task.field_notes, task.description].join(' '));
+    if (!want.size) return [];
+    const scored = [];
+    for (const x of all) {
+      if (x.id === task.id || x.kind !== 'defect') continue;
+      const rows = ((x.works_act || {}).rows || []).slice(0, 6).map(r => `${r.description}${r.qty ? ' – ' + r.qty + ' ' + (r.unit || '') : ''}`).join('; ');
+      for (const o of (x.defect_act || {}).objects || []) {
+        const have = tok(o.system + ' ' + o.defects);
+        let s = 0; want.forEach(w => { if (have.has(w)) s++; });
+        if (s >= 2) scored.push({ s, ex: { system: o.system, defects: o.defects, works: o.works, rows } });
+      }
+    }
+    return scored.sort((a, b) => b.s - a.s).slice(0, max).map(x => x.ex);
+  } catch (_) { return []; }
 }
 
 /** Nukopijuoja nuotrauką (su žymėjimais) į kitą užduotį; saugykloje daroma sava kopija, kad trynimas nepaveiktų originalo. */
