@@ -14,6 +14,7 @@ import { renderPrint } from './print.js';
 import { renderAnnualList } from './annual.js';
 import { combo } from './combo.js';
 import { renderHeat, renderHeatAccount } from './heat.js';
+import { startNotify } from './notify.js';
 
 const view = () => document.getElementById('view');
 let user = null;
@@ -37,6 +38,7 @@ async function start() {
   renderShell();
   lithuanianDates();
   route();
+  startNotify(() => !!user);
   if ('serviceWorker' in navigator && location.protocol === 'https:') {
     navigator.serviceWorker.register('sw.js').catch(() => {});
   }

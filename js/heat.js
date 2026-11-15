@@ -5,7 +5,7 @@
 
 import * as db from './data.js';
 import { icon } from './icons.js';
-import { $, esc, toast, confirmDialog, debounce, processImage, buildingSummary, fmtDate } from './util.js';
+import { $, esc, toast, confirmDialog, debounce, processImage, buildingSummary, fmtDate, photoIssues } from './util.js';
 import {
   STEPS, HP_STATUS, QUESTIONS, SLOTS, KINDS, GROUP_LABEL, expectedItems, itemLabel, itemFilled, computeProgress
 } from './heat-model.js';
@@ -510,6 +510,7 @@ async function renderPoint(el, id, stepId, me, go) {
             const im = await processImage(j.f, 2000, 0.82);
             S.photos.push(await db.addHpPhoto(id, im.blob, { slot: dbSlot(j), item_id: j.item_id, width: im.width, height: im.height }));
             ok = true;
+            photoIssues(im.blob).then(iss => { if (iss.length) toast(`Nuotrauka gali būti ${iss.join(' ir ')} – perfotografuokite, kol esate šilumos punkte`, 'info', 8000); });
           } catch (err) { toast('Nuotraukos įkelti nepavyko: ' + (err.message || err), 'error', 6000); }
           pending.splice(pending.indexOf(j), 1);
           redrawSlot(j.slot, j.item_id);

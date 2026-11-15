@@ -212,6 +212,18 @@ export async function listPhotos(taskId) {
   return data;
 }
 
+export async function listNotifications(limit = 20) {
+  if (isDemo) return [];
+  const { data, error } = await sb.from('notifications').select('*').order('created_at', { ascending: false }).limit(limit);
+  if (error) throw error;
+  return data || [];
+}
+export async function markNotificationsRead(ids) {
+  if (isDemo || !ids.length) return;
+  const { error } = await sb.from('notifications').update({ read_at: new Date().toISOString() }).in('id', ids);
+  if (error) throw error;
+}
+
 export async function addPhoto(taskId, blob, meta = {}) {
   const id = uuid();
   const path = `${taskId}/${id}.jpg`;

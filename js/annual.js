@@ -9,7 +9,7 @@ import { icon } from './icons.js';
 import { openAnnotator } from './annotator.js';
 import { aiPickHtml, bindAiPick } from './ai-pick.js';
 import { snapOf, keepCurrent, addGenerated, versionsHtml, bindVersions } from './act-versions.js';
-import { $, $$, esc, toast, today, fmtDate, debounce, processImage, confirmDialog } from './util.js';
+import { $, $$, esc, toast, today, fmtDate, debounce, processImage, confirmDialog, photoIssues } from './util.js';
 
 const OK_TEXT = 'Apžiūros metu defektų nenustatyta.';
 const OK_REC = 'Vykdyti tolimesnius priežiūros darbus.';
@@ -323,7 +323,12 @@ export function drawAnnualInspection(body, ctx) {
       toast('Įkeliama...', 'info', 1500);
       let sort = S.photos.reduce((m, p) => Math.max(m, p.sort || 0), -1) + 1;
       for (const f of files) {
-        try { const { blob, width, height } = await processImage(f); S.photos.push(await db.addPhoto(t.id, blob, { width, height, sort: sort++, ref: it.id, caption: it.name })); }
+        try {
+          const { blob, width, height } = await processImage(f);
+          S.photos.push(await db.addPhoto(t.id, blob, { width, height, sort: sort++, ref: it.id, caption: it.name }));
+          const iss = await photoIssues(blob);
+          if (iss.length) toast(`Nuotrauka (${it.name}) gali būti ${iss.join(' ir ')} – jei esate vietoje, perfotografuokite`, 'info', 8000);
+        }
         catch (err) { toast('Nepavyko įkelti: ' + err.message, 'error'); }
       }
       draw();

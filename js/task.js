@@ -7,7 +7,7 @@ import { icon } from './icons.js';
 import {
   $, $$, esc, nl2br, toast, confirmDialog, debounce, today, fmtDate, fmtDateTime,
   STATUSES, statusLabel, priorityLabel, PURPOSES, processImage, telHref, mapsHref,
-  fmtQty, parseQty, buildingSummary
+  fmtQty, parseQty, buildingSummary, photoIssues
 } from './util.js';
 import { openAnnotator } from './annotator.js';
 import { aiPickHtml, bindAiPick } from './ai-pick.js';
@@ -355,6 +355,7 @@ async function drawPhotos(body) {
     const prog = $('#up-progress');
     let sort = S.photos.reduce((m, p) => Math.max(m, p.sort || 0), -1) + 1;
     let done = 0;
+    const poor = [];
     for (const f of files) {
       prog.innerHTML = `<div class="progress"><span class="spinner"></span> Įkeliama ${done + 1} iš ${files.length}...</div>`;
       try {
@@ -362,6 +363,8 @@ async function drawPhotos(body) {
         const p = await db.addPhoto(S.task.id, blob, { width, height, sort: sort++ });
         S.photos.push(p);
         done++;
+        const iss = await photoIssues(blob);
+        if (iss.length) poor.push(`${done}-oji (${iss.join(', ')})`);
       } catch (err) {
         console.error(err);
         toast('Nepavyko įkelti: ' + (err.message || err), 'error');
@@ -370,6 +373,7 @@ async function drawPhotos(body) {
     prog.innerHTML = '';
     if (done && ['nauja', 'planuota'].includes(S.task.status)) await save({ status: 'apziureta' });
     toast(`Įkelta nuotraukų: ${done}`, 'ok');
+    if (poor.length) toast(`Gali būti prastos kokybės: ${poor.join('; ')}. Jei dar esate vietoje – perfotografuokite.`, 'info', 9000);
     draw();
   }
 }

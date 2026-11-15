@@ -110,6 +110,37 @@ export const priorityLabel = id => (PRIORITIES.find(s => s.id === id) || { label
 export const PURPOSES = ['Neeilinė', 'Kasmetinė', 'Kita papildoma'];
 
 // Nuotraukos sumažinimas prieš įkeliant (taupo vietą ir DI kainą)
+/**
+ * Greita nuotraukos kokybės patikra telefone (be DI, be ryšio): neryškumas, per tamsu, per šviesu.
+ * Grąžina pastabų sąrašą (tuščias = gerai). Slenksčiai atsargūs – geriau nepranešti, nei erzinti.
+ */
+export async function photoIssues(blob) {
+  try {
+    const bmp = await createImageBitmap(blob);
+    const W = 320, k = Math.min(1, W / Math.max(bmp.width, bmp.height));
+    const w = Math.max(8, Math.round(bmp.width * k)), h = Math.max(8, Math.round(bmp.height * k));
+    const c = typeof OffscreenCanvas !== 'undefined' ? new OffscreenCanvas(w, h) : Object.assign(document.createElement('canvas'), { width: w, height: h });
+    const g = c.getContext('2d', { willReadFrequently: true });
+    g.drawImage(bmp, 0, 0, w, h); bmp.close && bmp.close();
+    const d = g.getImageData(0, 0, w, h).data;
+    const Y = new Float32Array(w * h);
+    let sum = 0;
+    for (let i = 0; i < w * h; i++) { const y = 0.299 * d[i * 4] + 0.587 * d[i * 4 + 1] + 0.114 * d[i * 4 + 2]; Y[i] = y; sum += y; }
+    const mean = sum / (w * h);
+    let m = 0, m2 = 0, n = 0;                                    // Laplaso operatoriaus dispersija – kuo mažesnė, tuo neryškesnė
+    for (let y = 1; y < h - 1; y++) for (let x = 1; x < w - 1; x++) {
+      const i = y * w + x, l = 4 * Y[i] - Y[i - 1] - Y[i + 1] - Y[i - w] - Y[i + w];
+      m += l; m2 += l * l; n++;
+    }
+    const variance = m2 / n - (m / n) ** 2;
+    const out = [];
+    if (mean < 40) out.push('per tamsi');
+    else if (mean > 225) out.push('per šviesi');
+    if (variance < 18) out.push('neryški');
+    return out;
+  } catch (_) { return []; }
+}
+
 export async function processImage(file, maxSide = 1800, quality = 0.84) {
   // Greitas kelias: dekodavimas ir sumažinimas atliekami ne pagrindinėje gijoje, todėl puslapis nesustoja
   try {
