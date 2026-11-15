@@ -786,9 +786,9 @@ function drawActEditor() {
             </div>
             <div class="obj-body">
               <label>Pastebėti defektai, deformacijos, gedimai${ta(o.defects, 'data-o="defects"')}</label>
-              <button type="button" class="linkbtn" data-rewrite="${i}">${icon('spark')} Perrašyti šį objektą su DI</button>
               <label>Rekomenduojami darbai defektams pašalinti${ta(o.works, 'data-o="works"')}</label>
             </div>
+            <div class="obj-rewrite"><button type="button" class="linkbtn" data-rewrite="${i}">${icon('spark')} Perrašyti šį objektą su DI</button></div>
           </div>`).join('')}
       </div>
       <button class="btn small" data-act="add-obj">${icon('plus')} Pridėti objektą</button>
