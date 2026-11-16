@@ -395,7 +395,7 @@ function annualSheet(t, s, refPhotos) {
     <h3 class="an-h">APŽIŪROS DALYVIAI</h3>
     <div class="signs">
       ${signRow(`Techninis inžinierius${s.inspector_cert ? ` (kv. atestato Nr. ${s.inspector_cert})` : ''}`, s.engineer_name, s.signature)}
-      ${signRow('Klientų atstovas', '', '')}${signRow('', '', '')}
+      ${signRow('Klientų atstovas (PA vadybininkas)', String(t.manager || '').split(/[,;]|\s+\+?\d/)[0].trim(), '')}${signRow('', '', '')}
     </div>
   </section>`;
 }

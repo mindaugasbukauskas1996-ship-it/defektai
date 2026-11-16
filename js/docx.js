@@ -208,7 +208,7 @@ export async function exportDocx({ t, s, doc, figs, refPhotos = {} }) {
     ];
     ch.push(await signBlock([
       { position: `Techninis inžinierius${s.inspector_cert ? ` (kv. atestato Nr. ${s.inspector_cert})` : ''}`, name: s.engineer_name, sig: true },
-      { position: 'Klientų atstovas', name: '' }, { position: '', name: '' }
+      { position: 'Klientų atstovas (PA vadybininkas)', name: String(t.manager || '').split(/[,;]|\s+\+?\d/)[0].trim() }, { position: '', name: '' }
     ], '(pareigos)', WL));
     return ch;
   }
