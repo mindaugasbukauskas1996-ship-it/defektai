@@ -228,7 +228,9 @@ export function buildAprasas(input, images = []) {
   const h1 = t => B.push({ t: 'h1', text: t });
   const h2 = t => B.push({ t: 'h2', text: t });
   const p = (text, o = {}) => B.push({ t: 'p', text, ...o });
-  const kv = rows => B.push({ t: 'kv', rows });
+  // eilutės, kurių reikšmės nėra (tik „duomenų nėra“ / „–“), į aprašą nededamos; trūkumai vis tiek lieka biuro sąraše (gaps)
+  const emptyVal = v => !String(v == null ? '' : v).split(ND).join('').replace(/[\s,;/–-]+/g, '');
+  const kv = rows => B.push({ t: 'kv', rows: rows.filter(r => !emptyVal(r[1])) });
   const table = (w, head, rows, o = {}) => B.push({ t: 'table', w, head, rows, ...o });
 
   const address = hp.address + (hp.seq > 1 ? ` (šilumos punktas Nr. ${hp.seq})` : '');
