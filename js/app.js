@@ -15,6 +15,7 @@ import { renderAnnualList } from './annual.js';
 import { combo } from './combo.js';
 import { renderHeat, renderHeatAccount } from './heat.js';
 import { startNotify } from './notify.js';
+import { renderCalendar, toLocalInput, fromLocalInput } from './calendar.js';
 
 const view = () => document.getElementById('view');
 let user = null;
@@ -51,7 +52,8 @@ function renderShell(role = 'user') {
   const sp = `<a href="#/sp" data-nav="sp">${icon('heat')}<span>${role === 'heat' ? 'Šilumos punktai' : 'ŠP'}</span></a>`;
   $('#nav-top').innerHTML = `
     ${role === 'heat' ? sp : `<a href="#/" data-nav="list">${icon('list')}<span>Užduotys</span></a>
-    <a href="#/nauja" data-nav="new">${icon('plus')}<span>Nauja</span></a>${role === 'admin' && !db.isDemo ? sp : ''}`}
+    <a href="#/nauja" data-nav="new">${icon('plus')}<span>Nauja</span></a>
+    <a href="#/kalendorius" data-nav="cal">${icon('calendar')}<span>Vizitai</span></a>${role === 'admin' && !db.isDemo ? sp : ''}`}
     <a href="#/nustatymai" data-nav="settings">${icon('settings')}<span>${role === 'heat' ? 'Paskyra' : 'Nustatymai'}</span></a>`;
   $('#nav-bottom').innerHTML = $('#nav-top').innerHTML;
   $('#demo-banner').innerHTML = db.isDemo
@@ -91,6 +93,7 @@ async function route() {
       return await renderHeat(view(), ['sp'], go);
     }
     if (parts[0] === 'nauja') { setActiveNav('new'); return await renderTaskForm(null); }
+    if (parts[0] === 'kalendorius') { setActiveNav('cal'); return await renderCalendar(view()); }
     if (parts[0] === 'metine') { setActiveNav('annual'); return await renderAnnualList(view(), go); }
     if (parts[0] === 'neatiktis') { setActiveNav('nc'); return await renderTaskForm(null, 'nonconformity'); }
     if (parts[0] === 'nustatymai') { setActiveNav('settings'); return await renderSettings(parts[1]); }
@@ -532,6 +535,7 @@ async function renderTaskForm(id, kind = 'defect') {
       <label class="span2">Paslauga / sritis<select name="service_type"><option value="">— pasirinkite —</option>${opt(services, t.service_type)}</select></label>
       <label>Prioritetas<select name="priority">${opt(PRIORITIES, t.priority)}</select></label>
       <label>Atlikti iki<input name="due_date" type="date" value="${esc(fmtDate(t.due_date))}"></label>
+      <label class="span2">Susitikimas su gyventoju (data ir laikas)<input name="visit_at" type="datetime-local" value="${esc(toLocalInput(t.visit_at))}"></label>
       ${id ? `<label>Būsena<select name="status">${opt(STATUSES, t.status)}</select></label>` : ''}
       <label class="${id ? '' : 'span2'}">Pastatų administravimo vadybininkas<input name="manager" value="${esc(t.manager)}" placeholder="V. Pavardė, tel."></label>
       ${assignee}
@@ -575,6 +579,9 @@ async function renderTaskForm(id, kind = 'defect') {
     const data = Object.fromEntries(new FormData(form).entries());
     for (const k of Object.keys(data)) if (data[k] === '') data[k] = null;
     data.address = data.address || '';
+    // vizito laikas: į ISO; jei nenustatytas ir anksčiau nebuvo – nesiunčiame (kad veiktų ir be duomenų bazės papildymo)
+    if (data.visit_at) data.visit_at = fromLocalInput(data.visit_at);
+    else if (!t.visit_at) delete data.visit_at;
     const btn = form.querySelector('button[type=submit]');
     btn.disabled = true;
     try {
@@ -582,7 +589,7 @@ async function renderTaskForm(id, kind = 'defect') {
       toast('Išsaugota', 'ok');
       go(`#/u/${saved.id}`);
     } catch (err) {
-      toast(err.message, 'error');
+      toast(/visit_at/.test(err.message || '') ? 'Vizito laikui išsaugoti reikia duomenų bazės papildymo (kreipkitės į administratorių).' : err.message, 'error', 8000);
       btn.disabled = false;
     }
   });

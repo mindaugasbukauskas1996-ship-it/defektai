@@ -154,6 +154,16 @@ export async function listTasks() {
   return data;
 }
 
+/** Užduotys su sutartu vizito laiku (kalendoriui). Jei stulpelio visit_at dar nėra – grąžina tuščią sąrašą. */
+export async function listVisits() {
+  if (isDemo) return (await idbAll('tasks')).filter(t => t.visit_at).sort((a, b) => a.visit_at.localeCompare(b.visit_at));
+  const { data, error } = await sb.from('tasks')
+    .select('id,status,kind,address,city,apartment,stairwell,contact_name,contact_phone,entry_code,problem,visit_at,assigned_to')
+    .not('visit_at', 'is', null).order('visit_at', { ascending: true }).limit(1000);
+  if (error) { if (/visit_at|column/i.test(error.message || '')) return null; throw error; }
+  return data;
+}
+
 export async function getTask(id) {
   if (isDemo) return idbGet('tasks', id);
   const { data, error } = await sb.from('tasks').select('*').eq('id', id).maybeSingle();

@@ -15,6 +15,7 @@ import { snapOf, keepCurrent, addGenerated, versionsHtml, bindVersions } from '.
 import { bindDictation } from './dictate.js';
 import { checkAct, diffAct } from './act-check.js';
 import { drawAnnualInspection, drawAnnualActTab } from './annual.js';
+import { calendarButtons, bindCalendarButtons } from './calendar.js';
 
 const UNITS = ['Vnt.', 'm', 'm²', 'm³', 'Komplektas', 'val.', 'kg', 'T', 'Ltr', 'cm', 'para',
   'Kalendorinė diena', 'kWh', 'Suma (€)', 'Objektų skaičius', 'Butų skaičius', 'Patalpų skaičius', 'metras ir diena'];
@@ -172,6 +173,8 @@ function drawInfo(body) {
         ${row(isNc(t) ? 'Darbai' : 'Paslauga', t.service_type)}
         ${isNc(t) ? '' : row('Prioritetas', priorityLabel(t.priority))}
         ${row(isNc(t) ? 'Pašalinti iki' : 'Atlikti iki', fmtDate(t.due_date))}
+        ${isNc(t) ? '' : row('Susitikimas su gyventoju', fmtDateTime(t.visit_at))}
+        ${isNc(t) ? '' : calendarButtons(t)}
         ${row('Būsena', statusLabel(t.status))}
         ${row('Sukurta', fmtDateTime(t.created_at))}
         ${S.me.role === 'admin' && S.people.length ? `
@@ -217,6 +220,7 @@ function drawInfo(body) {
     if (ns) ns.innerHTML = `<div class="card-title">Toliau</div><div class="steps"><a class="step" href="#/u/${t.id}/apziura">${icon('edit')}<span>1. Apžiūra: pažymėti elementus, nuotraukos</span></a><a class="step" href="#/u/${t.id}/aktai">${icon('spark')}<span>2. Sugeneruoti ir peržiūrėti aktą</span></a></div>`;
   }
 
+  bindCalendarButtons(body, t);
   const cc = $('#copy-code');
   if (cc) cc.addEventListener('click', () => {
     navigator.clipboard && navigator.clipboard.writeText(t.entry_code);

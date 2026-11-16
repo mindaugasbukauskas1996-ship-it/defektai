@@ -774,3 +774,8 @@ end $$;
 drop trigger if exists notify_hp on public.heat_points;
 create trigger notify_hp after insert or update of assigned_to, status on public.heat_points
   for each row execute function public.trg_notify_hp();
+
+-- Vizito su gyventoju laikas (kalendorius)
+alter table public.tasks add column if not exists visit_at timestamptz;
+create index if not exists tasks_visit_at_idx on public.tasks (visit_at) where visit_at is not null;
+
