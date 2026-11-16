@@ -112,7 +112,7 @@ export const KINDS = {
   pavara: { label: 'Pavara', plate: true, hint: 'Nufotografuokite pavaros lentelę ir bendrą vaizdą.',
     fields: [['tipas', 'Tipas / valdymo signalas'], ['itampa', 'Maitinimo įtampa', 'V']] },
   ispletimo_indas: { label: 'Išsiplėtimo indas', plate: true, fields: [['turis', 'Tūris', 'l'], ['pn', 'Slėgio klasė PN', 'bar'], ['priesslegis', 'Priešslėgis', 'bar']] },
-  apsauginis_voztuvas: { label: 'Apsauginis vožtuvas', plate: true, hint: 'Suveikimo slėgis būna užrašytas ant vožtuvo dangtelio.',
+  apsauginis_voztuvas: { label: 'Apsauginis vožtuvas', plate: true, noMaker: true, hint: 'Suveikimo slėgis būna užrašytas ant vožtuvo dangtelio.',
     fields: [['dn', 'Skersmuo', 'DN'], ['slegis', 'Suveikimo slėgis', 'bar']] },
   papildymas: { label: 'Papildymo linija (vožtuvas / siurblys, skaitiklis)', plate: false,
     fields: [['irenginys', 'Vožtuvas ar siurblys (modelis)'], ['skaitiklio_dn', 'Papildymo skaitiklio skersmuo', 'DN'], ['rodmuo', 'Skaitiklio rodmuo', 'm³']] },   // sena (nebededama), paliekama jau surinktiems duomenims

@@ -188,7 +188,10 @@ export function aprasasMissing(c) {
     if (it.absent) continue;
     const k = KINDS[it.kind] || KINDS.kita;
     const name = `${itemLabel(it)} (${(GROUP_LABEL[it.grp] || '').toLowerCase()})`;
-    if (k.plate && !has(it.manufacturer) && !has(it.model)) {
+    if (k.noMaker) {                                   // pvz. apsauginis vožtuvas: gamintojo nereikia, pakanka skersmens ir slėgio
+      const sp = it.specs || {};
+      if (!has(sp.dn) || !has(sp.slegis)) out.push({ kind: 'item', step: it.grp, label: `${name}: trūksta ${[!has(sp.dn) && 'skersmens', !has(sp.slegis) && 'suveikimo slėgio'].filter(Boolean).join(' ir ')} – nuskaityti nuotraukas (DI) arba įvesti ranka` });
+    } else if (k.plate && !has(it.manufacturer) && !has(it.model)) {
       const bad = it.ai && it.ai.readable === 'neiskaitoma';
       out.push({ kind: 'item', step: it.grp, label: `${name}: ${bad ? 'lentelė neįskaitoma – perfotografuoti arba įvesti ranka' : it.ai ? 'DI nerado gamintojo ir modelio – įvesti ranka' : 'nėra gamintojo ir modelio – nuskaityti nuotraukas (DI) arba įvesti ranka'}` });
     }
@@ -401,7 +404,7 @@ export function buildAprasas(input, images = []) {
       const type = typeText(it);
       rows43.push([
         it.tag || '–', itemLabel(it),
-        type || (k.plate ? D('', `${itemLabel(it)} (${GROUP_LABEL[grp].toLowerCase()}): tipas, gamintojas`) : '–'),
+        type || (k.plate && !k.noMaker ? D('', `${itemLabel(it)} (${GROUP_LABEL[grp].toLowerCase()}): tipas, gamintojas`) : '–'),
         fixDn(specsText(it)) || '–',
         it.owner === 'Šilumos tiekėjas' ? (set.silumos_tiekejas || 'Šilumos tiekėjas') : (it.owner || 'Bendraturčiai')
       ]);
