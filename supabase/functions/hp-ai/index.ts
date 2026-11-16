@@ -114,7 +114,32 @@ function imageBlock(p: any) {
   return null;
 }
 
+// Katalogo paieška: pagal jau žinomą gamintoją ir modelį (be nuotraukų) interneto paieška suranda rodiklius
+const LOOKUP_SYSTEM = `Tu esi šilumos punktų įrangos specialistas. Gausi įrenginio gamintoją ir tikslų modelį. Interneto paieška suraskite OFICIALŲ gamintojo katalogą ar duomenų lapą (ne parduotuvių aprašymus) ir užpildykite prašomus rodiklius.
+- Rašyk tik tai, ką radai gamintojo dokumente tiksliai šiam modeliui. Jei modelis neaiškus, yra keli variantai arba reikšmės nerandi – lauką palik tuščią. Nespėliok.
+- Cirkuliacinių siurblių našumas ir slėgis katalogo duomenų lape – MAKSIMALIOS reikšmės (Q max, H max), galia – didžiausia (P1 max); nenustatytas darbo režimas.
+- Rodiklių laukuose rašyk tik reikšmę be mato vieneto (vienetas nurodytas prie lauko), dešimtainį skyriklį – kablelį. Perskaičiuok į prašomą vienetą (pvz. l/s → m³/h, kPa → m).
+- manufacturer ir model grąžink tokius, kokius gavai. extra – trumpai: dokumento pavadinimas / svetainė, iš kurios paimta. readable = "gera", jei radai bent vieną rodiklį, kitaip "neiskaitoma"; comment palik tuščią.
+Rezultatą VISADA pateik iškviesdamas įrankį „pateikti_irengini“.`;
+
+function buildLookup(payload: any, model: string) {
+  const it = payload.item || {}, lk = payload.lookup || {};
+  const fields = cleanFields(it.fields);
+  const { strict: _s, ...tool } = buildTool(fields) as any;
+  const text = `Įrenginys: ${String(it.name || '').slice(0, 200)}\nGamintojas: ${String(lk.manufacturer || '').slice(0, 120)}\nModelis: ${String(lk.model || '').slice(0, 160)}\n\nLAUKAI:\n` +
+    fields.map(f => `- ${f.key}: ${f.label}${f.unit ? ` (${f.unit})` : ''}`).join('\n');
+  return {
+    tool,
+    body: {
+      model, max_tokens: 4000, system: LOOKUP_SYSTEM,
+      tools: [{ type: 'web_search_20250305', name: 'web_search', max_uses: 3 }, tool], tool_choice: { type: 'auto' },
+      messages: [{ role: 'user', content: [{ type: 'text', text }] }]
+    }
+  };
+}
+
 function buildRequest(payload: any, model: string) {
+  if (payload && payload.lookup) return buildLookup(payload, model);
   const it = payload.item || {};
   const fields = cleanFields(it.fields);
   const tool = buildTool(fields);
@@ -182,7 +207,11 @@ Deno.serve(async (req: Request) => {
     });
     let res = await call(body);
     let data = await res.json().catch(() => ({}));
-    if (res.status === 400) {
+    if (payload && payload.lookup && res.ok && data.stop_reason === 'pause_turn') {   // paieška gali užtrukti ilgiau – tęsiame vieną kartą
+      res = await call({ ...(body as any), messages: [...(body as any).messages, { role: 'assistant', content: data.content }] });
+      data = await res.json().catch(() => ({}));
+    }
+    if (res.status === 400 && !(payload && payload.lookup)) {
       // atsarginis variantas: be griežtos schemos ir be „effort“ (jei modelis kurio nors parametro nepriima)
       console.error('hp-ai 400, kartojama paprastesne užklausa:', data && data.error && data.error.message);
       const { strict: _s, ...plainTool } = tool as any;

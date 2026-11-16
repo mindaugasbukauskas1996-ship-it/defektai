@@ -55,9 +55,26 @@ export async function readItem(S, it) {
       usage: { in: (u.input_tokens || 0) + (u.cache_creation_input_tokens || 0) + (u.cache_read_input_tokens || 0), out: u.output_tokens || 0 }
     }
   };
+  // Siurbliai: žinant modelį, trūkstamus rodiklius (Q, H, P) ieškome gamintojo kataloge (maksimalios vertės, žymima kaip „iš katalogo“)
+  const want = LOOKUP_KINDS[it.kind] || null;
+  if (want && has(patch.manufacturer) && has(patch.model)) {
+    const miss = k.fields.filter(([key]) => want.includes(key) && !has(patch.specs[key]));
+    if (miss.length) {
+      try {
+        const r = await db.hpAi({
+          lookup: { manufacturer: patch.manufacturer, model: patch.model },
+          item: { name: itemLabel(it), fields: miss.map(([key, label, unit]) => ({ key, label, unit: unit || '' })) }
+        });
+        const got = miss.map(([key]) => key).filter(key => has((r.specs || {})[key]));
+        for (const key of got) patch.specs[key] = r.specs[key];
+        if (got.length) patch.ai.catalog = { keys: got, src: r.extra || '' };
+      } catch (_) { /* katalogo paieška neprivaloma */ }
+    }
+  }
   Object.assign(it, await db.updateHpItem(it.id, patch));
   return it;
 }
+const LOOKUP_KINDS = { siurblys: ['q', 'h', 'p'], pap_siurblys: ['q', 'h', 'p'] };
 
 /** Trumpa DI būsenos eilutė įrenginio kortelei (rodoma ir šilumininkui). */
 export function aiBadge(it, full = true) {
@@ -67,7 +84,7 @@ export function aiBadge(it, full = true) {
   const names = (a.uncertain || []).map(key => key === 'manufacturer' ? 'gamintojas' : key === 'model' ? 'modelis' : ((k.fields.find(f => f[0] === key) || [])[1] || '').toLowerCase()).filter(Boolean);
   const st = !k.plate && a.readable === 'neiskaitoma' ? 'dalinai' : (a.readable || '');   // prietaisams be lentelės perfotografuoti neprašome
   return `<div class="hp-ai ${esc(st)}">${icon(st === 'gera' ? 'check' : 'alert')}<div><b>Sistema: ${esc(AI_LABEL[st] || 'nuskaityta')}</b>${st === 'neiskaitoma' ? ' – perfotografuokite arba įveskite duomenis ranka' : ''}
-    ${a.comment ? `<div>${esc(a.comment)}</div>` : ''}${full && names.length ? `<div class="muted small">Patikrinti: ${esc(names.join(', '))}</div>` : ''}${full && a.extra ? `<div class="muted small">Lentelėje dar: ${esc(a.extra)}</div>` : ''}</div></div>`;
+    ${a.comment ? `<div>${esc(a.comment)}</div>` : ''}${full && names.length ? `<div class="muted small">Patikrinti: ${esc(names.join(', '))}</div>` : ''}${full && a.extra ? `<div class="muted small">Lentelėje dar: ${esc(a.extra)}</div>` : ''}${a.catalog && a.catalog.keys.length ? `<div class="muted small">Iš gamintojo katalogo (maksimalios vertės, patikrinti): ${esc(a.catalog.keys.map(key => ((k.fields.find(f => f[0] === key) || [])[1] || key).toLowerCase()).join(', '))}${a.catalog.src ? ` – ${esc(a.catalog.src)}` : ''}</div>` : ''}</div></div>`;
 }
 
 async function pool(list, n, fn) {
