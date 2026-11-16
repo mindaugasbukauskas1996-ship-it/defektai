@@ -372,7 +372,7 @@ function annualSheet(t, s, refPhotos) {
   return `
   <section class="sheet sheet-annual">
     <div class="doc-top">
-      <div class="lined">${esc([s.engineer_name, g.org].filter(Boolean).join('  '))}</div>
+      <div class="lined" data-b="an.general.responsible" data-single>${esc(g.responsible ?? [s.engineer_name, g.org].filter(Boolean).join('  '))}</div>
       <div class="under">(už statinio techninę priežiūrą atsakingo asmens vardas, pavardė, organizacijos pavadinimas)</div>
       <h2>STATINIO APŽIŪROS AKTAS</h2>
       <div class="date-no"><span class="lined" data-b="t.act_date" data-single>${esc(fmtDate(t.act_date))}</span> Nr. <span class="lined" data-b="t.act_number" data-single>${esc(t.act_number || '')}</span></div>
@@ -394,7 +394,7 @@ function annualSheet(t, s, refPhotos) {
     <div class="an-concls">${a.conclusions.map((c, i) => `<div class="an-concl-p"><span class="n">${i + 1}.</span><span data-b="an.conclusions.${i}">${esc(c)}</span></div>`).join('')}</div>
     <h3 class="an-h">APŽIŪROS DALYVIAI</h3>
     <div class="signs">
-      ${signRow(`Techninis inžinierius${s.inspector_cert ? ` (kv. atestato Nr. ${s.inspector_cert})` : ''}`, s.engineer_name, s.signature)}
+      ${signRow(`Techninis inžinierius${s.inspector_cert ? ` (kv. atestato Nr. ${s.inspector_cert})` : ''}`, g.inspector_name ?? s.engineer_name, s.signature, 'an.general.inspector_name')}
       ${signRow('Klientų atstovas', g.client_rep ?? String(t.manager || '').replace(/[,;]?\s*(\+?\d|tel\b).*$/is, '').replace(/[,;\s]+$/, '').trim(), '', 'an.general.client_rep')}${signRow('', '', '')}
     </div>
   </section>`;

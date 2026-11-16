@@ -191,7 +191,7 @@ export async function exportDocx({ t, s, doc, figs, refPhotos = {} }) {
       }
     }
     const ch = [
-      P([new TextRun({ text: [s.engineer_name, g.org].filter(Boolean).join('  '), size: SZ })], { align: AlignmentType.CENTER, border: true, after: 0 }),
+      P([new TextRun({ text: g.responsible ?? [s.engineer_name, g.org].filter(Boolean).join('  '), size: SZ })], { align: AlignmentType.CENTER, border: true, after: 0 }),
       small('(už statinio techninę priežiūrą atsakingo asmens vardas, pavardė, organizacijos pavadinimas)'),
       P('STATINIO APŽIŪROS AKTAS', { bold: true, size: 28, align: AlignmentType.CENTER, before: 120, after: 120 }),
       P(`${fmtDate(t.act_date)}      Nr. ${t.act_number || ''}`, { size: 22, align: AlignmentType.CENTER, after: 0 }), small('(data)'),
@@ -207,7 +207,7 @@ export async function exportDocx({ t, s, doc, figs, refPhotos = {} }) {
       P('APŽIŪROS DALYVIAI', { bold: true, before: 200, after: 80 })
     ];
     ch.push(await signBlock([
-      { position: `Techninis inžinierius${s.inspector_cert ? ` (kv. atestato Nr. ${s.inspector_cert})` : ''}`, name: s.engineer_name, sig: true },
+      { position: `Techninis inžinierius${s.inspector_cert ? ` (kv. atestato Nr. ${s.inspector_cert})` : ''}`, name: g.inspector_name ?? s.engineer_name, sig: true },
       { position: 'Klientų atstovas', name: g.client_rep ?? String(t.manager || '').replace(/[,;]?\s*(\+?\d|tel\b).*$/is, '').replace(/[,;\s]+$/, '').trim() }, { position: '', name: '' }
     ], '(pareigos)', WL));
     return ch;
