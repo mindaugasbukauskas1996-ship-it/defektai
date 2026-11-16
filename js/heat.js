@@ -54,7 +54,7 @@ async function renderHeatUser(el, uid) {
       <label class="span2">Telefonas<input name="engineer_phone" type="tel" value="${esc(s.engineer_phone || '')}" placeholder="+370..."></label>
       <label class="span2">Kvalifikacijos dokumento Nr.<input name="hp_dok_nr" value="${esc(s.hp_dok_nr || '')}"></label>
       <label>Kas išdavė<input name="hp_dok_isdave" value="${esc(s.hp_dok_isdave || '')}"></label>
-      <label>Galioja iki<input name="hp_dok_iki" type="date" value="${esc(s.hp_dok_iki || '')}"></label>
+      <label>Galioja iki<input name="hp_dok_iki" type="text" inputmode="numeric" value="${esc(s.hp_dok_iki || '')}" placeholder="2027-05-31" autocomplete="off"></label>
       <div class="span4 form-actions"><button class="btn primary" type="submit">${icon('check')} Išsaugoti</button></div>
     </form>`;
   $('#hu-form').addEventListener('submit', async e => {
@@ -651,7 +651,7 @@ export async function renderHeatAccount(el, onLogout) {
       <label class="span2">Telefonas<input name="engineer_phone" type="tel" value="${esc(s.engineer_phone || '')}" placeholder="+370..."></label>
       <label class="span2">Kvalifikacijos dokumento Nr.<input name="hp_dok_nr" value="${esc(s.hp_dok_nr || '')}"></label>
       <label>Kas išdavė<input name="hp_dok_isdave" value="${esc(s.hp_dok_isdave || '')}"></label>
-      <label>Galioja iki<input name="hp_dok_iki" type="date" value="${esc(s.hp_dok_iki || '')}"></label>
+      <label>Galioja iki<input name="hp_dok_iki" type="text" inputmode="numeric" value="${esc(s.hp_dok_iki || '')}" placeholder="2027-05-31" autocomplete="off"></label>
       <div class="span4 form-actions"><button class="btn primary" type="submit">${icon('check')} Išsaugoti</button></div>
     </form>
     <div class="card">
