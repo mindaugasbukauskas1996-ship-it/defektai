@@ -363,11 +363,11 @@ function annualSheet(t, s, refPhotos) {
       <td data-b="an.sections.${si}.items.${ii}.text">${esc(it.text)}</td>
       <td data-b="an.sections.${si}.items.${ii}.rec">${esc(it.rec || '')}</td></tr>`).join('');
   }).join('');
-  const signRow = (pos, name, sig) => `
+  const signRow = (pos, name, sig, path) => `
     <div class="sign-row">
       <div class="sign-cell wide"><div class="sign-val">${esc(pos)}</div><div class="under">(pareigos)</div></div>
       <div class="sign-cell"><div class="sign-val">${sig ? `<img class="sig" src="${sig}" alt="">` : ''}</div><div class="under">(parašas)</div></div>
-      <div class="sign-cell"><div class="sign-val">${esc(name)}</div><div class="under">(vardas, pavardė)</div></div>
+      <div class="sign-cell"><div class="sign-val"${path ? ` data-b="${path}" data-single` : ''}>${esc(name)}</div><div class="under">(vardas, pavardė)</div></div>
     </div>`;
   return `
   <section class="sheet sheet-annual">
@@ -395,7 +395,7 @@ function annualSheet(t, s, refPhotos) {
     <h3 class="an-h">APŽIŪROS DALYVIAI</h3>
     <div class="signs">
       ${signRow(`Techninis inžinierius${s.inspector_cert ? ` (kv. atestato Nr. ${s.inspector_cert})` : ''}`, s.engineer_name, s.signature)}
-      ${signRow('Klientų atstovas', String(t.manager || '').replace(/[,;]?\s*(\+?\d|tel\b).*$/is, '').replace(/[,;\s]+$/, '').trim(), '')}${signRow('', '', '')}
+      ${signRow('Klientų atstovas', g.client_rep ?? String(t.manager || '').replace(/[,;]?\s*(\+?\d|tel\b).*$/is, '').replace(/[,;\s]+$/, '').trim(), '', 'an.general.client_rep')}${signRow('', '', '')}
     </div>
   </section>`;
 }
