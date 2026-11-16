@@ -11,6 +11,7 @@ const CORS = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
   'Access-Control-Allow-Methods': 'POST, OPTIONS'
 };
+const LOGIN_DOMAIN = 'sp.example.com';   // turi sutapti su LOGIN_DOMAIN faile js/app.js
 const json = (body: unknown, status = 200) =>
   new Response(JSON.stringify(body), { status, headers: { ...CORS, 'Content-Type': 'application/json' } });
 
@@ -68,21 +69,34 @@ Deno.serve(async (req: Request) => {
     const action = body && body.action;
 
     if (action === 'create') {
-      const email = String(body.email || '').trim().toLowerCase();
+      let email = String(body.email || '').trim().toLowerCase();
       const full_name = String(body.full_name || '').trim();
-      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return json({ error: 'Neteisingas el. pašto adresas.' }, 400);
+      // be el. pašto (pvz. šilumininkui): prisijungimo vardas iš vardo ir pavardės, vidinis adresas vardas@LOGIN_DOMAIN
+      const noMail = !email;
+      let slug = '';
+      if (noMail) {
+        const map: Record<string, string> = { ą: 'a', č: 'c', ę: 'e', ė: 'e', į: 'i', š: 's', ų: 'u', ū: 'u', ž: 'z' };
+        slug = full_name.toLowerCase().replace(/[ąčęėįšųūž]/g, c => map[c]).replace(/[^a-z0-9]+/g, '.').replace(/^\.+|\.+$/g, '');
+        if (!slug) return json({ error: 'Įrašykite vardą ir pavardę (arba el. paštą).' }, 400);
+      } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return json({ error: 'Neteisingas el. pašto adresas.' }, 400);
       const password = tempPassword();
-      const res = await fetch(`${url}/auth/v1/admin/users`, {
-        method: 'POST', headers: H,
-        body: JSON.stringify({ email, password, email_confirm: true, user_metadata: full_name ? { full_name } : {}, app_metadata: { admin_created: true } })
-      });
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok) {
+      for (let n = 0; n < 20; n++) {
+        if (noMail) email = `${slug}${n ? n + 1 : ''}@${LOGIN_DOMAIN}`;
+        const res = await fetch(`${url}/auth/v1/admin/users`, {
+          method: 'POST', headers: H,
+          body: JSON.stringify({ email, password, email_confirm: true, user_metadata: full_name ? { full_name } : {}, app_metadata: { admin_created: true } })
+        });
+        const data = await res.json().catch(() => ({}));
+        if (res.ok) {
+          // profilį (aktyvų, rolė „user“, su vardu) sukuria duomenų bazės trigeris handle_new_user pagal app_metadata.admin_created
+          return json({ id: data.id, email, password });
+        }
         const msg = String((data && (data.msg || data.message || data.error_description)) || res.statusText);
-        return json({ error: /already|registered|exists/i.test(msg) ? 'Toks el. paštas jau registruotas.' : `Nepavyko sukurti: ${msg}` }, 400);
+        const exists = /already|registered|exists/i.test(msg);
+        if (exists && noMail) continue;                       // vardas užimtas – bandome vardas2, vardas3...
+        return json({ error: exists ? 'Toks el. paštas jau registruotas.' : `Nepavyko sukurti: ${msg}` }, 400);
       }
-      // profilį (aktyvų, rolė „user“, su vardu) sukuria duomenų bazės trigeris handle_new_user pagal app_metadata.admin_created
-      return json({ id: data.id, email, password });
+      return json({ error: 'Nepavyko sugalvoti laisvo prisijungimo vardo.' }, 400);
     }
 
     if (action === 'reset') {

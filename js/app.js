@@ -128,6 +128,9 @@ function renderPending(me) {
   $('#pend-out').addEventListener('click', async () => { await db.signOut(); user = null; route(); });
 }
 
+// Paskyroms be el. pašto (pvz. šilumininkams) vidinis adresas = prisijungimo vardas + šis domenas (laiškai nesiunčiami)
+const LOGIN_DOMAIN = 'sp.example.com';
+
 function renderLogin() {
   document.body.classList.remove('logged');
   view().innerHTML = `
@@ -135,7 +138,7 @@ function renderLogin() {
       <h1>Defektų aktai</h1>
       <p class="muted">Prisijunkite savo paskyra</p>
       <form id="login-form">
-        <label>El. paštas<input type="email" name="email" autocomplete="username" required></label>
+        <label>El. paštas arba prisijungimo vardas<input type="text" name="email" autocomplete="username" autocapitalize="none" autocorrect="off" required></label>
         <label>Slaptažodis<input type="password" name="password" autocomplete="current-password" required></label>
         <button class="btn primary block" type="submit">Prisijungti</button>
       </form>
@@ -146,7 +149,9 @@ function renderLogin() {
     const btn = e.target.querySelector('button');
     btn.disabled = true; btn.textContent = 'Jungiamasi...';
     try {
-      await db.signIn(f.get('email'), f.get('password'));
+      let id = String(f.get('email') || '').trim();
+      if (!id.includes('@')) id = id.toLowerCase() + '@' + LOGIN_DOMAIN;          // šilumininkai be pašto jungiasi vardu
+      await db.signIn(id, f.get('password'));
       user = await db.getUser();
       route();
     } catch (err) {
@@ -812,11 +817,11 @@ async function renderSettings(targetId) {
             <div class="lbl">Naujas vartotojas</div>
             <div class="nu-row">
               <input id="nu-name" placeholder="Vardas, pavardė">
-              <input id="nu-email" type="email" autocomplete="off" placeholder="El. paštas">
+              <input id="nu-email" type="email" autocomplete="off" placeholder="El. paštas (neprivaloma)">
               <select id="nu-role" class="role-sel"><option value="user">Inžinierius</option><option value="heat">Šilumininkas</option></select>
               <button class="btn primary small" type="button" id="nu-create">Sukurti</button>
             </div>
-            <div class="muted small">Paskyra sukuriama iškart aktyvi. Inžinierius dirba su defektų aktais, šilumininkas mato tik jam priskirtus šilumos punktus. Gausite laikiną slaptažodį – perduokite jį vartotojui, o jis pasikeis Nustatymuose.</div>
+            <div class="muted small">Paskyra sukuriama iškart aktyvi. Inžinierius dirba su defektų aktais, šilumininkas mato tik jam priskirtus šilumos punktus. Jei el. pašto nėra (pvz. šilumininkui) – palikite tuščią: gausite prisijungimo vardą ir laikiną slaptažodį. Perduokite juos vartotojui, o jis pasikeis slaptažodį Nustatymuose.</div>
           </div>
         </div>` : ''}
       </div>`}
@@ -906,18 +911,21 @@ async function renderSettings(targetId) {
 
   // naujas vartotojas / naujas laikinas slaptažodis (admin)
   const showCredentials = (title, email, password) => {
+    const isLogin = String(email).endsWith('@' + LOGIN_DOMAIN);
+    const idLabel = isLogin ? 'Prisijungimo vardas' : 'El. paštas';
+    if (isLogin) email = String(email).slice(0, -(LOGIN_DOMAIN.length + 1));
     const wrap = document.createElement('div');
     wrap.className = 'modal-backdrop';
     wrap.innerHTML = `<div class="modal small" role="dialog" aria-modal="true">
       <h3>${esc(title)}</h3>
       <p class="muted small">Slaptažodis rodomas tik dabar. Perduokite jį vartotojui (pvz. žinute) ir paprašykite pasikeisti: Nustatymai → Pakeisti slaptažodį.</p>
-      <div class="cred"><div><span class="muted small">El. paštas</span><br><b>${esc(email)}</b></div>
+      <div class="cred"><div><span class="muted small">${idLabel}</span><br><b>${esc(email)}</b></div>
         <div><span class="muted small">Laikinas slaptažodis</span><br><b class="cred-pw">${esc(password)}</b></div></div>
       <div class="modal-actions"><button class="btn ghost" data-r="copy">Kopijuoti</button><button class="btn primary" data-r="ok">Uždaryti</button></div></div>`;
     wrap.addEventListener('click', async e => {
       const r = e.target.closest('[data-r]');
       if (r && r.dataset.r === 'copy') {
-        try { await navigator.clipboard.writeText(`El. paštas: ${email}\nLaikinas slaptažodis: ${password}`); toast('Nukopijuota', 'ok'); } catch (_) { toast('Nepavyko nukopijuoti – perrašykite ranka', 'error'); }
+        try { await navigator.clipboard.writeText(`${idLabel}: ${email}\nLaikinas slaptažodis: ${password}`); toast('Nukopijuota', 'ok'); } catch (_) { toast('Nepavyko nukopijuoti – perrašykite ranka', 'error'); }
       } else if (r) wrap.remove();
     });
     document.getElementById('modal-root').appendChild(wrap);
@@ -926,7 +934,7 @@ async function renderSettings(targetId) {
   const nuCreate = $('#nu-create');
   if (nuCreate) nuCreate.addEventListener('click', async () => {
     const email = $('#nu-email').value.trim(), full_name = $('#nu-name').value.trim();
-    if (!email) return toast('Įrašykite el. paštą', 'error');
+    if (!email && !full_name) return toast('Įrašykite vardą ir pavardę (arba el. paštą)', 'error');
     nuCreate.disabled = true;
     try {
       const r = await db.adminUsers({ action: 'create', email, full_name });
