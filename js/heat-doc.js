@@ -195,7 +195,7 @@ export function aprasasMissing(c) {
   }
   if (c.s.schema_yra === 'taip' && !c.photos.some(x => x.slot === 'schema')) out.push({ kind: 'sp', step: 'bendra', label: 'Nėra schemos nuotraukos' });
   for (const f of officeFields()) if (f.req && !c.val(f.k)) out.push({ kind: 'office', label: `${f.l} (${f.group})` });
-  if (!operatorRow(c)[1]) out.push({ kind: 'office', label: 'ŠP operatorius: priskirkite šilumininką (su užpildyta paskyra) arba įrašykite operatorių biuro laukuose' });
+  if (!operatorRow(c)[1]) out.push({ kind: 'office', label: 'ŠP operatorius: priskirkite šilumininką (Nustatymai → Paskyros → „Jo nustatymai“ – užpildykite jo duomenis) arba įrašykite operatorių biuro laukuose' });
   return out;
 }
 

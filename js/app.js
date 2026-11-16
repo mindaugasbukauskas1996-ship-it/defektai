@@ -810,7 +810,7 @@ async function renderSettings(targetId) {
           <ul class="acct-list">${accounts.map(p => `<li><b>${esc(db.profileName(p))}</b> <span class="muted small">${esc(p.email || '')}${p.role === 'admin' ? ' · admin' : ''}</span>
             ${p.id === account.id ? '' : `<label class="chk" title="Ar paskyra gali naudotis programa"><input type="checkbox" data-acc="${esc(p.id)}" ${p.active ? 'checked' : ''}> aktyvi</label>`}
             ${p.id === account.id || p.role === 'admin' ? '' : `<select class="role-sel" data-role="${esc(p.id)}" title="Inžinierius dirba su defektų aktais, šilumininkas – tik su šilumos punktais"><option value="user" ${p.role === 'user' ? 'selected' : ''}>Inžinierius</option><option value="heat" ${p.role === 'heat' ? 'selected' : ''}>Šilumininkas</option></select>`}
-            ${p.id === account.id ? '' : `<a class="btn small ghost" href="#/nustatymai/${esc(p.id)}" title="Keisti šio žmogaus vardą, pareigas, parašą">Jo nustatymai</a>`}
+            ${p.id === account.id ? '' : `<a class="btn small ghost" href="${p.role === 'heat' ? `#/sp/silumininkas/${esc(p.id)}` : `#/nustatymai/${esc(p.id)}`}" title="${p.role === 'heat' ? 'Šilumininko vardas, telefonas, kvalifikacijos dokumentas' : 'Keisti šio žmogaus vardą, pareigas, parašą'}">Jo nustatymai</a>`}
             ${p.id === account.id ? '' : `<button class="btn small ghost" type="button" data-reset="${esc(p.id)}" data-name="${esc(db.profileName(p))}" title="Nustatyti naują laikiną slaptažodį">Naujas slaptažodis</button>`}
             ${p.active ? '' : '<span class="tag nc">laukia aktyvavimo</span>'}</li>`).join('')}</ul>
           <div class="new-user">

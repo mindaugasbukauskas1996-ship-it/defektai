@@ -32,8 +32,37 @@ export async function renderHeat(el, parts, go) {
     if (me.role !== 'admin') { el.innerHTML = '<div class="card">Šie nustatymai prieinami tik administratoriui.</div>'; return; }
     return renderHpSettings(el);
   }
+  if (parts[1] === 'silumininkas' && parts[2]) {
+    if (me.role !== 'admin') { el.innerHTML = '<div class="card">Tik administratoriui.</div>'; return; }
+    return renderHeatUser(el, parts[2]);
+  }
   if (parts[1]) return renderPoint(el, parts[1], parts[2] || '', me, go);
   return renderList(el, me);
+}
+
+/** Administratorius užpildo šilumininko duomenis už jį (vardas, telefonas, kvalifikacijos dokumentas). */
+async function renderHeatUser(el, uid) {
+  const p = (await db.listProfiles()).find(x => x.id === uid);
+  if (!p) { el.innerHTML = '<div class="card">Paskyra nerasta.</div>'; return; }
+  const s = await db.getSettingsFor(uid);
+  el.innerHTML = `
+    <div class="page-head"><h1>${esc(db.profileName(p))}</h1><a class="btn ghost" href="#/nustatymai">← Paskyros</a></div>
+    <form id="hu-form" class="card form-grid">
+      <div class="card-title span4">Šilumininko duomenys (rašomi į aprašą)</div>
+      <div class="span4 muted small">Šiuos duomenis galite užpildyti už šilumininką; jis pats juos taip pat mato ir gali keisti savo paskyroje.</div>
+      <label class="span2">Vardas, pavardė<input name="engineer_name" value="${esc(s.engineer_name || '')}"></label>
+      <label class="span2">Telefonas<input name="engineer_phone" type="tel" value="${esc(s.engineer_phone || '')}" placeholder="+370..."></label>
+      <label class="span2">Kvalifikacijos dokumento Nr.<input name="hp_dok_nr" value="${esc(s.hp_dok_nr || '')}"></label>
+      <label>Kas išdavė<input name="hp_dok_isdave" value="${esc(s.hp_dok_isdave || '')}"></label>
+      <label>Galioja iki<input name="hp_dok_iki" type="date" value="${esc(s.hp_dok_iki || '')}"></label>
+      <div class="span4 form-actions"><button class="btn primary" type="submit">${icon('check')} Išsaugoti</button></div>
+    </form>`;
+  $('#hu-form').addEventListener('submit', async e => {
+    e.preventDefault();
+    const f = Object.fromEntries(new FormData(e.target));
+    try { await db.saveSettingsFor(uid, { ...s, ...f }); toast('Išsaugota', 'ok'); }
+    catch (err) { toast(err.message || String(err), 'error', 6000); }
+  });
 }
 
 // ---------------------------------------------------------------------
