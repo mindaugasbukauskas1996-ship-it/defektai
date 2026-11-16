@@ -9,7 +9,7 @@ import { $, esc, toast, confirmDialog, debounce, processImage, buildingSummary, 
 import {
   STEPS, HP_STATUS, QUESTIONS, SLOTS, KINDS, GROUP_LABEL, expectedItems, itemLabel, itemFilled, computeProgress, PAVARU_KATALOGAS, knownPick
 } from './heat-model.js';
-import { drawOffice, renderHpSettings, readItem, aiBadge, downloadZip } from './heat-office.js';
+import { drawOffice, renderHpSettings, readItem, aiBadge, downloadZip, processPoint } from './heat-office.js';
 import { renderSummary } from './heat-summary.js';
 
 const LF = { q: '', st: 'visi', who: 'all', picked: new Set() };
@@ -105,6 +105,7 @@ async function renderList(el, me) {
           <button class="btn small primary" data-b="assign">Priskirti</button>
           <button class="btn small ghost" data-b="unassign">Nuimti priskyrimą</button>
           <button class="btn small ghost" data-b="${LF.st === 'isbraukti' ? 'include' : 'exclude'}">${LF.st === 'isbraukti' ? 'Grąžinti į sąrašą' : 'Išbraukti (neprižiūrimi)'}</button>
+          <button class="btn small primary" data-b="process">${icon('spark')} DI: viskas</button>
           <button class="btn small" data-b="zip">${icon('file')} Aprašai (PDF, zip)</button>` : '<span class="muted small">Pažymėkite šilumos punktus, kad priskirtumėte juos šilumininkui arba atsisiųstumėte jų aprašus.</span>'}
         ${!n && rows.some(r => r.status === 'parengta' && !r.excluded) ? `<button class="btn small" data-b="zipready">${icon('file')} Visi parengti aprašai (PDF, zip)</button>` : ''}
       </div>`;
@@ -141,6 +142,22 @@ async function renderList(el, me) {
     const act = b.dataset.b, ids = [...LF.picked];
     if (act === 'all') { filtered().forEach(r => LF.picked.add(r.id)); return draw(); }
     if (act === 'none') { LF.picked.clear(); return draw(); }
+    if (act === 'process') {
+      const list = rows.filter(r => LF.picked.has(r.id));
+      if (!await confirmDialog(`Kiekvienam iš ${list.length} pažymėtų šilumos punktų DI nuskaitys lenteles ir schemą bei nuskenuos schemą (tik trūkstamus žingsnius). Tai kainuoja DI lėšų ir gali užtrukti. Tęsti?`, 'Tęsti')) return;
+      b.disabled = true;
+      let n = 0, bad = 0, first = '';
+      for (const r of list) {
+        b.textContent = `${++n} / ${list.length} – ${r.address}`;
+        try {
+          const rep = await processPoint(r.id);
+          if (rep.errors.length) { bad++; first = first || `${r.address}: ${rep.errors[0]}`; }
+        } catch (err) { bad++; first = first || `${r.address}: ${err.message || err}`; }
+      }
+      if (bad) toast(`Apdorota ${list.length - bad} iš ${list.length}. Pirma klaida – ${first}`, 'error', 12000);
+      else toast(`Apdorota šilumos punktų: ${list.length}`, 'ok', 6000);
+      return draw();
+    }
     if (act === 'zip' || act === 'zipready') {
       const list = act === 'zip' ? rows.filter(r => LF.picked.has(r.id)) : rows.filter(r => r.status === 'parengta' && !r.excluded);
       if (list.length > 20 && !await confirmDialog(`Bus sudaryta ${list.length} aprašų – tai gali užtrukti kelias minutes. Tęsti?`, 'Tęsti')) return;

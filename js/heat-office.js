@@ -153,6 +153,97 @@ export async function downloadZip(rows, onProgress = () => {}) {
 }
 
 // ---------------------------------------------------------------------
+// Schemos veiksmai be sąsajos (naudoja ir vedlys, ir masinis apdorojimas)
+// ---------------------------------------------------------------------
+
+async function saveOfficeNow(S, id, patch) {
+  S.hp.office = { ...(S.hp.office || {}), ...patch };
+  const r = await db.updateHeatPoint(id, { office: S.hp.office });
+  S.hp = { ...r, survey: S.hp.survey, office: S.hp.office };
+}
+
+/** DI nuskaito schemą (įrenginiai ir žymenys). */
+export async function readSchemaCore(S, id) {
+  const photos = S.photos.filter(p => !p.item_id && p.slot === 'schema');
+  if (!photos.length) throw new Error('Nėra schemos nuotraukos.');
+  const s = S.hp.survey || {};
+  const res = await db.hpSchemaAi({ sp_type: `šildymas – ${s.sildymas || '?'}, karštas vanduo – ${s.kv || '?'}`, kinds: Object.keys(KINDS), photos: await Promise.all(photos.map(db.hpPhotoForAI)) });
+  await saveOfficeNow(S, id, { schema_ai: { at: new Date().toISOString(), readable: res.readable, comment: res.comment, elements: res.elements, usage: res.usage || null } });
+  return res;
+}
+
+/** Nuskenuoja schemą (nespalvota, be rankraščio) ir pagal nutylėjimą ją patvirtina naudoti apraše. */
+export async function scanSchemaCore(S, id) {
+  const photos = S.photos.filter(p => !p.item_id && p.slot === 'schema');
+  if (!photos.length) throw new Error('Nėra schemos nuotraukos.');
+  const p = photos[photos.length - 1];
+  const res = await db.hpSchemaAi({ mode: 'scan', photos: [await db.hpPhotoForAI(p)] });
+  const blob = await (await fetch(await db.hpPhotoUrl(p))).blob();
+  const out = await makeScan(blob, { corners: res.corners, erase: res.erase });
+  const old = S.photos.find(x => !x.item_id && x.slot === 'schema_scan');
+  const ph = await db.addHpPhoto(id, out, { slot: 'schema_scan' });
+  if (old) { await db.deleteHpPhoto(old).catch(() => {}); S.photos = S.photos.filter(x => x.id !== old.id); }
+  S.photos.push(ph); S.scanUrl = URL.createObjectURL(out);
+  await saveOfficeNow(S, id, { schema_scan_comment: res.comment || '', schema_scan_ok: true });
+  return res;
+}
+
+/** Žymenys perkeliami į įrenginius pagal rūšį ir kontūrą (tik tuščius). */
+export async function applyTagsCore(S) {
+  const els = ((S.hp.office || {}).schema_ai || {}).elements || [];
+  const used = new Set();
+  let n = 0;
+  for (const e of els) {
+    if (!e.tag) continue;
+    const it = S.items.find(i => !i.absent && !i.tag && !used.has(i.id) && i.kind === e.kind && i.grp === e.grp);
+    if (!it) continue;
+    used.add(it.id);
+    Object.assign(it, await db.updateHpItem(it.id, { tag: e.tag }));
+    n++;
+  }
+  return n;
+}
+
+/**
+ * Viskas vienu veiksmu: nuskaito neskaitytas lenteles, nuskaito schemą, priskiria žymenis, nuskenuoja schemą (patvirtinta).
+ * Jau atliktų žingsnių nekartoja. Grąžina trumpą ataskaitą; klaidos neišmeta (kiekvienas žingsnis atskirai).
+ */
+export async function processState(S, id, onStep = () => {}) {
+  const rep = { read: 0, failed: 0, schema: false, scan: false, tags: 0, errors: [] };
+  S.hp.office = S.hp.office || {}; S.hp.survey = S.hp.survey || {};
+  const todo = aiReadable(S).filter(i => !i.ai);
+  if (todo.length) {
+    let n = 0;
+    await pool(todo, 3, async it => {
+      try { await readItem(S, it); rep.read++; } catch (e) { rep.failed++; rep.errors.push(e.message || String(e)); }
+      onStep(`Lentelės ${++n} / ${todo.length}`);
+    });
+  }
+  if (S.photos.some(p => !p.item_id && p.slot === 'schema')) {
+    if (!S.hp.office.schema_ai) {
+      onStep('Skaitoma schema…');
+      try { await readSchemaCore(S, id); rep.schema = true; } catch (e) { rep.errors.push('Schema: ' + (e.message || e)); }
+    }
+    if ((S.hp.office.schema_ai || {}).elements && S.items.some(i => !i.absent && !i.tag)) {
+      try { rep.tags = await applyTagsCore(S); } catch (e) { rep.errors.push('Žymenys: ' + (e.message || e)); }
+    }
+    if (!S.photos.some(p => !p.item_id && p.slot === 'schema_scan')) {
+      onStep('Skenuojama schema…');
+      try { await scanSchemaCore(S, id); rep.scan = true; } catch (e) { rep.errors.push('Skenavimas: ' + (e.message || e)); }
+    }
+  }
+  return rep;
+}
+
+/** Masiniam apdorojimui: įkelia ŠP duomenis ir atlieka processState. */
+export async function processPoint(id, onStep) {
+  const [hp, items, photos] = await Promise.all([db.getHeatPoint(id), db.listHpItems(id), db.listHpPhotos(id)]);
+  const S = { hp, items, photos };
+  S.hp.survey = S.hp.survey || {};
+  return processState(S, id, onStep);
+}
+
+// ---------------------------------------------------------------------
 // Žingsnis „Aprašas (biuras)“ vieno ŠP vedlyje
 // ---------------------------------------------------------------------
 
@@ -173,10 +264,36 @@ export async function drawOffice(root, S, id, hooks = {}) {
   let busy = false;
 
   root.innerHTML = `
+    <div class="card" id="of-all"></div>
     <div class="card" id="of-ai"></div>
     <div class="card" id="of-schema"></div>
     <div class="card" id="of-form"></div>
     <div class="card" id="of-out"></div>`;
+
+  // ---- 0. Viskas vienu mygtuku ----
+  function drawAll(progress = '') {
+    $('#of-all', root).innerHTML = `
+      <div class="of-actions">
+        <button class="btn primary big" type="button" data-all ${busy ? 'disabled' : ''}>${icon('spark')} Padaryti viską (nuskaityti nuotraukas, schemą ir nuskenuoti)</button>
+        <span class="muted small" id="of-all-prog">${esc(progress)}</span>
+      </div>
+      <div class="muted small">Atlieka tik trūkstamus žingsnius: nuskaito lenteles, schemą, priskiria žymenis ir nuskenuoja schemą (nuskenuota schema pažymima kaip patvirtinta). Kelis šilumos punktus iš karto galima apdoroti ŠP sąraše: pažymėkite juos ir spauskite „DI: viskas“.</div>`;
+  }
+
+  async function runAll() {
+    if (busy) return;
+    busy = true; drawAll('Pradedama…');
+    let rep = null;
+    try {
+      rep = await processState(S, id, t => { const el = $('#of-all-prog', root); if (el) el.textContent = t; });
+    } catch (err) { toast('Nepavyko: ' + (err.message || err), 'error', 8000); }
+    busy = false;
+    if (rep) {
+      if (rep.errors.length) toast(`Dalis žingsnių nepavyko: ${rep.errors[0]}`, 'error', 9000);
+      else toast('Viskas atlikta', 'ok');
+    }
+    if (root.isConnected) { drawAll(); drawAi(); drawSchema(); drawForm(); drawOut(); }
+  }
 
   // ---- 1. DI ----
   function drawAi(progress = '') {
@@ -257,11 +374,7 @@ export async function drawOffice(root, S, id, hooks = {}) {
     if (!photos.length || busy) return;
     busy = true; drawSchema('Skaitoma…');
     try {
-      const s = S.hp.survey || {};
-      const res = await db.hpSchemaAi({ sp_type: `šildymas – ${s.sildymas || '?'}, karštas vanduo – ${s.kv || '?'}`, kinds: Object.keys(KINDS), photos: await Promise.all(photos.map(db.hpPhotoForAI)) });
-      S.hp.office = { ...S.hp.office, schema_ai: { at: new Date().toISOString(), readable: res.readable, comment: res.comment, elements: res.elements, usage: res.usage || null } };
-      const r = await db.updateHeatPoint(id, { office: S.hp.office });
-      S.hp = { ...r, survey: S.hp.survey, office: S.hp.office };
+      const res = await readSchemaCore(S, id);
       busy = false; drawSchema(`Rasta elementų: ${res.elements.length}`);
     } catch (err) { busy = false; drawSchema(''); toast('Nepavyko nuskaityti schemos: ' + (err.message || err), 'error', 8000); }
   }
@@ -271,18 +384,8 @@ export async function drawOffice(root, S, id, hooks = {}) {
     if (!photos.length || busy) return;
     busy = true; drawSchema('Skenuojama…');
     try {
-      const p = photos[photos.length - 1];
-      const res = await db.hpSchemaAi({ mode: 'scan', photos: [await db.hpPhotoForAI(p)] });
-      const blob = await (await fetch(await db.hpPhotoUrl(p))).blob();
-      const out = await makeScan(blob, { corners: res.corners, erase: res.erase });
-      const old = S.photos.find(x => !x.item_id && x.slot === 'schema_scan');
-      const ph = await db.addHpPhoto(id, out, { slot: 'schema_scan' });
-      if (old) { await db.deleteHpPhoto(old).catch(() => {}); S.photos = S.photos.filter(x => x.id !== old.id); }
-      S.photos.push(ph); S.scanUrl = URL.createObjectURL(out);
-      S.hp.office = { ...S.hp.office, schema_scan_comment: res.comment || '', schema_scan_ok: false };
-      const r = await db.updateHeatPoint(id, { office: S.hp.office });
-      S.hp = { ...r, survey: S.hp.survey, office: S.hp.office };
-      busy = false; drawSchema('Nuskenuota – patikrinkite su nuotrauka'); drawOut();
+      await scanSchemaCore(S, id);
+      busy = false; drawSchema('Nuskenuota ir patvirtinta naudoti apraše – jei reikia, pataisykite arba nuimkite varnelę'); drawOut();
     } catch (err) { busy = false; drawSchema(''); toast('Nepavyko nuskenuoti: ' + (err.message || err), 'error', 9000); }
   }
 
@@ -349,18 +452,9 @@ export async function drawOffice(root, S, id, hooks = {}) {
 
   /** Žymenys perkeliami į įrenginius pagal rūšį ir kontūrą (tik tuščius). Armatūros ir manometrų žymenys sujungiami. */
   async function applyTags() {
-    const els = (S.hp.office.schema_ai || {}).elements || [];
-    const used = new Set();
     let n = 0;
     try {
-      for (const e of els) {
-        if (!e.tag) continue;
-        const it = S.items.find(i => !i.absent && !i.tag && !used.has(i.id) && i.kind === e.kind && i.grp === e.grp);
-        if (!it) continue;
-        used.add(it.id);
-        Object.assign(it, await db.updateHpItem(it.id, { tag: e.tag }));
-        n++;
-      }
+      n = await applyTagsCore(S);
       toast(`Žymenys priskirti: ${n}`, 'ok');
     } catch (err) { toast('Nepavyko išsaugoti žymenų: ' + (err.message || err), 'error', 6000); }
     drawSchema(`Priskirta žymenų: ${n}`); drawOut();
@@ -421,6 +515,7 @@ export async function drawOffice(root, S, id, hooks = {}) {
   }
 
   root.addEventListener('click', async e => {
+    if (e.target.closest('[data-all]')) return runAll();
     const ai = e.target.closest('[data-ai]');
     if (ai) return runAi(ai.dataset.ai === 'all');
     const sc = e.target.closest('[data-sch]');
@@ -465,7 +560,7 @@ export async function drawOffice(root, S, id, hooks = {}) {
     saveOffice();
   });
 
-  drawAi(); drawSchema(); drawForm(); drawOut();
+  drawAll(); drawAi(); drawSchema(); drawForm(); drawOut();
 }
 
 // ---------------------------------------------------------------------
