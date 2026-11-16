@@ -81,7 +81,7 @@ export const OFFICE = [
     { k: 'statybos_metai', l: 'Statybos metai', pre: c => c.obj.built_year },
     { k: 'aukstai', l: 'Aukštų skaičius', pre: c => c.obj.floors },
     { k: 'butai', l: 'Butų skaičius', pre: c => c.obj.apartments },
-    { k: 'pastato_aukstis', l: 'Pastato aukštis', u: 'm' },
+    { k: 'pastato_aukstis', l: 'Pastato aukštis', u: 'm', pre: c => fl(c) ? String(Math.round(fl(c) * 2.6 * 10) / 10).replace('.', ',') : '', hint: c => fl(c) ? `Skaičiuojama automatiškai: ${fl(c)} aukšt. × 2,6 m (jei reikia kitaip – įrašykite ranka)` : '' },
     { k: 'lubu_aukstis', l: 'Patalpų lubų aukštis (vyraujantis)', u: 'm', common: true },
     { k: 'sildomas_plotas', l: 'Bendras šildomų patalpų plotas', u: 'm²', req: true, hint: c => c.obj.usable_area ? `registre naudingas plotas ${c.obj.usable_area} m²` : '' },
     { k: 'turis', l: 'Pastato tūris', u: 'm³', req: true },
