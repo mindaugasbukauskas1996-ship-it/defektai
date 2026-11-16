@@ -186,7 +186,14 @@ export const itemLabel = it => {
   return it.label ? it.label : base;
 };
 
-export const itemFilled = it => !!(it.manufacturer || it.model || it.tag || it.note || it.qty || Object.values(it.specs || {}).some(v => v !== '' && v != null));
+// Dažniausios pavaros, kurias šilumininkas gali tiesiog pasirinkti (nuotraukos tada neprivalomos). Kita / Siemens – su nuotrauka.
+export const PAVARU_KATALOGAS = [
+  { id: 'amv10', label: 'Danfoss AMV 10', manufacturer: 'Danfoss', model: 'AMV 10', specs: { itampa: '230' } },
+  { id: 'amv30', label: 'Danfoss AMV 30', manufacturer: 'Danfoss', model: 'AMV 30', specs: {} }
+];
+export const knownPick = it => it && it.kind === 'pavara' ? PAVARU_KATALOGAS.find(p => p.manufacturer === it.manufacturer && p.model === it.model) || null : null;
+
+export const itemFilled =it => !!(it.manufacturer || it.model || it.tag || it.note || it.qty || Object.values(it.specs || {}).some(v => v !== '' && v != null));
 
 const answered = v => Array.isArray(v) ? v.length > 0 : v !== undefined && v !== null && String(v).trim() !== '';
 
@@ -214,7 +221,7 @@ export function computeProgress(hp, items, photos) {
     if (it.kind === 'valdiklis' && (hp.office || {}).valdiklis_modelis) continue;     // žinomas valdiklis – nei duomenų, nei nuotraukų nereikia
     const k = KINDS[it.kind] || KINDS.kita;
     const ph = photos.filter(p => p.item_id === it.id);
-    const ok = ph.length > 0;
+    const ok = ph.length > 0 || !!knownPick(it);       // pasirinkta žinoma pavara – nuotrauka neprivaloma
     checks.push({ step: it.grp, label: `${itemLabel(it)}: nuotrauka`, ok });
   }
   const total = checks.length, done = checks.filter(c => c.ok).length;

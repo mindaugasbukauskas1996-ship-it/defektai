@@ -7,7 +7,7 @@ import * as db from './data.js';
 import { icon } from './icons.js';
 import { $, esc, toast, confirmDialog, debounce, processImage, buildingSummary, fmtDate, photoIssues } from './util.js';
 import {
-  STEPS, HP_STATUS, QUESTIONS, SLOTS, KINDS, GROUP_LABEL, expectedItems, itemLabel, itemFilled, computeProgress
+  STEPS, HP_STATUS, QUESTIONS, SLOTS, KINDS, GROUP_LABEL, expectedItems, itemLabel, itemFilled, computeProgress, PAVARU_KATALOGAS, knownPick
 } from './heat-model.js';
 import { drawOffice, renderHpSettings, readItem, aiBadge, downloadZip } from './heat-office.js';
 import { renderSummary } from './heat-summary.js';
@@ -356,7 +356,10 @@ async function renderPoint(el, id, stepId, me, go) {
       ${fixed ? `<div class="hp-fixed"><b>${esc([it.manufacturer, it.model].filter(Boolean).join(' '))}</b> – jau žinoma. Nieko rinktis, vesti ar fotografuoti nereikia.</div>`
         : `${k.hint ? `<div class="muted small">${esc(k.hint)}</div>` : ''}
       ${reading.has(it.id) ? '<div class="muted small">Tikrinama, ar lentelė įskaitoma…</div>' : aiBadge(it, isAdmin)}`}
-      ${fixed ? '' : slotHtml({ slot: 'plate', item_id: it.id, title: 'Nuotraukos', req: true,
+      ${it.kind === 'pavara' ? `<label class="hp-pick">Pavaros tipas
+        <select data-pick><option value="">Pasirinkite…</option>${PAVARU_KATALOGAS.map(p => `<option value="${p.id}" ${knownPick(it) === p ? 'selected' : ''}>${esc(p.label)}</option>`).join('')}<option value="kita" ${it.manufacturer && !knownPick(it) ? 'selected' : ''}>Kita (Siemens ar kita) – reikia nuotraukos</option></select></label>
+        ${knownPick(it) ? '<div class="muted small">Nuotrauka neprivaloma. Jei norite, galite įkelti.</div>' : ''}` : ''}
+      ${fixed ? '' : slotHtml({ slot: 'plate', item_id: it.id, title: 'Nuotraukos', req: !knownPick(it),
         hint: k.plate ? 'Įkelkite 2 nuotraukas: gamyklinę lentelę (visa kadre, ryški, be blizgesio – kad būtų įskaitomi visi skaičiai) ir bendrą įrenginio vaizdą.' : '' })}
       <details class="hp-manual${fixed ? ' hp-hide' : ''}" ${itemFilled(it) && !fixed ? 'open' : ''}><summary>Įvesti duomenis ranka</summary>
         <div class="form-grid">
@@ -528,7 +531,7 @@ async function renderPoint(el, id, stepId, me, go) {
             }).catch(() => { /* patikra neprivaloma */ }).finally(() => { schemaChecking = false; if (body.isConnected && step === 'bendra') drawBody(); });
           }
           const it = j.item_id ? S.items.find(x => x.id === j.item_id) : null;
-          if (it && (KINDS[it.kind] || KINDS.kita).plate && !isFixed(it) && !reading.has(it.id) && !pending.some(p => p.item_id === j.item_id)) {
+          if (it && (KINDS[it.kind] || KINDS.kita).plate && !isFixed(it) && !knownPick(it) && !reading.has(it.id) && !pending.some(p => p.item_id === j.item_id)) {
             reading.add(it.id);
             readItem(S, it).then(() => {
               if (it.ai && it.ai.readable !== 'gera') toast(it.ai.comment || 'Lentelė neįskaitoma – perfotografuokite', 'error', 9000);
@@ -548,13 +551,18 @@ async function renderPoint(el, id, stepId, me, go) {
     const it = S.items.find(x => x.id === card.dataset.item);
     if (!it) return;
     let patch = null;
-    if (t.dataset.absent !== undefined) patch = { absent: t.checked };
+    if (t.dataset.pick !== undefined) {
+      const p = PAVARU_KATALOGAS.find(x => x.id === t.value);
+      if (p) patch = { manufacturer: p.manufacturer, model: p.model, specs: { ...(it.specs || {}), ...p.specs } };
+      else if (knownPick(it)) patch = { manufacturer: null, model: null };
+      else return;
+    } else if (t.dataset.absent !== undefined) patch = { absent: t.checked };
     else if (t.dataset.f) patch = { [t.dataset.f]: t.dataset.f === 'qty' ? (parseInt(t.value, 10) || null) : (t.value.trim() || null) };
     else if (t.dataset.s) patch = { specs: { ...(it.specs || {}), [t.dataset.s]: t.value.trim() } };
     if (!patch) return;
     try {
       Object.assign(it, await db.updateHpItem(it.id, patch));
-      if (patch.absent !== undefined) drawBody();
+      if (patch.absent !== undefined || t.dataset.pick !== undefined) drawBody();
       touch();
     } catch (err) { toast('Nepavyko išsaugoti: ' + (err.message || err), 'error', 6000); }
   });
