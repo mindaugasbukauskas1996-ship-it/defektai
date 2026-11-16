@@ -349,7 +349,7 @@ export function buildAprasas(input, images = []) {
     const mag = lc(s.magistraliu_vieta), st = lc(s.stovu_vieta);
     p(`Magistraliniai vamzdynai išvedžioti ${mag || V('', 'Magistralių vieta')}, stovai – ${st || V('', 'Stovų vieta')}. Stovams atjungti ir vandeniui išleisti įrengta uždaromoji armatūra su išleidimo ventiliais.`);
     const nuor = (s.nuorinimas || []).map(x => /automatin/i.test(x) ? 'automatinius nuorintojus' : 'viršutinio aukšto šildymo prietaisų nuorinimo čiaupus');
-    p(`Oras iš sistemos šalinamas per ${nuor.join(' ir ') || V('', 'Oro šalinimo būdas')}.`);
+    p(`Oras iš sistemos šalinamas per ${nuor.join(' ir ') || 'automatinius nuorintojus ir radiatorius butuose viršutiniuose aukštuose'}.`);   // nenurodžius – įprastas būdas
   }
 
   h2('2.4. Karšto vandens sistema');
