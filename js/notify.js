@@ -29,7 +29,8 @@ function mount() {
     if (e.target.closest('[data-allow]')) { Notification.requestPermission().then(draw); return; }
     if (e.target.closest('.bell-btn')) { panel = !panel; draw(); }
   });
-  document.addEventListener('click', e => { if (panel && !e.target.closest('#bell')) { panel = false; draw(); } });
+  // composedPath – nes paspaudus varpelį jo turinys perpiešiamas ir e.target jau nebe DOM medyje
+  document.addEventListener('click', e => { if (panel && !e.composedPath().some(n => n && n.id === 'bell')) { panel = false; draw(); } });
   return b;
 }
 
