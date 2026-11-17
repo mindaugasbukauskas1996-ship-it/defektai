@@ -58,6 +58,11 @@ export async function makeScan(blob, spec) {
     const area = Math.abs(c.reduce((a, p, i) => a + (p[0] * c[(i + 1) % 4][1] - c[(i + 1) % 4][0] * p[1]), 0)) / 2;
     if (area >= 0.45 * sw * sh) { q = c; usedCorners = true; }        // per maža sritis = greičiausiai klaidingas iškirpimas
   }
+  // DI kartais išvardija kampus atvirkštine (veidrodine) tvarka – tada paveikslėlis išeitų atspindėtas. Tikriname apėjimo kryptį.
+  if (usedCorners) {
+    const signed = q.reduce((a, p, i) => a + (p[0] * q[(i + 1) % 4][1] - q[(i + 1) % 4][0] * p[1]), 0);
+    if (signed < 0) q = [q[1], q[0], q[3], q[2]];                      // sukeičiame kairę ↔ dešinę
+  }
   const d = (a, b) => Math.hypot(a[0] - b[0], a[1] - b[1]);
   let W = Math.max(d(q[0], q[1]), d(q[3], q[2])), H = Math.max(d(q[0], q[3]), d(q[1], q[2]));
   if (W < 200 || H < 200) { q = FULL; W = sw; H = sh; usedCorners = false; }

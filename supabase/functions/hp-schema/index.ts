@@ -220,6 +220,10 @@ async function callClaude(apiKey: string, body: unknown) {
     const r = await fetch('https://api.anthropic.com/v1/messages', { method: 'POST', headers: { 'content-type': 'application/json', 'x-api-key': apiKey, 'anthropic-version': '2023-06-01' }, body: JSON.stringify(body) });
     const d = await r.json().catch(() => ({}));
     if (r.ok) return d;
+    if (r.status === 400 && body && (body as any).output_config) {            // kai kurie modeliai nepalaiko output_config – bandome be jo
+      const { output_config: _o, ...plain } = body as any;
+      body = plain; attempt = -1; continue;
+    }
     if ((r.status === 429 || r.status === 529) && attempt === 0) { await new Promise(res => setTimeout(res, 2500)); continue; }
     throw new Error(`Claude API klaida (${r.status}): ${(d && d.error && d.error.message) || r.statusText}`);
   }
@@ -271,7 +275,7 @@ function buildExtract(payload: any, model: string) {
   if (payload.sp_type) text += `Šilumos punktas: ${str(payload.sp_type, 200)}\n`;
   if (payload.address) text += `Pastatas: ${str(payload.address, 150)}\n`;
   content.push({ type: 'text', text: text || 'Schemos vaizdas:' }, im, { type: 'text', text: 'Perskaityk schemą ir pateik per įrankį „pateikti_modeli“.' });
-  return { tool, body: { model, max_tokens: 16000, system: EXTRACT_SYSTEM, tools: [tool], tool_choice: { type: 'tool', name: 'pateikti_modeli' }, messages: [{ role: 'user', content }] } };
+  return { tool, body: { model, max_tokens: 16000, system: EXTRACT_SYSTEM, tools: [tool], tool_choice: { type: 'auto' }, output_config: { effort: 'medium' }, messages: [{ role: 'user', content }] } };
 }
 
 function buildVerify(payload: any, model: string) {
@@ -296,7 +300,7 @@ function buildVerify(payload: any, model: string) {
     { type: 'text', text: 'ORIGINALAS:' }, orig, { type: 'text', text: 'PROGRAMOS NUBRAIŽYTA KOPIJA:' }, draw,
     { type: 'text', text: 'KOPIJOS JSON:\n' + JSON.stringify(payload.model || {}).slice(0, 60000) + '\n\nPateik pataisas per įrankį „pateikti_pataisas“.' }
   ];
-  return { tool, body: { model, max_tokens: 8000, system: VERIFY_SYSTEM, tools: [tool], tool_choice: { type: 'tool', name: 'pateikti_pataisas' }, messages: [{ role: 'user', content }] } };
+  return { tool, body: { model, max_tokens: 8000, system: VERIFY_SYSTEM, tools: [tool], tool_choice: { type: 'auto' }, output_config: { effort: 'medium' }, messages: [{ role: 'user', content }] } };
 }
 
 Deno.serve(async (req: Request) => {
