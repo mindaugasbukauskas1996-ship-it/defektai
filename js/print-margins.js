@@ -36,7 +36,7 @@ function before() {
   if (!document.querySelector('.sheet')) return;
   try {
     styleEl = document.createElement('style');
-    styleEl.textContent = '@page { size: A4; margin: 0 } @page annual { size: A4 landscape; margin: 0 } .pg-wrap td { padding: 0 var(--pg-side, 12mm); vertical-align: top }';
+    styleEl.textContent = '@page { size: A4; margin: 0 } @page annual { size: A4 landscape; margin: 0 } .pg-wrap > thead > tr > td, .pg-wrap > tbody > tr > td, .pg-wrap > tfoot > tr > td { padding: 0 var(--pg-side, 12mm); vertical-align: top }';
     document.head.appendChild(styleEl);
     wrapSheets();
   } catch (_) { after(); }
