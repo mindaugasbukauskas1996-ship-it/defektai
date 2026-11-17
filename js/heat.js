@@ -136,7 +136,7 @@ async function renderList(el, me) {
           <button class="btn small ghost" data-b="${LF.st === 'isbraukti' ? 'include' : 'exclude'}">${LF.st === 'isbraukti' ? 'Grąžinti į sąrašą' : 'Išbraukti (neprižiūrimi)'}</button>
           <button class="btn small primary" data-b="process">${icon('spark')} DI: viskas</button>
           <button class="btn small" data-b="zip">${icon('file')} Aprašai (PDF, zip)</button>` : '<span class="muted small">Pažymėkite šilumos punktus, kad priskirtumėte juos šilumininkui arba atsisiųstumėte jų aprašus.</span>'}
-                <button class="btn small" data-b="schemazip" title="Geriausia kiekvieno ŠP schemos nuotrauka vienu zip failu (pažymėtiems arba visiems)">${icon('file')} Schemų nuotraukos (zip)${n ? ` – ${n}` : ''}</button>
+                <button class="btn small" data-b="schemazip" title="Geriausia kiekvieno ŠP schemos nuotrauka zip failais (pažymėtiems; jei nieko nepažymėta – tik pateiktiems)">${icon('file')} Schemų nuotraukos (zip)${n ? ` – ${n}` : ''}</button>
         ${!n && rows.some(r => r.status === 'parengta' && !r.excluded) ? `<button class="btn small" data-b="zipready">${icon('file')} Visi parengti aprašai (PDF, zip)</button>` : ''}
       </div>`;
     }
@@ -173,7 +173,9 @@ async function renderList(el, me) {
     if (act === 'all') { filtered().forEach(r => LF.picked.add(r.id)); return draw(); }
     if (act === 'none') { LF.picked.clear(); return draw(); }
     if (act === 'schemazip') {
-      const list = LF.picked.size ? rows.filter(r => LF.picked.has(r.id)) : rows.filter(r => !r.excluded);
+      // pažymėti; jei nieko nepažymėta – tik šilumininko pateikti (ir parengti) ŠP, ne visi
+      const list = LF.picked.size ? rows.filter(r => LF.picked.has(r.id)) : rows.filter(r => !r.excluded && sent(r));
+      if (!list.length) return toast('Nėra pateiktų šilumos punktų. Pažymėkite norimus sąraše.', 'error', 6000);
       if (list.length > 30 && !await confirmDialog(`Bus patikrinta ${list.length} šilumos punktų ir atsisiųsta po kelis zip failus. Tai gali užtrukti kelias minutes. Tęsti?`, 'Tęsti')) return;
       b.disabled = true;
       try {
