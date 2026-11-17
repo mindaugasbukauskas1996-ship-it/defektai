@@ -482,6 +482,10 @@ async function renderPoint(el, id, stepId, me, go) {
       if (opt.dataset.many) { const a = new Set(s[k] || []); if (a.has(v)) a.delete(v); else a.add(v); s[k] = [...a]; }
       else s[k] = s[k] === v ? '' : v;
       saveSurvey();
+      if (k === 'keli_sp' && s[k] === 'taip') {              // name yra daugiau nei vienas ŠP – antras sukuriamas pats
+        db.ensureSecondHp(id).then(nid => { if (nid) toast('Sukurtas antras šilumos punktas – rasite jį ŠP sąraše', 'ok', 7000); })
+          .catch(err => toast('Nepavyko sukurti antro ŠP: ' + (err.message || err), 'error', 7000));
+      }
       if (TYPE_KEYS.includes(k)) await syncItems();
       drawTop(); drawSteps(); drawBody();
       return;

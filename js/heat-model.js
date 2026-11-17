@@ -44,7 +44,7 @@ export const QUESTIONS = {
     { key: 'kv_cirkuliacija', label: 'Ar karšto vandens sistema su cirkuliacija?', type: 'one', req: true, options: YN, show: kvOn },
     { key: 'nuotolinis', label: 'Ar yra nuotolinis valdymas / stebėjimas?', type: 'one', options: [...YN, ['nezinau', 'Nežinau']], show: (s, o = {}) => !o.nuotolinis },   // jau žinoma – neklausiama
     { key: 'keli_sp', label: 'Ar šiame name yra daugiau nei vienas šilumos punktas?', type: 'one', options: YN,
-      hint: 'Jei taip – praneškite biurui, kad sistemoje pridėtų antrą ŠP.' }
+      hint: 'Jei taip – antras šilumos punktas sistemoje sukuriamas automatiškai (rasite jį ŠP sąraše). Jei jų daugiau nei du – pasakykite biurui.' }
   ],
   bendra: [
     { key: 'schema_yra', label: 'Ar ŠP ant sienos kabo schema?', type: 'one', req: true, options: YN }

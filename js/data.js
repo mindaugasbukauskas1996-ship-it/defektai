@@ -996,6 +996,13 @@ export async function addHeatPointCopy(hp) {
   return data;
 }
 
+/** Jei name yra daugiau nei vienas ŠP – sukuria antrą (grąžina naujo id arba null, jei jau yra). */
+export async function ensureSecondHp(hpId) {
+  const { data, error } = await sb.rpc('ensure_second_hp', { p_hp: hpId });
+  hpErr(error);
+  return data || null;
+}
+
 export async function listHpItems(hpId) {
   const { data, error } = await sb.from('hp_items').select('*').eq('heat_point_id', hpId).order('sort').order('created_at');
   hpErr(error);
