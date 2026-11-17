@@ -203,8 +203,9 @@ export async function scanSchemaCore(S, id, opts = {}) {
  * Rezultatas (JPEG) saugomas kaip nuotrauka slot „schema_draw“, JSON – office.schema_graph. Patvirtinti naudoti apraše turi žmogus.
  */
 export async function redrawSchemaCore(S, id, step = () => {}) {
-  let scanPh = S.photos.find(p => !p.item_id && p.slot === 'schema_scan');
-  if (!scanPh) { step('Ruošiama nuskenuota schema…'); await scanSchemaCore(S, id); scanPh = S.photos.find(p => !p.item_id && p.slot === 'schema_scan'); }
+  // visada šviežias skenas iš naujausios nuotraukos (senas skenas galėjo būti veidrodinis, nukirptas ar iš kitos nuotraukos)
+  step('Ruošiama nuskenuota schema…'); await scanSchemaCore(S, id);
+  const scanPh = S.photos.find(p => !p.item_id && p.slot === 'schema_scan');
   if (!scanPh) throw new Error('Nėra schemos nuotraukos.');
   const bmp = await createImageBitmap(await (await fetch(await db.hpPhotoUrl(scanPh))).blob());
   const aspect = Math.round(bmp.height / bmp.width * 1000) / 1000;
