@@ -1124,7 +1124,15 @@ export async function listUnreadablePlates() {
 
 /** DI: schemos nuotraukos skaitymas (Edge funkcija „hp-schema“). */
 export async function hpSchemaAi(payload) {
-  const { data, error } = await sb.functions.invoke('hp-schema', { body: { payload } });
+  // ilgos DI užklausos telefone kartais „nenukeliauja“ atgal (serveris atsako, o naršyklė – ne): tik tada kartojame, daugiausia 2 kartus
+  let res, last;
+  for (let i = 0; i < 3; i++) {
+    res = await sb.functions.invoke('hp-schema', { body: { payload } });
+    last = res.error;
+    if (!last || !/failed to send|load failed|network|fetch/i.test(String(last.message || last))) break;
+    await new Promise(r => setTimeout(r, 1500));
+  }
+  const { data, error } = res;
   if (error) {
     let msg = error.message;
     try { const body = await error.context.json(); if (body && body.error) msg = body.error; } catch (_) { /* ignore */ }

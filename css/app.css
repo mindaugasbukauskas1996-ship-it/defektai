@@ -671,3 +671,10 @@ input[type=date], select { min-width: 0; max-width: 100%; }
 .bell-item.unread { background: #eef6ff; font-weight: 600; }
 .bell-item small { color: #6b7a8a; font-weight: 400; }
 .bell-empty { padding: 10px; }
+
+/* ŠP biuro skydelis: tekstai ir mygtukai telefone telpa į ekraną (nebeplečia puslapio) */
+#hp-office, #hp-office .card { max-width: 100%; min-width: 0; }
+#hp-office .btn { white-space: normal; max-width: 100%; height: auto; line-height: 1.3; text-align: center; }
+#hp-office .of-table { display: block; max-width: 100%; overflow-x: auto; }
+#hp-office .of-table td, #hp-office .of-table th { overflow-wrap: anywhere; }
+#hp-office .of-actions > * { max-width: 100%; }
