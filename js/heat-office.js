@@ -161,6 +161,79 @@ export async function downloadZip(rows, onProgress = () => {}) {
 }
 
 // ---------------------------------------------------------------------
+// Schemų nuotraukų eksportas (geriausia nuotrauka kiekvienam ŠP)
+// ---------------------------------------------------------------------
+
+/** Nuotraukos kokybės įvertis (didesnis = geriau): ryškumas × skiriamoji geba × ekspozicija. Be DI, naršyklėje. */
+async function photoScore(blob) {
+  try {
+    const bmp = await createImageBitmap(blob);
+    const long = Math.max(bmp.width, bmp.height), k = Math.min(1, 800 / long);
+    const w = Math.max(8, Math.round(bmp.width * k)), h = Math.max(8, Math.round(bmp.height * k));
+    const c = document.createElement('canvas'); c.width = w; c.height = h;
+    const g = c.getContext('2d', { willReadFrequently: true });
+    g.drawImage(bmp, 0, 0, w, h); bmp.close && bmp.close();
+    const d = g.getImageData(0, 0, w, h).data;
+    const Y = new Float32Array(w * h);
+    let sum = 0;
+    for (let i = 0; i < w * h; i++) { Y[i] = 0.299 * d[i * 4] + 0.587 * d[i * 4 + 1] + 0.114 * d[i * 4 + 2]; sum += Y[i]; }
+    const mean = sum / (w * h);
+    let m = 0, m2 = 0, n = 0;
+    for (let y = 1; y < h - 1; y++) for (let x = 1; x < w - 1; x++) {
+      const i = y * w + x, l = 4 * Y[i] - Y[i - 1] - Y[i + 1] - Y[i - w] - Y[i + w];
+      m += l; m2 += l * l; n++;
+    }
+    const sharp = m2 / n - (m / n) ** 2;
+    const res = Math.min(1, long / 1400);
+    const expo = mean < 70 ? mean / 70 : mean > 215 ? Math.max(0.2, (255 - mean) / 40) : 1;
+    return sharp * res * expo;
+  } catch (_) { return 0; }
+}
+
+/**
+ * Admin: kiekvieno ŠP geriausia schemos nuotrauka (kai jų kelios – išrenkama pagal kokybę) vienu zip failu.
+ * Failo vardas: <ŠP id pradžia>__<adresas>.jpg – pagal id vėliau galima priskirti perbraižytą schemą atgal.
+ */
+export async function downloadSchemaZip(rows, onProgress = () => {}) {
+  const files = [], index = ['id;adresas;schemos nuotraukų;pasirinkta'];
+  let n = 0, got = 0;
+  const flush = async part => {
+    if (!files.length) return;
+    saveBlob(await zipBlobs(files), `Schemos ${part}.zip`);
+    files.length = 0;
+  };
+  let part = 1;
+  for (const r of rows) {
+    onProgress(++n, rows.length, r.address);
+    let ph = [];
+    try { ph = (await db.listHpPhotos(r.id)).filter(p => !p.item_id && p.slot === 'schema'); } catch (_) { continue; }
+    if (!ph.length) continue;
+    let best = ph[0], bestScore = -1;
+    const blobs = new Map();
+    for (const p of ph) {
+      try {
+        const blob = await (await fetch(await db.hpPhotoUrl(p))).blob();
+        blobs.set(p.id, blob);
+        const sc = ph.length > 1 ? await photoScore(blob) : 1;
+        if (sc > bestScore) { bestScore = sc; best = p; }
+      } catch (_) { /* nuotrauka praleidžiama */ }
+    }
+    const blob = blobs.get(best.id);
+    if (!blob) continue;
+    const addr = String(r.address || 'adresas').replace(/[\\/:*?"<>|]+/g, ' ').trim().slice(0, 80) + (r.seq > 1 ? ` ŠP${r.seq}` : '');
+    files.push({ name: `${String(r.id).slice(0, 8)}__${addr}.jpg`, blob });
+    index.push(`${r.id};${String(r.address || '').replace(/;/g, ',')};${ph.length};${files[files.length - 1].name}`);
+    got++;
+    if (files.length >= 40) await flush(part++);
+  }
+  if (got) {
+    files.push({ name: 'indeksas.csv', blob: new Blob(['﻿' + index.join('\r\n')], { type: 'text/csv;charset=utf-8' }) });
+    await flush(part);
+  }
+  return got;
+}
+
+// ---------------------------------------------------------------------
 // Schemos veiksmai be sąsajos (naudoja ir vedlys, ir masinis apdorojimas)
 // ---------------------------------------------------------------------
 
