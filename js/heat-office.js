@@ -173,13 +173,15 @@ export async function readSchemaCore(S, id) {
 }
 
 /** Nuskenuoja schemą (nespalvota, be rankraščio) ir pagal nutylėjimą ją patvirtina naudoti apraše. */
-export async function scanSchemaCore(S, id) {
+export async function scanSchemaCore(S, id, opts = {}) {
   const photos = S.photos.filter(p => !p.item_id && p.slot === 'schema');
   if (!photos.length) throw new Error('Nėra schemos nuotraukos.');
   const p = photos[photos.length - 1];
   const res = await db.hpSchemaAi({ mode: 'scan', photos: [await db.hpPhotoForAI(p)] });
   const blob = await (await fetch(await db.hpPhotoUrl(p))).blob();
-  const out = await makeScan(blob, { corners: res.corners, erase: res.erase });
+  const out = await makeScan(blob, { corners: res.corners, erase: res.erase, full: !!opts.full });
+  const note = opts.full ? 'Naudota visa nuotrauka (be iškirpimo).' : makeScan.lastCrop ? '' : 'DI nurodytas iškirpimas atmestas – naudota visa nuotrauka.';
+  res.comment = [res.comment, note].filter(Boolean).join(' ');
   const old = S.photos.find(x => !x.item_id && x.slot === 'schema_scan');
   const ph = await db.addHpPhoto(id, out, { slot: 'schema_scan' });
   if (old) { await db.deleteHpPhoto(old).catch(() => {}); S.photos = S.photos.filter(x => x.id !== old.id); }
@@ -354,6 +356,7 @@ export async function drawOffice(root, S, id, hooks = {}) {
       </div>
       <div class="of-actions">
         <button class="btn" type="button" data-sch="scan" ${photos.length && !busy ? '' : 'disabled'}>${icon('spark')} ${scanPh ? 'Nuskenuoti iš naujo' : 'Nuskenuoti schemą (nespalvota, be rankraščio)'}</button>
+        ${photos.length ? `<button class="btn" type="button" data-sch="scanfull" ${busy ? 'disabled' : ''}>Nuskenuoti visą nuotrauką (be iškirpimo)</button>` : ''}
       </div>
       ${scanPh ? `<div class="muted small">Dar kas nors netrinta? Pele (ar pirštu) pažymėkite stačiakampį ant schemos ir spauskite „Ištrinti pažymėtas vietas“.</div>
         <div class="of-svg"><div class="of-erase" id="of-erase"><img alt="Nuskenuota schema" draggable="false" src="${esc(S.scanUrl || '')}">${(S.eraseRects || []).map(r => `<i style="left:${r.x * 100}%;top:${r.y * 100}%;width:${r.w * 100}%;height:${r.h * 100}%"></i>`).join('')}</div></div>
@@ -379,12 +382,12 @@ export async function drawOffice(root, S, id, hooks = {}) {
     } catch (err) { busy = false; drawSchema(''); toast('Nepavyko nuskaityti schemos: ' + (err.message || err), 'error', 8000); }
   }
 
-  async function scanSchema() {
+  async function scanSchema(full = false) {
     const photos = S.photos.filter(p => !p.item_id && p.slot === 'schema');
     if (!photos.length || busy) return;
     busy = true; drawSchema('Skenuojama…');
     try {
-      await scanSchemaCore(S, id);
+      await scanSchemaCore(S, id, { full });
       busy = false; drawSchema('Nuskenuota ir patvirtinta naudoti apraše – jei reikia, pataisykite arba nuimkite varnelę'); drawOut();
     } catch (err) { busy = false; drawSchema(''); toast('Nepavyko nuskenuoti: ' + (err.message || err), 'error', 9000); }
   }
@@ -524,6 +527,7 @@ export async function drawOffice(root, S, id, hooks = {}) {
       if (a === 'read') return readSchema();
       if (a === 'apply') return applyTags();
       if (a === 'scan') return scanSchema();
+      if (a === 'scanfull') return scanSchema(true);
       if (a === 'erase') return eraseMarked();
       if (a === 'unmark') { S.eraseRects = []; return drawSchema(); }
       if (a === 'clear') return clearScan();

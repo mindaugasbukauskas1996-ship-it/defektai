@@ -48,11 +48,20 @@ export async function makeScan(blob, spec) {
   g0.translate(sw / 2, sh / 2); g0.rotate(rot * Math.PI / 180); g0.drawImage(bmp, -bmp.width / 2, -bmp.height / 2);
   const src = g0.getImageData(0, 0, sw, sh);
 
-  // lapo kampai (jei DI nenurodė – visas vaizdas)
-  let q = (Array.isArray(spec.corners) && spec.corners.length === 4) ? spec.corners.map(p => [clamp01(p.x) * (sw - 1), clamp01(p.y) * (sh - 1)]) : [[0, 0], [sw - 1, 0], [sw - 1, sh - 1], [0, sh - 1]];
+  // lapo kampai (jei DI nenurodė, jie neįtikimi arba prašoma visos nuotraukos – visas vaizdas)
+  const FULL = [[0, 0], [sw - 1, 0], [sw - 1, sh - 1], [0, sh - 1]];
+  let q = FULL, usedCorners = false;
+  if (!spec.full && Array.isArray(spec.corners) && spec.corners.length === 4) {
+    let c = spec.corners.map(p => [clamp01(p.x) * (sw - 1), clamp01(p.y) * (sh - 1)]);
+    const cx = c.reduce((a, p) => a + p[0], 0) / 4, cy = c.reduce((a, p) => a + p[1], 0) / 4;
+    c = c.map(p => [Math.min(sw - 1, Math.max(0, cx + (p[0] - cx) * 1.04)), Math.min(sh - 1, Math.max(0, cy + (p[1] - cy) * 1.04))]);   // šiek tiek platesnis – DI kampai dažnai būna per siauri
+    const area = Math.abs(c.reduce((a, p, i) => a + (p[0] * c[(i + 1) % 4][1] - c[(i + 1) % 4][0] * p[1]), 0)) / 2;
+    if (area >= 0.45 * sw * sh) { q = c; usedCorners = true; }        // per maža sritis = greičiausiai klaidingas iškirpimas
+  }
   const d = (a, b) => Math.hypot(a[0] - b[0], a[1] - b[1]);
   let W = Math.max(d(q[0], q[1]), d(q[3], q[2])), H = Math.max(d(q[0], q[3]), d(q[1], q[2]));
-  if (W < 200 || H < 200) { q = [[0, 0], [sw - 1, 0], [sw - 1, sh - 1], [0, sh - 1]]; W = sw; H = sh; }
+  if (W < 200 || H < 200) { q = FULL; W = sw; H = sh; usedCorners = false; }
+  makeScan.lastCrop = usedCorners;
   const k = Math.min(1, 2600 / Math.max(W, H));
   const ow = Math.round(W * k), oh = Math.round(H * k);
   const h = homography(ow, oh, q);
