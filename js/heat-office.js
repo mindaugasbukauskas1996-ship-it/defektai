@@ -8,6 +8,7 @@ import * as db from './data.js';
 import { icon } from './icons.js';
 import { $, esc, toast, confirmDialog, debounce, blobToDataURL } from './util.js';
 import { KINDS, GROUP_LABEL, itemLabel } from './heat-model.js';
+import { renderSchema, svgToPng, applyCorrections, normalizeModel } from './schema-render.js';
 import { OFFICE, COMPANY, DEFAULT_TEXTS, makeCtx, buildAprasas, aprasasMissing, specsText } from './heat-doc.js';
 import { makeScan } from './heat-scan.js';
 import { aprasasDocx, aprasasPdf, zipBlobs, saveBlob } from './heat-export.js';
@@ -109,6 +110,13 @@ async function svgToImage(svg) {
 
 async function schemaImages(photos, office = {}) {
   const out = [];
+  const draw = office.schema_draw_ok && photos.find(x => !x.item_id && x.slot === 'schema_draw');     // DI perbraižyta ir patvirtinta schema – pirmenybė
+  if (draw) {
+    try {
+      const blob = await (await fetch(await db.hpPhotoUrl(draw))).blob();
+      return [{ dataUrl: await blobToDataURL(blob), bytes: new Uint8Array(await blob.arrayBuffer()), width: draw.width, height: draw.height }];
+    } catch (_) { /* krentame į skeną / originalą */ }
+  }
   const scan = office.schema_scan_ok && photos.find(x => !x.item_id && x.slot === 'schema_scan');
   if (scan) {
     try {
@@ -188,6 +196,46 @@ export async function scanSchemaCore(S, id, opts = {}) {
   S.photos.push(ph); S.scanUrl = URL.createObjectURL(out);
   await saveOfficeNow(S, id, { schema_scan_comment: res.comment || '', schema_scan_ok: true });
   return res;
+}
+
+/**
+ * Schemos perbraižymas: nuskenuota schema → DI perskaito į JSON → programa nubraižo → DI patikrina ir pataiso (iki 2 kartų).
+ * Rezultatas (JPEG) saugomas kaip nuotrauka slot „schema_draw“, JSON – office.schema_graph. Patvirtinti naudoti apraše turi žmogus.
+ */
+export async function redrawSchemaCore(S, id, step = () => {}) {
+  let scanPh = S.photos.find(p => !p.item_id && p.slot === 'schema_scan');
+  if (!scanPh) { step('Ruošiama nuskenuota schema…'); await scanSchemaCore(S, id); scanPh = S.photos.find(p => !p.item_id && p.slot === 'schema_scan'); }
+  if (!scanPh) throw new Error('Nėra schemos nuotraukos.');
+  const bmp = await createImageBitmap(await (await fetch(await db.hpPhotoUrl(scanPh))).blob());
+  const aspect = Math.round(bmp.height / bmp.width * 1000) / 1000;
+  const s = S.hp.survey || {};
+  step('DI skaito schemą (užtrunka 1–2 min.)…');
+  const ex = await db.hpSchemaAi({ mode: 'extract', photos: [await db.hpPhotoForAI(scanPh)], aspect, sp_type: `šildymas – ${s.sildymas || '?'}, karštas vanduo – ${s.kv || '?'}`, address: S.hp.address });
+  if (ex.readable === 'neiskaitoma') throw new Error(ex.comment || 'Schema neįskaitoma – perfotografuokite iš arčiau, be blizgesio.');
+  let model = normalizeModel({ ...ex.model, aspect });
+  if (!model.symbols.length && !model.pipes.length) throw new Error('DI nieko neperskaitė iš schemos. Pabandykite dar kartą arba perfotografuokite.');
+  const usage = [ex.usage];
+  let rounds = 0;
+  for (let i = 0; i < 2; i++) {
+    step(`Tikrinama kopija (${i + 1}/2)…`);
+    const r = renderSchema(model);
+    const png = await svgToPng(r.svg, r.w, r.h, 1600);
+    const ver = await db.hpSchemaAi({ mode: 'verify', photos: [await db.hpPhotoForAI(scanPh)], render: { data: await blobToDataURL(png) }, model });
+    usage.push(ver.usage);
+    if (ver.done || !(ver.corrections || []).length) break;
+    const ac = applyCorrections(model, ver.corrections);
+    if (!ac.applied) break;
+    model = normalizeModel({ ...ac.model, aspect }); rounds++;
+  }
+  step('Saugoma…');
+  const fin = renderSchema(model);
+  const jpg = await svgToPng(fin.svg, fin.w, fin.h, 2800, 'image/jpeg');
+  const old = S.photos.find(x => !x.item_id && x.slot === 'schema_draw');
+  const ph = await db.addHpPhoto(id, jpg, { slot: 'schema_draw', width: 2800, height: Math.round(2800 * fin.h / fin.w) });
+  if (old) { await db.deleteHpPhoto(old).catch(() => {}); S.photos = S.photos.filter(x => x.id !== old.id); }
+  S.photos.push(ph); S.drawUrl = URL.createObjectURL(jpg);
+  await saveOfficeNow(S, id, { schema_graph: model, schema_draw_ok: false, schema_draw_comment: ex.comment || '', schema_draw_info: { at: new Date().toISOString(), rounds, truncated: !!ex.truncated, usage } });
+  return { model, rounds, truncated: !!ex.truncated };
 }
 
 /** Žymenys perkeliami į įrenginius pagal rūšį ir kontūrą (tik tuščius). */
@@ -343,6 +391,8 @@ export async function drawOffice(root, S, id, hooks = {}) {
   function drawSchema(msg = '') {
     const sch = S.hp.office.schema_ai, photos = S.photos.filter(p => !p.item_id && p.slot === 'schema');
     const scanPh = S.photos.find(p => !p.item_id && p.slot === 'schema_scan');
+    const drawPh = S.photos.find(p => !p.item_id && p.slot === 'schema_draw');
+    if (drawPh && !S.drawUrl) db.hpPhotoUrl(drawPh).then(u => { S.drawUrl = u; drawSchema(msg); }).catch(() => {});
     if (scanPh && !S.scanUrl) db.hpPhotoUrl(scanPh).then(u => { S.scanUrl = u; drawSchema(msg); }).catch(() => {});
     const tagged = S.items.filter(i => !i.absent && i.tag).length;
     $('#of-schema', root).innerHTML = `
@@ -358,6 +408,17 @@ export async function drawOffice(root, S, id, hooks = {}) {
         <button class="btn" type="button" data-sch="scan" ${photos.length && !busy ? '' : 'disabled'}>${icon('spark')} ${scanPh ? 'Nuskenuoti iš naujo' : 'Nuskenuoti schemą (nespalvota, be rankraščio)'}</button>
         ${photos.length ? `<button class="btn" type="button" data-sch="scanfull" ${busy ? 'disabled' : ''}>Nuskenuoti visą nuotrauką (be iškirpimo)</button>` : ''}
       </div>
+      <div class="of-actions">
+        <button class="btn primary" type="button" data-sch="redraw" ${photos.length && !busy ? '' : 'disabled'}>${icon('spark')} ${drawPh ? 'Perbraižyti iš naujo' : 'Perbraižyti schemą (DI)'}</button>
+        <span class="muted small">Stipresnis DI perskaito schemą, programa nubraižo švarią kopiją ir ją patikrina. Užtrunka 1–3 min., kainuoja daugiau nei skenavimas.</span>
+      </div>
+      ${drawPh ? `<div class="of-cmp">
+          <figure><figcaption>Originalas (skenas)</figcaption><img alt="Originalas" src="${esc(S.scanUrl || '')}"></figure>
+          <figure><figcaption>Perbraižyta</figcaption><img alt="Perbraižyta schema" src="${esc(S.drawUrl || '')}"></figure>
+        </div>
+        ${S.hp.office.schema_draw_comment ? `<div class="muted small">DI pastaba: ${esc(S.hp.office.schema_draw_comment)}</div>` : ''}
+        <label class="chk"><input type="checkbox" data-sch="drawok" ${S.hp.office.schema_draw_ok ? 'checked' : ''}> Palyginau su originalu ir patvirtinu – naudoti perbraižytą schemą apraše (kitaip dedama nuskenuota / originali)</label>
+        <button class="btn small ghost" type="button" data-sch="drawclear">Pašalinti perbraižytą schemą</button>` : ''}
       ${scanPh ? `<div class="muted small">Dar kas nors netrinta? Pele (ar pirštu) pažymėkite stačiakampį ant schemos ir spauskite „Ištrinti pažymėtas vietas“.</div>
         <div class="of-svg"><div class="of-erase" id="of-erase"><img alt="Nuskenuota schema" draggable="false" src="${esc(S.scanUrl || '')}">${(S.eraseRects || []).map(r => `<i style="left:${r.x * 100}%;top:${r.y * 100}%;width:${r.w * 100}%;height:${r.h * 100}%"></i>`).join('')}</div></div>
         <div class="of-actions">
@@ -380,6 +441,22 @@ export async function drawOffice(root, S, id, hooks = {}) {
       const res = await readSchemaCore(S, id);
       busy = false; drawSchema(`Rasta elementų: ${res.elements.length}`);
     } catch (err) { busy = false; drawSchema(''); toast('Nepavyko nuskaityti schemos: ' + (err.message || err), 'error', 8000); }
+  }
+
+  async function redrawSchema() {
+    if (busy || !S.photos.some(p => !p.item_id && p.slot === 'schema')) return;
+    busy = true; drawSchema('Pradedama…');
+    try {
+      const r = await redrawSchemaCore(S, id, m => drawSchema(m));
+      busy = false; drawSchema(`Perbraižyta${r.rounds ? ` (pataisyta ${r.rounds} k.)` : ''}${r.truncated ? ' – DI atsakymas nutrūko, schema gali būti nepilna' : ''}. Palyginkite su originalu ir patvirtinkite.`); drawOut();
+    } catch (err) { busy = false; drawSchema(''); toast('Nepavyko perbraižyti: ' + (err.message || err), 'error', 10000); }
+  }
+
+  async function clearDraw() {
+    const old = S.photos.find(x => !x.item_id && x.slot === 'schema_draw');
+    if (old) { await db.deleteHpPhoto(old).catch(() => {}); S.photos = S.photos.filter(x => x.id !== old.id); }
+    S.drawUrl = '';
+    await saveSvgFlag({ schema_draw_ok: null, schema_graph: null, schema_draw_comment: null, schema_draw_info: null });
   }
 
   async function scanSchema(full = false) {
@@ -528,6 +605,9 @@ export async function drawOffice(root, S, id, hooks = {}) {
       if (a === 'apply') return applyTags();
       if (a === 'scan') return scanSchema();
       if (a === 'scanfull') return scanSchema(true);
+      if (a === 'redraw') return redrawSchema();
+      if (a === 'drawok') return saveSvgFlag({ schema_draw_ok: sc.checked });
+      if (a === 'drawclear') return clearDraw();
       if (a === 'erase') return eraseMarked();
       if (a === 'unmark') { S.eraseRects = []; return drawSchema(); }
       if (a === 'clear') return clearScan();

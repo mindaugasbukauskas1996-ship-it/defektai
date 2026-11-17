@@ -174,6 +174,131 @@ const num01 = (v: unknown) => Math.min(1, Math.max(0, Number(v) || 0));
 
 const str = (v: unknown, max = 120) => (typeof v === 'string' ? v : v == null ? '' : String(v)).trim().slice(0, max);
 
+// ---------------------------------------------------------------------
+// Schemos perbraižymas: „extract“ (nuotrauka → JSON) ir „verify“ (originalas + atvaizdas → pataisos).
+// Braižo naršyklė (js/schema-render.js); DI tik skaito ir tikrina. Modelis: ANTHROPIC_MODEL_SCHEMA (numatytas stipresnis).
+// ---------------------------------------------------------------------
+const SCHEMA_MODEL_DEFAULT = 'claude-opus-5-5';
+const SYMBOL_TYPES = ['valve', 'check_valve', 'strainer', 'pump', 'pressure_gauge', 'thermometer', 'temp_sleeve', 'temp_sensor', 'sr_sensor', 'motor_valve', 'regulator', 'drain_valve', 'safety_valve', 'flange', 'flowmeter', 'pipe_break', 'boundary_mark'];
+
+const EXTRACT_SYSTEM = `Tu esi šilumos punktų principinių schemų skaitytojas. Gausi schemos (spausdinto brėžinio) vaizdą. Reikia ją „perskaityti“ į struktūrą, iš kurios programa nubraižys švarią kopiją. Schemos NEPIEŠK – tik aprašyk, ką matai.
+
+KOORDINATĖS: visos normalizuotos 0–1000 abiem ašims pagal VISĄ vaizdą (x – į dešinę, y – žemyn; (0,0) – kairysis viršutinis kampas). Vaizdas jau ištiesintas. aspect = vaizdo aukštis / plotis.
+
+KĄ APRAŠYTI:
+- pipes (vamzdžiai): kiekvienas nepertraukiamas vamzdis kaip ortogonali laužtė p=[[x,y],…] (tik horizontalūs ir vertikalūs atkarpos), n = pavadinimas (T1, T2, T3, T4, V1, T11, T21…), jei yra. c=1 – valdymo kabeliai (ploni pilki punktyriniai).
+- junctions: taškai, kur vamzdžiai sujungti (juoda dėmė). crossings: kur vamzdžiai kertasi BE sujungimo.
+- boxes: šilumokaičiai (k="exchanger"), išsiplėtimo indai (k="vessel", t = užrašas), skaitikliai ir kitos dėžės (k="box", t = užrašo eilutės), punktyriniai rėmai su pavadinimu, pvz. „ĮVADAS SU APSKAITA“ (k="region", t=[pavadinimas]). x,y – kairysis viršutinis kampas, w,h – matmenys.
+- symbols: įrenginiai ant vamzdžių, tipai TIK iš sąrašo: ${SYMBOL_TYPES.join(', ')}. x,y – simbolio centras ant vamzdžio. v=1, jei vamzdis vertikalus. s="u" jei prietaisas (manometras, termometras, drenažas, jutiklis) eina į viršų nuo vamzdžio, "d" – į apačią. dn – skersmuo (DN50, DN15…), kvs – Kvs reikšmė (pvz. "Kvs 8"), tx – užrašas (pvz. "10 bar"). r=-1 jei siurblio ar atbulinio vožtuvo kryptis į kairę.
+- labels: juodi užrašai (pvz. „Iš šilumos tinklų T1“, „Į šildymo sistemą T11 Ø66×1,5“, matmenys), t=tekstas, z=šrifto dydis (11–22), a="s" (pradžia) / "m" (centras) / "e" (pabaiga). r=1 jei užrašas RAUDONAS (DN ir Ds žymenys prie vamzdžių).
+- positions: dideli raudoni pozicijų numeriai (1, 2, 12.1, S2, 4.1…) – t=numeris, x,y – centras.
+- title_block: spaudo duomenys (object, document, client, code, sheet), jei yra.
+
+TAISYKLĖS:
+- IGNORUOK antspaudus, parašus, ranka rašytus įrašus, datas, „Suderinta“ žymas.
+- Nespėliok: jei simbolio ar užrašo neįskaitai – praleisk. Neišgalvok žymenų.
+- Koordinates rašyk kuo tiksliau (±5 vienetų). Vienodame lygyje esančius horizontalius vamzdžius laikyk tame pačiame y.
+- Kiekvieną simbolį deda ant vamzdžio linijos (jo x,y turi būti ant to vamzdžio).
+Rezultatą pateik per įrankį „pateikti_modeli“.`;
+
+const VERIFY_SYSTEM = `Tu tikrinai schemos perbraižymą. Gausi: (1) ORIGINALIĄ schemą, (2) programos nubraižytą jos kopiją ir (3) kopijos JSON aprašą su elementų id. Palygink ir pateik pataisas, kad kopija atitiktų originalą: trūkstami elementai (op="add"), nereikalingi (op="remove"), neteisingai išdėstyti ar netinkamo tipo (op="move"/"change" su patch).
+Koordinatės tos pačios kaip JSON (normalizuotos 0–1000). kind: symbols | pipes | labels | positions | boxes | junctions | crossings. Elementų forma kaip JSON (symbols: type,x,y,dir ("h"/"v"),side ("up"/"down"),dn,kvs,text,d; labels: x,y,text,size,anchor ("start"/"middle"/"end"),color ("red"/"black"); positions: x,y,text; pipes: pts=[[x,y]…]; boxes: kind,x,y,w,h,text).
+Taisyk tik tai, kas tikrai neatitinka (trūksta įrenginio, neteisinga DN / numerio reikšmė, pasislinkęs daugiau nei ~15 vienetų, trūksta vamzdžio). Smulkių skirtumų ignoruok. Ranka rašytų įrašų ir antspaudų nekopijuok. Jei kopija jau tinkama – grąžink tuščią corrections ir done=true.
+Rezultatą pateik per įrankį „pateikti_pataisas“.`;
+
+const imgBlock = (p: any) => {
+  if (p && typeof p.url === 'string' && /^https:\/\//.test(p.url)) return { type: 'image', source: { type: 'url', url: p.url } };
+  if (p && typeof p.data === 'string') {
+    const m = /^data:(image\/(?:png|jpeg));base64,([A-Za-z0-9+/=]+)$/.exec(p.data);
+    if (m && m[2].length < 9_000_000) return { type: 'image', source: { type: 'base64', media_type: m[1], data: m[2] } };
+  }
+  return null;
+};
+
+async function callClaude(apiKey: string, body: unknown) {
+  for (let attempt = 0; attempt < 2; attempt++) {
+    const r = await fetch('https://api.anthropic.com/v1/messages', { method: 'POST', headers: { 'content-type': 'application/json', 'x-api-key': apiKey, 'anthropic-version': '2023-06-01' }, body: JSON.stringify(body) });
+    const d = await r.json().catch(() => ({}));
+    if (r.ok) return d;
+    if ((r.status === 429 || r.status === 529) && attempt === 0) { await new Promise(res => setTimeout(res, 2500)); continue; }
+    throw new Error(`Claude API klaida (${r.status}): ${(d && d.error && d.error.message) || r.statusText}`);
+  }
+  throw new Error('Claude API nepasiekiamas.');
+}
+
+const nz = (v: unknown, a = 0, b = 1000) => Math.min(b, Math.max(a, Number(v) || 0));
+const pt = (q: any) => [nz(q && q[0]), nz(q && q[1])];
+
+/** Trumpų raktų atsakymas → pilnas modelis (js/schema-render.js formatas). */
+function expandModel(raw: any) {
+  const a = (k: string) => (Array.isArray(raw && raw[k]) ? raw[k] : []).filter((x: any) => x && typeof x === 'object' || Array.isArray(x));
+  let k = 0;
+  const id = (c: string) => c + (++k);
+  return {
+    title: str(raw && raw.title, 200), aspect: nz(raw && raw.aspect, 0.4, 1.2) || 0.707,
+    pipes: a('pipes').slice(0, 200).map((p: any) => ({ id: id('p'), name: str(p.n, 20), style: p.c ? 'control' : 'solid', pts: (Array.isArray(p.p) ? p.p : []).slice(0, 60).map(pt) })).filter((p: any) => p.pts.length >= 2),
+    junctions: a('junctions').slice(0, 300).map((q: any) => ({ id: id('j'), x: nz(q[0] ?? q.x), y: nz(q[1] ?? q.y) })),
+    crossings: a('crossings').slice(0, 100).map((q: any) => ({ id: id('c'), x: nz(q[0] ?? q.x), y: nz(q[1] ?? q.y) })),
+    boxes: a('boxes').slice(0, 60).map((b: any) => ({ id: id('b'), kind: ['exchanger', 'box', 'vessel', 'region'].includes(b.k) ? b.k : 'box', x: nz(b.x), y: nz(b.y), w: nz(b.w), h: nz(b.h), text: (Array.isArray(b.t) ? b.t : b.t ? [b.t] : []).slice(0, 6).map((s: unknown) => str(s, 60)) })),
+    symbols: a('symbols').slice(0, 400).filter((s: any) => SYMBOL_TYPES.includes(s.t)).map((s: any) => ({ id: id('s'), type: s.t, x: nz(s.x), y: nz(s.y), dir: s.v ? 'v' : 'h', side: s.s === 'd' ? 'down' : s.s === 'u' ? 'up' : undefined, dn: str(s.dn, 20), kvs: str(s.kvs, 20), text: str(s.tx, 20), d: s.r === -1 ? -1 : 1 })),
+    labels: a('labels').slice(0, 400).map((l: any) => ({ id: id('l'), x: nz(l.x), y: nz(l.y), text: str(l.t, 120), size: nz(l.z || 15, 9, 40), anchor: l.a === 's' ? 'start' : l.a === 'e' ? 'end' : 'middle', color: l.r ? 'red' : 'black' })),
+    positions: a('positions').slice(0, 120).map((p: any) => ({ id: id('n'), x: nz(p.x), y: nz(p.y), text: str(p.t, 12) })),
+    title_block: raw && raw.title_block && typeof raw.title_block === 'object' ? { object: str(raw.title_block.object, 160), document: str(raw.title_block.document, 80), client: str(raw.title_block.client, 100), code: str(raw.title_block.code, 80), sheet: str(raw.title_block.sheet, 60) } : null
+  };
+}
+
+function buildExtract(payload: any, model: string) {
+  const tool = {
+    name: 'pateikti_modeli', description: 'Pateikia perskaitytą schemą struktūruota forma.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        readable: { type: 'string', enum: ['gera', 'dalinai', 'neiskaitoma'] }, comment: { type: 'string' },
+        title: { type: 'string' }, aspect: { type: 'number' },
+        pipes: { type: 'array', items: { type: 'object' } }, junctions: { type: 'array', items: { type: 'array', items: { type: 'number' } } },
+        crossings: { type: 'array', items: { type: 'array', items: { type: 'number' } } }, boxes: { type: 'array', items: { type: 'object' } },
+        symbols: { type: 'array', items: { type: 'object' } }, labels: { type: 'array', items: { type: 'object' } },
+        positions: { type: 'array', items: { type: 'object' } }, title_block: { type: 'object' }
+      },
+      required: ['readable', 'comment', 'aspect', 'pipes', 'symbols', 'labels', 'positions']
+    }
+  };
+  const content: any[] = [];
+  const im = imgBlock((payload.photos || [])[0]);
+  if (!im) throw new Error('Nėra schemos nuotraukos.');
+  let text = '';
+  if (payload.aspect) text += `Vaizdo aukštis/plotis = ${Number(payload.aspect).toFixed(3)}.\n`;
+  if (payload.sp_type) text += `Šilumos punktas: ${str(payload.sp_type, 200)}\n`;
+  if (payload.address) text += `Pastatas: ${str(payload.address, 150)}\n`;
+  content.push({ type: 'text', text: text || 'Schemos vaizdas:' }, im, { type: 'text', text: 'Perskaityk schemą ir pateik per įrankį „pateikti_modeli“.' });
+  return { tool, body: { model, max_tokens: 16000, system: EXTRACT_SYSTEM, tools: [tool], tool_choice: { type: 'tool', name: 'pateikti_modeli' }, messages: [{ role: 'user', content }] } };
+}
+
+function buildVerify(payload: any, model: string) {
+  const tool = {
+    name: 'pateikti_pataisas', description: 'Pateikia pataisas perbraižytai schemai.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        done: { type: 'boolean' }, comment: { type: 'string' },
+        corrections: { type: 'array', items: { type: 'object', properties: {
+          op: { type: 'string', enum: ['add', 'remove', 'move', 'change'] },
+          kind: { type: 'string', enum: ['symbols', 'pipes', 'labels', 'positions', 'boxes', 'junctions', 'crossings'] },
+          id: { type: 'string' }, item: { type: 'object' }, patch: { type: 'object' }
+        }, required: ['op', 'kind'] } }
+      },
+      required: ['done', 'corrections']
+    }
+  };
+  const orig = imgBlock((payload.photos || [])[0]), draw = imgBlock(payload.render);
+  if (!orig || !draw) throw new Error('Trūksta originalo ar atvaizdo.');
+  const content: any[] = [
+    { type: 'text', text: 'ORIGINALAS:' }, orig, { type: 'text', text: 'PROGRAMOS NUBRAIŽYTA KOPIJA:' }, draw,
+    { type: 'text', text: 'KOPIJOS JSON:\n' + JSON.stringify(payload.model || {}).slice(0, 60000) + '\n\nPateik pataisas per įrankį „pateikti_pataisas“.' }
+  ];
+  return { tool, body: { model, max_tokens: 8000, system: VERIFY_SYSTEM, tools: [tool], tool_choice: { type: 'tool', name: 'pateikti_pataisas' }, messages: [{ role: 'user', content }] } };
+}
+
 Deno.serve(async (req: Request) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: CORS });
   if (req.method !== 'POST') return json({ error: 'Tik POST' }, 405);
@@ -183,6 +308,21 @@ Deno.serve(async (req: Request) => {
   if (!apiKey) return json({ error: 'Serveryje nenustatytas ANTHROPIC_API_KEY' }, 500);
   try {
     const { payload } = await req.json();
+    if (payload && (payload.mode === 'extract' || payload.mode === 'verify')) {
+      const model = Deno.env.get('ANTHROPIC_MODEL_SCHEMA') || SCHEMA_MODEL_DEFAULT;
+      const d = payload.mode === 'extract' ? buildExtract(payload, model) : buildVerify(payload, model);
+      const dd: any = await callClaude(apiKey, d.body);
+      if (dd.stop_reason === 'refusal') throw new Error('DI atsisakė apdoroti šią nuotrauką.');
+      const u = (dd.content || []).find((b: any) => b.type === 'tool_use' && b.name === d.tool.name);
+      if (!u || !u.input) throw new Error('DI negrąžino atsakymo (' + (dd.stop_reason || 'nežinoma priežastis') + '). Bandykite dar kartą.');
+      const raw: any = u.input;
+      const usage = { ...(dd.usage || {}), model: dd.model || model };
+      if (payload.mode === 'extract') {
+        return json({ readable: ['gera', 'dalinai', 'neiskaitoma'].includes(raw.readable) ? raw.readable : 'dalinai', comment: str(raw.comment, 400), model: expandModel(raw), truncated: dd.stop_reason === 'max_tokens', usage });
+      }
+      const corr = (Array.isArray(raw.corrections) ? raw.corrections : []).slice(0, 60).filter((c: any) => c && ['add', 'remove', 'move', 'change'].includes(c.op));
+      return json({ done: !!raw.done || !corr.length, comment: str(raw.comment, 400), corrections: corr, usage });
+    }
     if (payload && payload.mode === 'scan') {
       const d = buildScan(payload, Deno.env.get('ANTHROPIC_MODEL') || MODEL_DEFAULT);
       const call = (b: unknown) => fetch('https://api.anthropic.com/v1/messages', { method: 'POST', headers: { 'content-type': 'application/json', 'x-api-key': apiKey, 'anthropic-version': '2023-06-01' }, body: JSON.stringify(b) });
