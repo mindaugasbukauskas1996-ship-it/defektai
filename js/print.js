@@ -6,6 +6,8 @@
 import * as db from './data.js';
 import { icon } from './icons.js';
 import { $$, esc, nl2br, fmtDate, fmtQty, toast, parseQty, debounce } from './util.js';
+import { initPrintMargins } from './print-margins.js';
+initPrintMargins();
 
 export async function renderPrint(el, id, doc) {
   el.innerHTML = `<div class="loading">Ruošiamas dokumentas...</div>`;
