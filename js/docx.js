@@ -56,9 +56,18 @@ export async function exportDocx({ t, s, doc, figs, refPhotos = {} }) {
   async function signBlock(rows, posNote, totalW = W) {
     const sigCache = s.signature ? await dataUrlBytes(s.signature).catch(() => null) : null;
     const out = [];
-    const cw = [Math.round(totalW * 0.42), Math.round(totalW * 0.22), Math.round(totalW * 0.36)];
+    const cw = [Math.round(totalW * 0.4), Math.round(totalW * 0.26), Math.round(totalW * 0.34)];
+    // parašas didesnis; santykis pagal tikrą paveikslėlį (ne iškreipiamas)
+    let sw = 150, sh = 60;
+    if (sigCache) {
+      try {
+        const bmp = await createImageBitmap(new Blob([sigCache]));
+        const k = Math.min(160 / bmp.width, 70 / bmp.height);
+        sw = Math.max(40, Math.round(bmp.width * k)); sh = Math.max(16, Math.round(bmp.height * k));
+      } catch (_) { /* paliekami numatyti matmenys */ }
+    }
     const mk = async r => {
-      const sig = r.sig && sigCache ? [new Paragraph({ alignment: AlignmentType.CENTER, children: [new ImageRun({ data: sigCache, transformation: { width: 110, height: 44 }, type: 'png' })] })] : [P('', { after: 0 })];
+      const sig = r.sig && sigCache ? [new Paragraph({ alignment: AlignmentType.CENTER, children: [new ImageRun({ data: sigCache, transformation: { width: sw, height: sh }, type: 'png' })] })] : [P('', { after: 0 })];
       return [
         row([cell([P(r.position || ' ', { align: AlignmentType.CENTER, after: 0 })], { w: cw[0], borders: BOTTOM, v: VerticalAlign.BOTTOM }),
           cell(sig, { w: cw[1], borders: BOTTOM, v: VerticalAlign.BOTTOM }),

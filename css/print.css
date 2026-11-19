@@ -51,9 +51,10 @@ table { border-collapse: collapse; width: 100%; }
 .attach { margin: 3mm 0 5mm; }
 
 .signs { margin-top: 5mm; display: flex; flex-direction: column; gap: 3.5mm; break-inside: avoid; page-break-inside: avoid; }
-.sign-row { display: grid; grid-template-columns: 2.4fr 1fr 1.8fr; gap: 6mm; }
+.sign-row { display: grid; grid-template-columns: 2.2fr 1.4fr 1.8fr; gap: 6mm; align-items: end; }   /* end – kad visų trijų langelių linijos būtų vienoje aukštyje, o didesnis parašas „sėdėtų“ ant linijos */
 .sign-val { border-bottom: 1px solid #000; min-height: 7mm; display: flex; align-items: flex-end; justify-content: center; text-align: center; padding-bottom: 1px; }
-.sig { max-height: 16mm; max-width: 40mm; }
+.sig { max-height: 24mm; max-width: 100%; }
+.sheet-annual .sig { max-height: 26mm; }
 
 h2.up { text-transform: uppercase; text-align: center; font-size: 13pt; margin: 2mm 0 6mm; }
 .kvs { display: flex; flex-direction: column; gap: 2.5mm; margin-bottom: 6mm; }
