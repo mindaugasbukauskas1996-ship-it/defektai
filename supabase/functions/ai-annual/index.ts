@@ -45,6 +45,7 @@ const SYSTEM = `Tu esi patyręs daugiabučių gyvenamųjų namų techninės prie
 
 Gausi apžiūros elementų sąrašą (sienos, stogas, cokolis ir t. t.). Kiekvienam elementui, kuriame inžinierius nurodė defektų („yra defektų“), parašyk du SKIRTUS laukus:
 • defects – pastebėti defektai: ką matoma, jų mastas ir vieta (apie 2–4 trumpi sakiniai, be taisymo technologijų). Jokių nuorodų į paveikslėlius („žr. 3 pav.“) ir be žodžio „Pastaba:“.• rec – rekomendacijos: TRUMPAI, 1–2 sakiniai, tik KĄ daryti (pvz. „Užtaisyti įtrūkimus, nudažyti sienas. Stebėti, ar įtrūkimai plečiasi.“). NEAPRAŠYK technologijų, medžiagų, darbų eigos ir kaip taisyti. Negali būti ilgesnė nei ~200 simbolių.
+- NUOTRAUKOS YRA PAGRINDINIS ŠALTINIS. Prie elemento nurodytas nuotraukas (jų numeriai pateikti prie elemento, pačios nuotraukos – žemiau su ta pačia numeracija) PRIVALAI atidžiai apžiūrėti ir defects lauke aprašyti, ką jose matyti: pažeidimo rūšį (įtrūkimai, atšokęs tinkas ar dažai, drėgmės pėdsakai, pelėsis, korozija, išdaužyti ar nusilaupę elementai, deformacijos, nešvara ir pan.), jo vietą ir mastą (nedidelis / vietomis / dideliame plote). Ant nuotraukų gali būti raudonų žymėjimų – jie rodo, kur yra defektas. Inžinieriaus pastaba gali būti trumpa ar jos gali nebūti – tada defektus aprašyk tik iš nuotraukų. Jei pastaba ir nuotrauka papildo viena kitą, sujunk. Jei nuotraukoje matyti reikšmingas defektas, nepaminėtas pastaboje, įtrauk jį ir parašyk apie tai lauke assumptions („Nuotraukoje N matyti ..., pastaboje nenurodyta – patikrinti“). Jei nuotrauka neryški ar nieko aiškaus neparodo, taip pat parašyk assumptions.
 - Nenurodyk to, ko nėra inžinieriaus pastabose, nuotraukose ar praėjusių metų akte. Inžinieriaus pastaba gali būti ilga (perkelta iš defektų akto) – ją sutrumpink ir sutvarkyk.
 - Rašyk taisyklinga dalykine lietuvių kalba, trumpais techniniais sakiniais. Jokių kreipinių.
 - NIEKUR nenurodyk STR ar kitų norminių dokumentų punktų ir nuorodų (nei elementų tekstuose, nei rekomendacijose, nei išvadose).
@@ -119,7 +120,8 @@ function buildRequest(payload: any, model: string) {
     text += `\n[id=${it.id}] ${it.no} ${it.name}\n  būsena: ${it.status === 'defects' ? 'YRA DEFEKTŲ' : 'defektų nėra'}\n`;
     if (it.brief) text += `  inžinieriaus pastabos: ${it.brief}\n`;
     if (it.prev) text += `  pernai: ${String(it.prev).slice(0, 900)}\n`;
-    if ((it.photos || []).length) text += `  nuotraukos: ${it.photos.join(', ')}\n`;
+    if ((it.photos || []).length) text += `  nuotraukos (APŽIŪRĖK IR APRAŠYK, KĄ MATYTI): ${it.photos.join(', ')}\n`;
+    else if (it.status === 'defects') text += '  nuotraukų nėra\n';
   }
   if (payload.instruction) text += `\nINŽINIERIAUS NURODYMAS (pataisymui): ${payload.instruction}\nDabartinės išvados: ${JSON.stringify(payload.conclusions || [])}\n`;
   content.push({ type: 'text', text });
