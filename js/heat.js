@@ -348,7 +348,7 @@ async function renderPoint(el, id, stepId, me, go) {
     const lab = `<div class="hp-ql">${esc(q.label)}${q.req ? ' <span class="hp-req">*</span>' : ''}${q.unit ? ` <span class="muted small">(${esc(q.unit)})</span>` : ''}${q.office ? ' <span class="tag">pildo biuras</span>' : ''}</div>${q.hint ? `<div class="muted small">${esc(q.hint)}</div>` : ''}`;
     if (q.type === 'one' || q.type === 'many') {
       const on = x => q.type === 'many' ? (v || []).includes(x) : v === x;
-      return `<div class="hp-q">${lab}<div class="hp-opts">${q.options.map(o => Array.isArray(o) ? o : [o, o]).map(([val, l]) =>
+      return `<div class="hp-q">${lab}<div class="hp-opts">${q.options.map(o => Array.isArray(o) ? o : [o, o]).filter(([val]) => val !== 'nezinau' || on(val)).map(([val, l]) =>
         `<button type="button" class="hp-opt${on(val) ? ' on' : ''}" data-q="${q.key}" data-v="${esc(val)}"${q.type === 'many' ? ' data-many="1"' : ''}>${esc(l)}</button>`).join('')}</div></div>`;
     }
     if (q.type === 'area') return `<div class="hp-q">${lab}<textarea data-qi="${q.key}" rows="3" placeholder="${esc(q.ph || '')}">${esc(v || '')}</textarea></div>`;

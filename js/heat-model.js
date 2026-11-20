@@ -51,8 +51,8 @@ export const QUESTIONS = {
   ],
   namas: [
     { head: 'Šildymo sistema name' },
-    { key: 'sildymo_tipas', office: true, label: 'Šildymo sistemos tipas', type: 'one', options: [['vienvamzde', 'Vienvamzdė'], ['dvivamzde', 'Dvivamzdė'], ['kolektorine', 'Kolektorinė'], ['nezinau', 'Nežinau']] },
-    { key: 'paskirstymas', office: true, label: 'Šilumnešio paskirstymas', type: 'one', options: [['apatinis', 'Apatinis'], ['virsutinis', 'Viršutinis'], ['nezinau', 'Nežinau']] },
+    { key: 'sildymo_tipas', label: 'Šildymo sistemos tipas', type: 'one', options: [['vienvamzde', 'Vienvamzdė'], ['dvivamzde', 'Dvivamzdė'], ['kolektorine', 'Kolektorinė'], ['nezinau', 'Nežinau']] },
+    { key: 'paskirstymas', label: 'Šilumnešio paskirstymas', type: 'one', options: [['apatinis', 'Apatinis'], ['virsutinis', 'Viršutinis'], ['nezinau', 'Nežinau']] },
     { key: 'magistraliu_vieta', label: 'Kur išvedžiotos magistralės?', type: 'many', options: ['Rūsyje', 'Palėpėje', 'Techniniame koridoriuje'] },
     { key: 'stovu_vieta', label: 'Kur yra stovai?', type: 'many', options: ['Butuose', 'Laiptinėse', 'Šachtose'] },
     { key: 'nuorinimas', office: true, label: 'Kaip šalinamas oras?', type: 'many', options: ['Nuorinimo čiaupai viršutinio aukšto prietaisuose', 'Automatiniai nuorintojai'] },
