@@ -83,8 +83,8 @@ export const OFFICE = [
     { k: 'butai', l: 'Butų skaičius', pre: c => c.obj.apartments },
     { k: 'pastato_aukstis', l: 'Pastato aukštis', u: 'm', pre: c => fl(c) ? String(Math.round(fl(c) * 2.6 * 10) / 10).replace('.', ',') : '', hint: c => fl(c) ? `Skaičiuojama automatiškai: ${fl(c)} aukšt. × 2,6 m (jei reikia kitaip – įrašykite ranka)` : '' },
     { k: 'lubu_aukstis', l: 'Patalpų lubų aukštis (vyraujantis)', u: 'm', common: true },
-    { k: 'sildomas_plotas', l: 'Bendras šildomų patalpų plotas', u: 'm²', req: true, hint: c => c.obj.usable_area ? `registre naudingas plotas ${c.obj.usable_area} m²` : '' },
-    { k: 'turis', l: 'Pastato tūris', u: 'm³', req: true },
+    { k: 'sildomas_plotas', l: 'Bendras šildomų patalpų plotas', u: 'm²', req: true, pre: c => c.obj.usable_area ? String(Math.round(Number(c.obj.usable_area) * 100) / 100).replace('.', ',') : '', hint: c => c.obj.usable_area ? `paimta iš registro (naudingas plotas ${c.obj.usable_area} m²)` : '' },
+    { k: 'turis', l: 'Pastato tūris', u: 'm³', req: true, pre: c => c.obj.volume ? String(Math.round(Number(c.obj.volume))) : '' },
     { k: 'valdytojas', l: 'Bendrojo naudojimo objektų valdytojas', span: 2, pre: c => c.valdytojas }] },
   { title: '1.4 ir 2.2. Sistema', fields: [
     { k: 'montuotojas', l: 'ŠP sumontavusi įmonė (pavadinimas, buveinė)', span: 2, pre: c => c.s.montuotojas },
