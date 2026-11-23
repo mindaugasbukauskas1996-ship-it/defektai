@@ -77,7 +77,7 @@ export const OFFICE = [
     { k: 'op_dok', l: 'ŠP operatoriaus kvalifikacijos dokumentas (Nr., kas išdavė, galioja iki)', span: 2 },
     { k: 'op_tel', l: 'ŠP operatoriaus telefonas' }] },
   { title: '1.1. Pastatas', fields: [
-    { k: 'unikalus_nr', l: 'Unikalus numeris', req: true, ph: '0000-0000-0000' },
+    { k: 'unikalus_nr', l: 'Unikalus numeris', req: true, ph: '0000-0000-0000', pre: c => c.obj.unique_no },
     { k: 'statybos_metai', l: 'Statybos metai', pre: c => c.obj.built_year },
     { k: 'aukstai', l: 'Aukštų skaičius', pre: c => c.obj.floors },
     { k: 'butai', l: 'Butų skaičius', pre: c => c.obj.apartments },
