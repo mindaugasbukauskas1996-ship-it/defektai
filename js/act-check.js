@@ -61,9 +61,22 @@ export async function checkAct(kind, t, photos = []) {
         if (!R.norms.has(norm)) out.push({ level: 'err', where: name, text: `norma „${norm}“ nėra STR žinyne – patikrinkite` });
         else if (pt && !R.pts.has(norm + '|' + pt)) out.push({ level: 'err', where: name, text: `punkto „${norm} ${pt} p.“ nėra žinyne – gali būti išgalvotas` });
       }
-      if (kind === 'defect' && !any) out.push({ level: 'warn', where: name, text: 'nėra STR pagrindo skliaustuose' });
+      void any;           // defektų akte STR nuorodos rašomos išvadoje (žr. žemiau), ne prie objekto
     }
   });
+  // defektų akte teisinis pagrindas – išvadoje: tikrinamos ten esančios nuorodos
+  if (kind === 'defect' && R.pts.size) {
+    const sum = String((t.defect_act || {}).summary || '');
+    let m, any = false;
+    CITE.lastIndex = 0;
+    while ((m = CITE.exec(sum))) {
+      any = true;
+      const norm = m[1].replace(/\s+/, ' '), pt = (m[2] || '').replace(/\.$/, '');
+      if (!R.norms.has(norm)) out.push({ level: 'err', where: 'Išvada', text: `norma „${norm}“ nėra STR žinyne – patikrinkite` });
+      else if (pt && !R.pts.has(norm + '|' + pt)) out.push({ level: 'err', where: 'Išvada', text: `punkto „${norm} ${pt} p.“ nėra žinyne – gali būti išgalvotas` });
+    }
+    if (!any && !objs.some(o => /\bSTR\s/.test(o.defects || ''))) out.push({ level: 'warn', where: 'Išvada', text: 'išvadoje nėra STR pagrindo („Teisinis pagrindas“)' });
+  }
   if (objs.length >= 3) {
     const top = Object.entries(seenCite).sort((a, b) => b[1] - a[1])[0];
     if (top && top[1] === objs.length) out.push({ level: 'info', text: `Visur ta pati nuoroda (${top[0]}) – ar tikrai tinka kiekvienam objektui?` });

@@ -16,6 +16,7 @@ import { bindDictation } from './dictate.js';
 import { checkAct, diffAct } from './act-check.js';
 import { drawAnnualInspection, drawAnnualActTab } from './annual.js';
 import { calendarButtons, bindCalendarButtons } from './calendar.js';
+import { moveStrToSummary, hasStrInObjects } from './str-move.js';
 
 const UNITS = ['Vnt.', 'm', 'm²', 'm³', 'Komplektas', 'val.', 'kg', 'T', 'Ltr', 'cm', 'para',
   'Kalendorinė diena', 'kWh', 'Suma (€)', 'Objektų skaičius', 'Butų skaičius', 'Patalpų skaičius', 'metras ir diena'];
@@ -733,10 +734,10 @@ async function ensureActNumber(patch) {
 }
 
 function normalizeDefect(d) {
-  return {
+  return moveStrToSummary({
     purpose: d.purpose || '', problem: d.problem || '', urgency: d.urgency || 'Planinis', summary: d.summary || '',
     objects: (d.objects || []).map(o => ({ system: o.system || '', defects: o.defects || '', works: o.works || '', photos: o.photos || [] }))
-  };
+  });
 }
 
 function normalizeWorks(w) {
@@ -796,7 +797,8 @@ function drawActEditor() {
           </div>`).join('')}
       </div>
       <button class="btn small" data-act="add-obj">${icon('plus')} Pridėti objektą</button>
-      <label class="block-lbl">Išvada / santrauka${ta(d.summary, 'data-d="summary"', 2)}</label>
+      <label class="block-lbl">Išvada / santrauka (čia ir teisinis pagrindas – STR nuorodos)${ta(d.summary, 'data-d="summary"', 6)}</label>
+      ${hasStrInObjects(d) ? `<button class="btn small" type="button" data-act="str-move" title="STR nuorodos objektų tekstuose perkeliamos į išvadą">Perkelti STR nuorodas į išvadą</button>` : ''}
     </div>
 
     ${w ? `
@@ -982,6 +984,7 @@ function bindActEditor(body) {
     const t = S.task;
     const a = b.dataset.act;
     if (a === 'add-obj') t.defect_act.objects.push({ system: '', defects: '', works: '', photos: [] });
+    else if (a === 'str-move') { moveStrToSummary(t.defect_act); toast('STR nuorodos perkeltos į išvadą', 'ok'); }
     else if (a === 'del-obj') {
       if (!await confirmDialog('Pašalinti šį objektą iš akto?', 'Pašalinti')) return;
       t.defect_act.objects.splice(+b.closest('[data-oi]').dataset.oi, 1);

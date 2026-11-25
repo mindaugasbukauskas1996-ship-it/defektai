@@ -124,7 +124,7 @@ Rašymo taisyklės:
 - Rekomenduojamuose darbuose nurodyk konkrečius veiksmus, eiliškumą ir, jei svarbu, skubumą (pvz., „Nedelsiant atjungti ir apžiūrėti...“).
 
 Pagrindas pagal STR (privaloma):
-- Defektavimo aktas turi būti paremtas STR. Kiekvieno objekto lauko defects PABAIGOJE parašyk teisinį pagrindą skliaustuose: norma, punktas ir trumpa reikšmė iš žinyno, pvz. „(STR 1.07.03:2017 13.5 p. – atitvarų siūlėse neturi atsirasti plyšių ir apsauginių sluoksnių pažeidimų; STR 2.01.01(1):2005)“. Pasirink 1–3 tinkamiausias nuorodas iš žemiau pateikto STR žinyno pagal apžiūrėtą sistemą.
+- Defektavimo aktas turi būti paremtas STR, bet STR nuorodų NEDĖK objektų laukuose defects ir works (ten – tik faktai ir darbai, be skliaustuose rašomų nuorodų). Visą teisinį pagrindą surink į lauką summary: jo PABAIGOJE nauja pastraipa „Teisinis pagrindas: …“, kurioje išvardyk visas panaudotas nuorodas vieną kartą (be pasikartojimų): norma, punktas ir trumpa reikšmė iš žinyno, atskirtos kabliataškiais, pvz. „Teisinis pagrindas: STR 1.07.03:2017 13.5 p. – atitvarų siūlėse neturi atsirasti plyšių ir apsauginių sluoksnių pažeidimų; STR 2.01.01(1):2005.“. Pasirink tinkamiausias nuorodas iš žemiau pateikto STR žinyno pagal apžiūrėtas sistemas.
 - Nuorodas ir jų reikšmes imk TIK iš žinyno. Jei reikalingos normos žinyne nėra arba nesi tikras dėl punkto – parašyk tik žinyne esančią žymą be punkto arba nieko, ir įrašyk į assumptions pastabą „Patikrinti STR pagrindą: <objektas>“.
 - Nuorodos neturi keisti defektų aprašymo turinio – tai tik pagrindas; neišgalvok faktų, kad „pritaikytum“ normą.
 - Jei pažeidimas mažina pastato saugą, atsparumą ar higieną, summary pabaigoje trumpai nurodyk, kurį esminį reikalavimą (STR 2.01.01(n)) tai liečia.
@@ -201,7 +201,7 @@ const ACT_TOOL = {
             }
           },
           urgency: { type: 'string', enum: ['Avarinis', 'Skubus', 'Planinis'], description: 'Darbų skubumas.' },
-          summary: { type: 'string', description: 'Trumpa išvada 1–3 sakiniai: kas nustatyta ir kas rekomenduojama.' }
+          summary: { type: 'string', description: 'Išvada: 1–3 sakiniai (kas nustatyta ir kas rekomenduojama), o po jų nauja pastraipa „Teisinis pagrindas: …“ su visomis STR nuorodomis (be pasikartojimų).' }
         },
         required: ['purpose', 'problem', 'objects', 'urgency', 'summary']
       },
